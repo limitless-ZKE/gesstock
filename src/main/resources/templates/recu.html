@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Reçu de Vente #<span th:text="${vente.id}">1</span></title>
+    <style>
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            width: 80mm;
+            margin: 0 auto;
+            padding: 10px;
+            color: #000;
+        }
+        .text-center {
+            text-align: center;
+        }
+        .header h2 {
+            margin: 0;
+            font-size: 18px;
+            text-transform: uppercase;
+        }
+        .header p {
+            margin: 3px 0;
+            font-size: 12px;
+        }
+        .divider {
+            border-top: 1px dashed #000;
+            margin: 10px 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            font-size: 11px;
+            padding: 3px 0;
+        }
+        th {
+            border-bottom: 1px solid #000;
+            text-align: left;
+        }
+        .text-right {
+            text-align: right;
+        }
+        .total-box {
+            margin-top: 10px;
+            font-size: 13px;
+            font-weight: bold;
+        }
+        .footer {
+            margin-top: 20px;
+            font-size: 11px;
+        }
+        .no-print {
+            margin-top: 15px;
+            text-align: center;
+        }
+        button {
+            padding: 8px 15px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        @media print {
+            .no-print {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header text-center">
+        <h2>GesStock 3.0</h2>
+        <p>Gestion de Stock & Ventes</p>
+        <p>Reçu N° : <strong th:text="${vente.id}">1</strong></p>
+        <p>Date : <span th:text="${#temporals.format(vente.dateVente, 'dd/MM/yyyy HH:mm')}">03/10/2026 09:30</span></p>
+    </div>
+
+    <div class="divider"></div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Désignation</th>
+                <th class="text-center">Qté</th>
+                <th class="text-right">Prix</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr th:each="ligne : ${vente.lignesVente}">
+                <td th:text="${ligne.article.designation}">Article</td>
+                <td class="text-center" th:text="${ligne.quantite}">1</td>
+                <td class="text-right" th:text="${#numbers.formatDecimal(ligne.prixUnitaire * ligne.quantite, 1, 'POINT', 0, 'COMMA')} + ' FCFA'">1 000 FCFA</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="divider"></div>
+
+    <div class="total-box text-right">
+        <span>TOTAL : </span>
+        <span th:text="${#numbers.formatDecimal(vente.totalVente, 1, 'POINT', 0, 'COMMA')} + ' FCFA'">0 FCFA</span>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="footer text-center">
+        <p>Merci pour votre confiance !</p>
+        <p>À bientôt</p>
+    </div>
+
+    <div class="no-print">
+        <button onclick="window.print()">Imprimer le reçu</button>
+    </div>
+
+</body>
+</html>

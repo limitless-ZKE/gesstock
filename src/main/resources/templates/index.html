@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tableau de bord - GesStock</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+</head>
+<body class="bg-light">
+
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
+    <div class="container-fluid">
+        <a class="navbar-brand fw-bold" th:href="@{/}">GesStock</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav me-auto">
+                <li class="nav-item"><a class="nav-link active" th:href="@{/}">Tableau de bord</a></li>
+                <li class="nav-item"><a class="nav-link" th:href="@{/articles}">Gestion des Articles</a></li>
+                <!-- Nouveaux liens ajoutés pour les ventes -->
+                <li class="nav-item"><a class="nav-link text-warning fw-semibold" th:href="@{/ventes/nouveau}">🛒 Effectuer une Vente</a></li>
+                <li class="nav-item"><a class="nav-link" th:href="@{/ventes/historique}">📋 Historique Ventes</a></li>
+            </ul>
+            <form th:action="@{/logout}" method="post" class="d-flex">
+                <button type="submit" class="btn btn-outline-light btn-sm">Déconnexion</button>
+            </form>
+        </div>
+    </div>
+</nav>
+
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-speedometer2"></i> Tableau de Bord</h2>
+        <div>
+            <a th:href="@{/ventes/nouveau}" class="btn btn-success me-2"><i class="bi bi-cart-plus"></i> Nouvelle Vente</a>
+            <a th:href="@{/articles/nouveau}" class="btn btn-primary"><i class="bi bi-plus-circle"></i> Nouvel Article</a>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-6 mb-3">
+            <div class="card text-white bg-primary shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title">Total Articles</h5>
+                    <p class="card-text fs-3 fw-bold" th:text="${articles != null ? articles.size() : 0}">0</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 mb-3">
+            <div class="card text-white bg-danger shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title">En Alerte de Stock (&le; 5)</h5>
+                    <p class="card-text fs-3 fw-bold" th:text="${articlesAlerte != null ? articlesAlerte.size() : 0}">0</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-dark text-white fw-bold">Liste Globale des Articles</div>
+        <div class="card-body p-0">
+            <table class="table table-striped mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>ID</th>
+                        <th>Nom</th>
+                        <th>Prix (FCFA)</th>
+                        <th>Quantité</th>
+                        <th class="text-center">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="art : ${articles}">
+                        <td th:text="${art.id}">1</td>
+                        <td th:text="${art.nom}">Nom</td>
+                        <td th:text="${art.prix}">0</td>
+                        <td th:text="${art.quantite}">0</td>
+                        <td class="text-center">
+                            <a th:href="@{/articles/editer/{id}(id=${art.id})}" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></a>
+                            <a th:href="@{/articles/supprimer/{id}(id=${art.id})}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Supprimer ?')"><i class="bi bi-trash"></i></a>
+                        </td>
+                    </tr>
+                    <tr th:if="${#lists.isEmpty(articles)}">
+                        <td colspan="5" class="text-center text-muted py-3">Aucun article disponible.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

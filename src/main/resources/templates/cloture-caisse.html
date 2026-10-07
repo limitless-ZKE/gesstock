@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GesStock - Clôture de Caisse</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+</head>
+<body class="bg-light">
+
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand fw-bold" href="/">GesStock 3.0</a>
+            <div>
+                <a th:href="@{/}" class="btn btn-outline-light btn-sm me-2">Tableau de Bord</a>
+                <a th:href="@{/statistiques}" class="btn btn-outline-warning btn-sm me-2">📊 Statistiques</a>
+                <a th:href="@{/ventes/historique}" class="btn btn-outline-info btn-sm">📜 Historique</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2>💰 Clôture de Caisse Journalière</h2>
+            <button onclick="window.print()" class="btn btn-outline-primary">🖨️ Imprimer la Clôture</button>
+        </div>
+
+        <!-- Récapitulatif -->
+        <div class="row mb-4">
+            <div class="col-md-4 mb-3">
+                <div class="card bg-white shadow-sm p-3 border-start border-primary border-4">
+                    <span class="text-muted small">Date du jour</span>
+                    <h4 class="mb-0 fw-bold" th:text="${#temporals.format(dateAujourdhui, 'dd/MM/yyyy')}">01/01/2026</h4>
+                </div>
+            </div>
+            <div class="col-md-4 mb-3">
+                <div class="card bg-white shadow-sm p-3 border-start border-info border-4">
+                    <span class="text-muted small">Nombre de Ventes</span>
+                    <h4 class="mb-0 fw-bold" th:text="${nombreVentes}">0</h4>
+                </div>
+            </div>
+            <div class="col-md-4 mb-3">
+                <div class="card bg-success text-white shadow-sm p-3">
+                    <span class="small">Recette Total Espèces</span>
+                    <h3 class="mb-0 fw-bold" th:text="${totalJournee + ' FCFA'}">0 FCFA</h3>
+                </div>
+            </div>
+        </div>
+
+        <!-- Détail des encaissements du jour -->
+        <div class="card shadow-sm">
+            <div class="card-header bg-white py-3">
+                <h5 class="mb-0">Détail des Transactions du Jour</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-striped align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Heure</th>
+                                <th>Article</th>
+                                <th>Quantité</th>
+                                <th>Montant Encaissé</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="vente : ${ventesDuJour}">
+                                <td th:text="${#temporals.format(vente.dateVente, 'HH:mm:ss')}">12:00:00</td>
+                                <td th:text="${vente.article != null ? vente.article.nom : 'Article supprimé'}">Article</td>
+                                <td th:text="${vente.quantite}">1</td>
+                                <td th:text="${vente.prixTotal + ' FCFA'}">0 FCFA</td>
+                            </tr>
+                            <tr th:if="${ventesDuJour == null or #lists.isEmpty(ventesDuJour)}">
+                                <td colspan="4" class="text-center text-muted py-4">Aucune vente enregistrée aujourd'hui.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>
