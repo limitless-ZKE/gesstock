@@ -11,6 +11,7 @@ import ClientsDettesPage from "./pages/ClientsDettesPage";
 import DashboardPage from "./pages/DashboardPage";
 import FournisseursPage from "./pages/FournisseursPage";
 import HomeRedirect from "./components/HomeRedirect";
+import InventairesPage from "./pages/InventairesPage";
 import LoginPage from "./pages/LoginPage";
 import StatistiquesPage from "./pages/StatistiquesPage";
 import VentesHistoriquePage from "./pages/VentesHistoriquePage";
@@ -47,6 +48,7 @@ export default function App() {
             <Route path="/articles" element={<ArticlesPage />} />
             <Route path="/approvisionnements" element={<ApprovisionnementsPage />} />
             <Route path="/fournisseurs" element={<FournisseursPage />} />
+            <Route path="/inventaires" element={<InventairesPage />} />
             <Route path="/admin/utilisateurs" element={<AdminUsersPage />} />
             <Route path="/clients-dettes" element={<ClientsDettesPage />} />
             <Route path="/statistiques" element={<StatistiquesPage />} />

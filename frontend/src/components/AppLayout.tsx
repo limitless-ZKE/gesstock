@@ -4,6 +4,7 @@ import {
   Building2,
   ChartNoAxesCombined,
   ChevronRight,
+  ClipboardList,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -27,6 +28,7 @@ const navigation = [
   { to: "/historique-ventes", label: "Historique des ventes", icon: ReceiptText },
   { to: "/caisse/mouvements", label: "Mouvements de caisse", icon: SlidersHorizontal },
   { to: "/articles", label: "Articles", icon: Boxes },
+  { to: "/inventaires", label: "Inventaires", icon: ClipboardList },
   { to: "/approvisionnements", label: "Approvisionnements", icon: PackagePlus },
   { to: "/fournisseurs", label: "Fournisseurs", icon: Building2 },
   { to: "/clients-dettes", label: "Clients & dettes", icon: UsersRound },
@@ -78,7 +80,7 @@ export default function AppLayout() {
   const normalizedRoles = user?.roles.map((role) => role.toUpperCase().replace(/^ROLE_/, "")) ?? [];
   const visibleNavigation = navigation.filter(({ to }) => {
     if (to === "/admin/utilisateurs") return normalizedRoles.includes("ADMIN");
-    if (["/approvisionnements", "/fournisseurs"].includes(to)) {
+    if (["/approvisionnements", "/fournisseurs", "/inventaires"].includes(to)) {
       return normalizedRoles.some((role) => ["ADMIN", "MANAGER", "GESTIONNAIRE"].includes(role));
     }
     if (to === "/statistiques") return normalizedRoles.some((role) => ["ADMIN", "MANAGER", "GESTIONNAIRE"].includes(role));
