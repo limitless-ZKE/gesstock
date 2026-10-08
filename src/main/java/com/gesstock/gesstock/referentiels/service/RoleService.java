@@ -6,17 +6,23 @@ import com.gesstock.gesstock.repositories.UtilisateurRepository;
 import com.gesstock.gesstock.referentiels.dto.RoleRequest;
 import com.gesstock.gesstock.referentiels.dto.RoleResponse;
 import com.gesstock.gesstock.common.exception.ConflitRessourceException;
+import com.gesstock.gesstock.common.exception.RequeteInvalideException;
 import com.gesstock.gesstock.common.exception.RessourceIntrouvableException;
+import com.gesstock.gesstock.config.Roles;
 import com.gesstock.gesstock.referentiels.mapper.RoleMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 @Service
 @Transactional
 public class RoleService {
+
+    /** Les droits de chaque rôle sont fixés dans SecurityConfig : un rôle d'un autre nom n'ouvrirait aucun accès. */
+    private static final Set<String> ROLES_CONNUS = Set.of(Roles.ADMIN, Roles.MANAGER, Roles.GESTIONNAIRE, Roles.CAISSIER);
 
     private final RoleRepository roleRepository;
     private final UtilisateurRepository utilisateurRepository;
@@ -38,6 +44,7 @@ public class RoleService {
 
     public RoleResponse creer(RoleRequest request) {
         String name = normaliser(request.name());
+        verifierRoleConnu(name);
         verifierNomDisponible(name, null);
         Role role = new Role();
         role.setName(name);
@@ -48,6 +55,7 @@ public class RoleService {
         Role role = trouver(id);
         String ancienNom = role.getName();
         String nouveauNom = normaliser(request.name());
+        verifierRoleConnu(nouveauNom);
         verifierNomDisponible(nouveauNom, id);
         role.setName(nouveauNom);
         role.getUtilisateurs().forEach(utilisateur -> {
@@ -69,6 +77,13 @@ public class RoleService {
     private Role trouver(Long id) {
         return roleRepository.findById(id)
             .orElseThrow(() -> new RessourceIntrouvableException("Rôle introuvable: " + id));
+    }
+
+    private void verifierRoleConnu(String name) {
+        if (!ROLES_CONNUS.contains(name)) {
+            throw new RequeteInvalideException("Rôle inconnu : les droits de chaque rôle sont définis dans l'application. "
+                + "Rôles disponibles : ADMIN, MANAGER, GESTIONNAIRE, CAISSIER");
+        }
     }
 
     private void verifierNomDisponible(String name, Long idIgnore) {
