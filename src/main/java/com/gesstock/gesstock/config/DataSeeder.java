@@ -29,7 +29,7 @@ import java.util.List;
 import java.util.Set;
 
 @Component
-@Profile("!prod")
+@Profile({"dev", "test"})
 public class DataSeeder implements CommandLineRunner {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(DataSeeder.class);

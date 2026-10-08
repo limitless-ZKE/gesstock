@@ -25,7 +25,7 @@ public class OpenAPIConfig {
                     .type(SecurityScheme.Type.APIKEY)
                     .in(SecurityScheme.In.COOKIE)
                     .name("JSESSIONID")
-                    .description("Session obtenue via POST /login ; les requêtes d'écriture exigent aussi l'en-tête X-XSRF-TOKEN.")))
+                    .description("Session obtenue via POST /api/auth/login ; les requêtes d'écriture exigent aussi l'en-tête X-XSRF-TOKEN.")))
             .addSecurityItem(new SecurityRequirement().addList(SESSION_SCHEME));
     }
 }

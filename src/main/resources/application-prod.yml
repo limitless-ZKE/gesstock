@@ -1,0 +1,9 @@
+# Profil de PRODUCTION (SPRING_PROFILES_ACTIVE=prod).
+# Les secrets (DB_URL, DB_USERNAME, DB_PASSWORD, CORS_ALLOWED_ORIGINS, APP_ADMIN_*) viennent UNIQUEMENT de l'environnement.
+logging:
+  structured:
+    format:
+      console: ecs                     # logs JSON (une ligne par événement)
+  level:
+    root: INFO
+    com.gesstock: INFO

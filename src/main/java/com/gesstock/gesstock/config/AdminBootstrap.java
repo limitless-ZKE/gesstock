@@ -21,7 +21,7 @@ import java.util.Set;
  * (APP_ADMIN_USERNAME / APP_ADMIN_PASSWORD) : aucun mot de passe par défaut n'est jamais créé.
  */
 @Component
-@Profile("prod")
+@Profile("!dev & !test")
 public class AdminBootstrap implements CommandLineRunner {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(AdminBootstrap.class);

@@ -1,92 +1,141 @@
 package com.gesstock.gesstock.config;
 
-import java.util.List;
-
+import com.gesstock.gesstock.security.LimiteConnexionsFilter;
+import com.gesstock.gesstock.security.LimiteurConnexions;
+import jakarta.servlet.DispatcherType;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.security.autoconfigure.actuate.web.servlet.EndpointRequest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.authentication.logout.HttpStatusReturningLogoutSuccessHandler;
 import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
-import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.Customizer;
-import org.springframework.http.HttpMethod;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.web.authentication.HttpStatusEntryPoint;
-import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.http.HttpStatus;
+import org.springframework.security.web.savedrequest.NullRequestCache;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.util.List;
+
+import static com.gesstock.gesstock.config.Roles.ADMIN;
+import static com.gesstock.gesstock.config.Roles.CAISSIER;
+import static com.gesstock.gesstock.config.Roles.GESTIONNAIRE;
+import static com.gesstock.gesstock.config.Roles.MANAGER;
+import static org.springframework.http.HttpMethod.GET;
+import static org.springframework.http.HttpMethod.POST;
+
+/**
+ * API pure : session par cookie, CSRF par cookie lu par le front, réponses d'erreur en JSON, aucune page HTML.
+ * Principe : tout ce qui n'est pas explicitement autorisé est refusé ({@code anyRequest().denyAll()}).
+ */
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
 
     private final List<String> allowedOrigins;
+    private final boolean secureCookies;
 
     public SecurityConfig(
-        @Value("${app.cors.allowed-origins:http://localhost:5173}") List<String> allowedOrigins
+        @Value("${app.cors.allowed-origins}") List<String> allowedOrigins,
+        @Value("${app.security.cookies.secure:true}") boolean secureCookies
     ) {
         this.allowedOrigins = allowedOrigins;
+        this.secureCookies = secureCookies;
+    }
+
+    /**
+     * Supervision (port séparé, jamais exposé au réseau) : seule la sonde de santé est ouverte, sans session ni cookie.
+     * Sans cette chaîne, la règle « tout refuser par défaut » ci-dessous bloquerait aussi le contrôle de santé de Docker.
+     */
+    @Bean
+    @Order(1)
+    public SecurityFilterChain supervision(HttpSecurity http) throws Exception {
+        http
+            .securityMatcher(EndpointRequest.toAnyEndpoint())
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers(EndpointRequest.to("health")).permitAll()
+                .anyRequest().denyAll())
+            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .csrf(csrf -> csrf.disable());
+        return http.build();
     }
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    @Order(2)
+    public SecurityFilterChain filterChain(HttpSecurity http, ApiSecurityHandlers handlers, LimiteurConnexions limiteur) throws Exception {
+        CookieCsrfTokenRepository csrfRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
+        csrfRepository.setCookieCustomizer(cookie -> cookie.sameSite("Lax").secure(secureCookies));
+
         http
-            // Authentification par cookie de session : la protection CSRF reste active.
-            // Le jeton est exposé dans le cookie XSRF-TOKEN, relu par le frontend (axios)
-            // puis renvoyé dans l'en-tête X-XSRF-TOKEN. Les formulaires Thymeleaf
-            // (th:action) reçoivent le jeton automatiquement.
+            // Authentification par cookie de session : la protection CSRF reste active. Le jeton est exposé dans le
+            // cookie XSRF-TOKEN, relu par le frontend (axios) puis renvoyé dans l'en-tête X-XSRF-TOKEN.
             .csrf(csrf -> csrf
-                .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
+                .csrfTokenRepository(csrfRepository)
                 .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler()))
             .addFilterAfter(new CsrfCookieFilter(), BasicAuthenticationFilter.class)
+            .addFilterBefore(new LimiteConnexionsFilter(limiteur), UsernamePasswordAuthenticationFilter.class)
             .cors(Customizer.withDefaults())
-            .exceptionHandling(exceptions -> exceptions
-                .defaultAuthenticationEntryPointFor(
-                    new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED),
-                    request -> request.getServletPath().startsWith("/api/")
-                ))
+            // Pas de mémorisation de la requête refusée : une requête anonyme ne crée plus de session serveur.
+            .requestCache(cache -> cache.requestCache(new NullRequestCache()))
+            .exceptionHandling(errors -> errors
+                .authenticationEntryPoint(handlers)
+                .accessDeniedHandler(handlers))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers(
-                    "/css/**", "/js/**", "/images/**", "/login",
-                    "/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**"
-                ).permitAll()
-                .requestMatchers("/api/referentiels/utilisateurs/**", "/api/referentiels/roles/**").hasRole("ADMIN")
-                .requestMatchers("/api/referentiels/unites-mesure/**")
-                    .hasAnyRole("ADMIN", "MANAGER", "GESTIONNAIRE")
-                .requestMatchers("/api/referentiels/sessions-caisse/**")
-                    .hasAnyRole("ADMIN", "MANAGER", "GESTIONNAIRE", "CAISSIER", "VENDEUR")
-                .requestMatchers("/api/caisse/**")
-                    .hasAnyRole("ADMIN", "MANAGER", "GESTIONNAIRE", "CAISSIER", "VENDEUR")
-                .requestMatchers("/api/articles/**").hasAnyRole("ADMIN", "MANAGER", "GESTIONNAIRE", "VENDEUR")
+                .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
+                .requestMatchers(POST, "/api/auth/login").permitAll()
+
+                // Documentation de l'API : jamais anonyme (et désactivée hors profil « dev » par la configuration).
+                .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").hasRole(ADMIN)
+
+                .requestMatchers("/api/auth/**").authenticated()
+                .requestMatchers("/api/referentiels/utilisateurs/**", "/api/referentiels/roles/**").hasRole(ADMIN)
+
+                // Catalogue : lecture pour tous les métiers (la caisse en a besoin), écriture pour le stock.
+                .requestMatchers(GET, "/api/articles/**", "/api/referentiels/unites-mesure/**")
+                    .hasAnyRole(ADMIN, MANAGER, GESTIONNAIRE, CAISSIER)
+                .requestMatchers("/api/articles/**", "/api/referentiels/unites-mesure/**")
+                    .hasAnyRole(ADMIN, MANAGER, GESTIONNAIRE)
                 .requestMatchers("/api/fournisseurs/**", "/api/approvisionnements/**")
-                    .hasAnyRole("ADMIN", "MANAGER", "GESTIONNAIRE")
-                .requestMatchers(HttpMethod.POST, "/api/ventes/*/annulation")
-                    .hasAnyRole("ADMIN", "MANAGER", "GESTIONNAIRE")
+                    .hasAnyRole(ADMIN, MANAGER, GESTIONNAIRE)
+
+                // Caisse et ventes. L'annulation d'une vente (retour de stock, dette, remboursement) est réservée
+                // aux responsables : elle peut faire sortir de l'argent de la caisse.
+                .requestMatchers("/api/referentiels/sessions-caisse/**", "/api/caisse/**")
+                    .hasAnyRole(ADMIN, MANAGER, GESTIONNAIRE, CAISSIER)
+                .requestMatchers(POST, "/api/ventes/*/annulation").hasAnyRole(ADMIN, MANAGER)
                 .requestMatchers("/api/proformas/**", "/api/ventes/**")
-                    .hasAnyRole("ADMIN", "MANAGER", "GESTIONNAIRE", "CAISSIER", "VENDEUR", "USER")
+                    .hasAnyRole(ADMIN, MANAGER, GESTIONNAIRE, CAISSIER)
                 .requestMatchers("/api/clients/**", "/api/dettes-clients/**")
-                    .hasAnyRole("ADMIN", "MANAGER", "GESTIONNAIRE", "CAISSIER", "VENDEUR", "USER")
-                .requestMatchers(HttpMethod.GET, "/api/promotions/**")
-                    .hasAnyRole("ADMIN", "MANAGER", "GESTIONNAIRE", "CAISSIER", "VENDEUR")
+                    .hasAnyRole(ADMIN, MANAGER, GESTIONNAIRE, CAISSIER)
+
+                // Pilotage.
+                .requestMatchers(GET, "/api/promotions/**").hasAnyRole(ADMIN, MANAGER, GESTIONNAIRE, CAISSIER)
                 .requestMatchers("/api/promotions/**", "/api/statistiques/**", "/api/journal-activites/**")
-                    .hasAnyRole("ADMIN", "MANAGER", "GESTIONNAIRE")
-                .requestMatchers("/articles/**").hasAnyRole("ADMIN", "GESTIONNAIRE", "VENDEUR")
-                .requestMatchers("/ventes/**").hasAnyRole("ADMIN", "VENDEUR", "USER")
-                .anyRequest().authenticated()
+                    .hasAnyRole(ADMIN, MANAGER, GESTIONNAIRE)
+
+                .anyRequest().denyAll()
             )
+            // Connexion par formulaire (POST /api/auth/login) mais sans page HTML : le « loginPage » personnalisé
+            // supprime la page de connexion générée par Spring ; les réponses sont du JSON, jamais des redirections.
             .formLogin(form -> form
-                .defaultSuccessUrl("/", true)
-                .permitAll()
-            )
+                .loginPage("/api/auth/login")
+                .successHandler(handlers::loginReussi)
+                .failureHandler(handlers::loginEchoue))
             .logout(logout -> logout
-                .logoutSuccessUrl("/login?logout")
-                .permitAll()
-            );
+                .logoutUrl("/api/auth/logout")
+                .logoutSuccessHandler(new HttpStatusReturningLogoutSuccessHandler(HttpStatus.NO_CONTENT)));
 
         return http.build();
     }
@@ -95,12 +144,15 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(allowedOrigins);
-        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        configuration.setAllowedMethods(List.of(
+            HttpMethod.GET.name(), HttpMethod.POST.name(), HttpMethod.PUT.name(),
+            HttpMethod.PATCH.name(), HttpMethod.DELETE.name(), HttpMethod.OPTIONS.name()));
         configuration.setAllowedHeaders(List.of("Content-Type", "Accept", "X-XSRF-TOKEN"));
         configuration.setAllowCredentials(true);
+        configuration.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", configuration);
+        source.registerCorsConfiguration("/api/**", configuration);
         return source;
     }
 
