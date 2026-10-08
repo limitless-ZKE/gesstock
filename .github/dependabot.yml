@@ -1,0 +1,41 @@
+# Mises à jour automatiques : seulement les correctifs et les versions mineures, regroupés en une demande par écosystème et par
+# semaine. Les versions MAJEURES (Spring Boot, Vite, TypeScript, React…) sont ignorées volontairement : un saut de majeure se
+# décide et se fait à part, avec les tests en place pour le sécuriser.
+version: 2
+updates:
+  - package-ecosystem: maven
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      maven-correctifs:
+        update-types: [minor, patch]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      npm-correctifs:
+        update-types: [minor, patch]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: monthly

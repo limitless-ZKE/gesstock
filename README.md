@@ -27,6 +27,9 @@ Depuis VS Code (Spring Boot Dashboard, « Run »), ajouter `SPRING_PROFILES_ACTI
 - Comptes de démonstration (profil `dev` uniquement) : `admin`, `caissier`, `gestionnaire`.
 - Sonde de santé : `http://127.0.0.1:8081/actuator/health` (port de supervision, jamais exposé au réseau).
 - Les tests tournent sur H2 en mémoire : `./mvnw test`.
+- Front : `npm run lint`, `npm test` (Vitest + Testing Library, API simulée) et `npm run build` (types + production), depuis
+  `frontend/` ; la CI les lance. Détails et choix volontairement différés dans `frontend/README.md`. Les correctifs de
+  dépendances arrivent par Dependabot (versions majeures ignorées, à décider à part).
 - Test des migrations sur un vrai MySQL (désactivé par défaut ; il crée et supprime ses propres bases jetables, en
   `sql_mode` strict) :
 
@@ -35,9 +38,9 @@ Depuis VS Code (Spring Boot Dashboard, « Run »), ajouter `SPRING_PROFILES_ACTI
     ./mvnw test -Dtest=MigrationsMysqlIT
   ```
 
-  Il vérifie l'installation neuve (V1 à V9 puis validation Hibernate, y compris les valeurs d'enum MySQL que Hibernate
-  ne contrôle pas), la mise à jour depuis V3 avec des données, et la reprise d'une base existante. La CI le lance
-  sur MySQL 8.4.
+  Il vérifie l'installation neuve (V1 à V12 puis validation Hibernate, y compris les valeurs d'enum MySQL que Hibernate
+  ne contrôle pas, et les contraintes CHECK / index uniques qui portent les règles de fond), la mise à jour depuis V3 avec
+  des données, et la reprise d'une base existante. La CI le lance sur MySQL 8.4.
 
 ## Authentification et droits
 
