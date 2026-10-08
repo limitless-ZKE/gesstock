@@ -65,7 +65,7 @@ class MigrationsMysqlIT {
 
         try (ConfigurableApplicationContext contexte = demarrer(base, "--spring.flyway.baseline-on-migrate=false")) {
             JdbcTemplate jdbc = contexte.getBean(JdbcTemplate.class);
-            assertThat(versionsAppliquees(jdbc)).containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10");
+            assertThat(versionsAppliquees(jdbc)).containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11");
             assertThat(migrationsEnEchec(jdbc)).isZero();
             assertThat(derives(contexte, base)).as("enum Java absents de la base").isEmpty();
 
@@ -80,6 +80,8 @@ class MigrationsMysqlIT {
             jdbc.update("UPDATE inventaires SET statut = 'ANNULE' WHERE code = 'INV-IT-1'");
             jdbc.update(insertion, "INV-IT-3", "EN_SAISIE", utilisateurId); // la voie est libre une fois le premier annulé
             jdbc.update(insertion, "INV-IT-4", "VALIDE", utilisateurId);    // les inventaires terminés ne comptent pas
+
+            compteFournisseurGarantiParLaBase(jdbc, utilisateurId);
         }
     }
 
@@ -158,7 +160,7 @@ class MigrationsMysqlIT {
         try (ConfigurableApplicationContext contexte = demarrer(base,
             "--spring.flyway.baseline-on-migrate=true", "--spring.flyway.baseline-version=3")) {
             JdbcTemplate jdbc = contexte.getBean(JdbcTemplate.class);
-            assertThat(versionsAppliquees(jdbc)).containsExactly("3", "4", "5", "6", "7", "8", "9", "10");
+            assertThat(versionsAppliquees(jdbc)).containsExactly("3", "4", "5", "6", "7", "8", "9", "10", "11");
             assertThat(migrationsEnEchec(jdbc)).isZero();
         }
     }
@@ -203,6 +205,42 @@ class MigrationsMysqlIT {
         return new SpringApplicationBuilder(GesstockApplication.class)
             .web(WebApplicationType.NONE)
             .run(arguments.toArray(String[]::new));
+    }
+
+    /** V11 : les règles du compte fournisseur sont tenues par la BASE (unicité, contraintes CHECK), pas seulement par le code. */
+    private void compteFournisseurGarantiParLaBase(JdbcTemplate jdbc, Long utilisateurId) {
+        jdbc.update("INSERT INTO fournisseurs (nom) VALUES ('IT fournisseur')");
+        Long fournisseurId = jdbc.queryForObject("SELECT id FROM fournisseurs WHERE nom = 'IT fournisseur'", Long.class);
+        String bon = "INSERT INTO approvisionnements (numero, fournisseur_id, statut, version) VALUES (?, ?, 'RECU', 0)";
+        jdbc.update(bon, "BR-IT-1", fournisseurId);
+        jdbc.update(bon, "BR-IT-2", fournisseurId);
+        Long bon1 = jdbc.queryForObject("SELECT id FROM approvisionnements WHERE numero = 'BR-IT-1'", Long.class);
+        Long bon2 = jdbc.queryForObject("SELECT id FROM approvisionnements WHERE numero = 'BR-IT-2'", Long.class);
+
+        String dette = "INSERT INTO dettes_fournisseurs (date_creation, montant_initial, montant_regle, statut, fournisseur_id, "
+            + "approvisionnement_id, version) VALUES (CURDATE(), ?, ?, 'EN_COURS', ?, ?, 0)";
+        jdbc.update(dette, 1000, 0, fournisseurId, bon1);
+        assertThatThrownBy(() -> jdbc.update(dette, 1000, 0, fournisseurId, bon1))
+            .as("une seule dette par bon").isInstanceOf(org.springframework.dao.DuplicateKeyException.class);
+        assertThatThrownBy(() -> jdbc.update(dette, 1000, 1500, fournisseurId, bon2))
+            .as("réglé au-delà de la dette").isInstanceOf(org.springframework.dao.DataAccessException.class);
+        assertThatThrownBy(() -> jdbc.update(dette, 0, 0, fournisseurId, bon2))
+            .as("dette de montant nul").isInstanceOf(org.springframework.dao.DataAccessException.class);
+
+        Long detteId = jdbc.queryForObject("SELECT id FROM dettes_fournisseurs WHERE approvisionnement_id = ?", Long.class, bon1);
+        String reglement = "INSERT INTO reglements_fournisseurs (dette_id, fournisseur_id, montant, source, mode_reglement, date_reglement) "
+            + "VALUES (?, ?, 100, ?, ?, NOW())";
+        assertThatThrownBy(() -> jdbc.update(reglement, detteId, fournisseurId, "PAIEMENT", null))
+            .as("un paiement a un mode de règlement").isInstanceOf(org.springframework.dao.DataAccessException.class);
+        assertThatThrownBy(() -> jdbc.update(reglement, detteId, fournisseurId, "AVOIR", "VIREMENT"))
+            .as("un avoir imputé n'a ni mode ni absence d'avoir").isInstanceOf(org.springframework.dao.DataAccessException.class);
+        jdbc.update(reglement, detteId, fournisseurId, "PAIEMENT", "VIREMENT");
+
+        String avoir = "INSERT INTO avoirs_fournisseurs (fournisseur_id, montant, montant_utilise, date_creation, motif, cree_par_id, version) "
+            + "VALUES (?, ?, ?, NOW(), 'IT', ?, 0)";
+        assertThatThrownBy(() -> jdbc.update(avoir, fournisseurId, 100, 150, utilisateurId))
+            .as("avoir consommé au-delà de son montant").isInstanceOf(org.springframework.dao.DataAccessException.class);
+        jdbc.update(avoir, fournisseurId, 100, 40, utilisateurId);
     }
 
     private List<String> versionsAppliquees(JdbcTemplate jdbc) {

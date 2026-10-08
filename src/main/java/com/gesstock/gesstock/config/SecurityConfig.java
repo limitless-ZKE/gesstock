@@ -107,6 +107,8 @@ public class SecurityConfig {
                     .hasAnyRole(ADMIN, MANAGER, GESTIONNAIRE, CAISSIER)
                 .requestMatchers("/api/articles/**", "/api/referentiels/unites-mesure/**")
                     .hasAnyRole(ADMIN, MANAGER, GESTIONNAIRE)
+                // Un avoir saisi à la main efface une dette sans qu'aucun argent ne bouge : décision de responsable.
+                .requestMatchers(POST, "/api/fournisseurs/*/avoirs").hasAnyRole(ADMIN, MANAGER)
                 .requestMatchers("/api/fournisseurs/**", "/api/approvisionnements/**")
                     .hasAnyRole(ADMIN, MANAGER, GESTIONNAIRE)
                 // Inventaire : le comptage est un travail de stock ; appliquer les écarts au stock est une décision de responsable.

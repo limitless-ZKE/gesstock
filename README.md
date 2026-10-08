@@ -102,6 +102,13 @@ Seuls ces quatre rôles existent. Les anciens rôles `VENDEUR` et `USER` sont fu
   si un écart ferait passer un stock sous zéro (article à recompter). Tout écart exige un motif à la soumission. Les articles non
   comptés ne sont pas touchés. `GET /api/inventaires/{id}/export.xlsx` donne la feuille de comptage. Un stock de départ saisi
   à la création d'un article laisse un mouvement `STOCK_INITIAL`.
+- **Compte fournisseur** (`/api/fournisseurs/comptes`, `/{id}/compte`) : recevoir un bon crée une dette égale à son total (quantité
+  × prix) ; un bon de valeur nulle n'en crée pas, et les bons reçus avant `V11` n'en ont pas non plus (on ignore ce qui a déjà été
+  payé). `POST /api/fournisseurs/dettes/{id}/reglements` enregistre un paiement : jamais au-delà du solde ; en espèces il exige une
+  session de caisse ouverte avec assez de liquide et laisse une SORTIE de caisse au nom du fournisseur. Un avoir (créé à la main
+  par ADMIN ou MANAGER, ou par un retour de marchandise) s'impute de lui-même sur les dettes les plus anciennes ; ce qui reste
+  en crédit s'impute sur les prochains bons dès leur réception. Les écritures d'un même fournisseur sont sérialisées par un verrou
+  sur sa ligne. Un paiement enregistré ne s'annule pas (pas d'écran de correction pour l'instant).
 - **Coût du stock** : le coût d'un article est son coût moyen pondéré (CMP), recalculé à chaque réception ; chaque ligne de
   vente mémorise le coût du moment, donc la marge d'une vente passée ne bouge plus. `historique_prix_achat` garde l'évolution.
 - **TVA** : le taux est imposé par le serveur (`APP_TVA_TAUX`, 0 par défaut : aucune TVA), jamais saisi à la caisse
@@ -148,6 +155,8 @@ Le contrôle de santé de Docker interroge `http://127.0.0.1:8081/actuator/healt
 - `V9__approbation_remises.sql` : responsable ayant approuvé une remise, sur les lignes de vente et de proforma.
 - `V10__inventaire_physique.sql` : inventaires et leurs lignes (un seul inventaire en cours à la fois, garanti par un index
   unique sur une colonne générée), type de mouvement `STOCK_INITIAL`, lien mouvement de stock → inventaire.
+- `V11__compte_fournisseur.sql` : dettes fournisseurs (une par bon reçu), règlements (paiement ou avoir imputé) et avoirs, avec
+  les contraintes de montants tenues par la base.
 - Une migration déjà appliquée ne se modifie jamais : toute évolution du schéma est un nouveau fichier
   `V<n>__description.sql`.
 - Une base créée à la main par `ddl-auto=update` n'est **pas** reprise automatiquement (`V3` échouerait : colonne

@@ -7,6 +7,7 @@ import com.gesstock.gesstock.common.exception.ConflitRessourceException;
 import com.gesstock.gesstock.common.exception.RessourceIntrouvableException;
 import com.gesstock.gesstock.approvisionnements.mapper.ApprovisionnementMapper;
 import com.gesstock.gesstock.entities.*;
+import com.gesstock.gesstock.fournisseurs.service.CompteFournisseurService;
 import com.gesstock.gesstock.repositories.*;
 import com.gesstock.gesstock.stock.CoutMoyenPondere;
 import org.springframework.stereotype.Service;
@@ -29,6 +30,7 @@ public class EntreeStockService {
     private final JournalActiviteService journalActiviteService;
     private final HistoriquePrixAchatRepository historiquePrixAchatRepository;
     private final UtilisateurRepository utilisateurRepository;
+    private final CompteFournisseurService compteFournisseurService;
 
     public EntreeStockService(
         ApprovisionnementRepository approvisionnementRepository,
@@ -37,8 +39,10 @@ public class EntreeStockService {
         MouvementStockRepository mouvementStockRepository,
         JournalActiviteService journalActiviteService,
         HistoriquePrixAchatRepository historiquePrixAchatRepository,
-        UtilisateurRepository utilisateurRepository
+        UtilisateurRepository utilisateurRepository,
+        CompteFournisseurService compteFournisseurService
     ) {
+        this.compteFournisseurService = compteFournisseurService;
         this.historiquePrixAchatRepository = historiquePrixAchatRepository;
         this.utilisateurRepository = utilisateurRepository;
         this.approvisionnementRepository = approvisionnementRepository;
@@ -130,6 +134,8 @@ public class EntreeStockService {
         approvisionnement.setStatut(StatutApprovisionnement.RECU);
         articleRepository.saveAll(articlesVerrouilles.values());
         approvisionnementRepository.save(approvisionnement);
+        // Le bon reçu devient une dette envers le fournisseur (et les avoirs qu'il nous doit déjà s'y imputent).
+        compteFournisseurService.enregistrerDette(approvisionnement, username);
         journalActiviteService.enregistrer("VALIDATION", "APPROVISIONNEMENT", approvisionnement.getId(),
             "Réception du bon " + approvisionnement.getNumero(), username);
         return ApprovisionnementMapper.toResponse(approvisionnement);
