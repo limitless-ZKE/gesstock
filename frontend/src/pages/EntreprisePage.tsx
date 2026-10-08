@@ -54,16 +54,20 @@ export default function EntreprisePage() {
   const [notice, setNotice] = useState<{ text: string; isError: boolean } | null>(null);
   const champFichier = useRef<HTMLInputElement>(null);
 
+  // Le formulaire reprend les valeurs du serveur UNE FOIS, au premier chargement. Il ne doit plus être réinitialisé ensuite :
+  // envoyer ou retirer un logo recharge l'entreprise, ce qui effacerait sinon les textes saisis et pas encore enregistrés.
   useEffect(() => {
-    if (entreprise) setForm(depuis(entreprise));
-  }, [entreprise]);
+    if (entreprise && form === null) setForm(depuis(entreprise));
+  }, [entreprise, form]);
 
   async function enregistrer(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!form) return;
     setBusy(true);
     try {
-      await api.put("/entreprise", form);   // champs vides : le serveur les enregistre comme absents
+      // champs vides : le serveur les enregistre comme absents ; sa réponse (textes nettoyés) remplace la saisie
+      const { data } = await api.put<Entreprise>("/entreprise", form);
+      setForm(depuis(data));
       await rafraichir();
       setNotice({ text: "Informations enregistrées. Elles apparaissent dès maintenant sur les documents imprimés.", isError: false });
     } catch (reason) {

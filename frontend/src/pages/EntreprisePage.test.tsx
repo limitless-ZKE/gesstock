@@ -34,7 +34,7 @@ const png = (octets = 1000, nom = "logo.png", type = "image/png") => new File([n
 describe("EntreprisePage", () => {
   beforeEach(() => {
     rafraichir.mockReset().mockResolvedValue(undefined);
-    vi.mocked(api.put).mockReset().mockResolvedValue({ data: {} });
+    vi.mocked(api.put).mockReset().mockImplementation(async (_chemin, corps) => ({ data: { ...ENTREPRISE, ...(corps as object) } }));
     vi.mocked(api.post).mockReset().mockResolvedValue({ data: {} });
     vi.mocked(api.delete).mockReset().mockResolvedValue({ data: {} });
     vi.spyOn(window, "confirm").mockReturnValue(true);
@@ -78,6 +78,28 @@ describe("EntreprisePage", () => {
     expect(ticket).toHaveTextContent("Nouveau commerce");
     expect(screen.getByRole("region", { name: "Aperçu de l’en-tête A4" })).toHaveTextContent("Nouveau commerce");
     expect(api.put).not.toHaveBeenCalled();   // simple aperçu : rien n'est enregistré
+  });
+
+  it("garde les textes saisis quand on envoie un logo avant d'enregistrer (le rechargement ne les efface pas)", async () => {
+    const utilisateur = afficher(["ADMIN"]);
+    const nom = screen.getByLabelText("Nom de l’entreprise");
+    await utilisateur.clear(nom);
+    await utilisateur.type(nom, "Nom pas encore enregistré");
+
+    await utilisateur.upload(screen.getByLabelText("Choisir un fichier de logo"), png());
+    await waitFor(() => expect(rafraichir).toHaveBeenCalled());
+
+    expect(screen.getByLabelText("Nom de l’entreprise")).toHaveValue("Nom pas encore enregistré");
+  });
+
+  it("reprend dans le formulaire les textes nettoyés renvoyés par le serveur après l'enregistrement", async () => {
+    vi.mocked(api.put).mockResolvedValue({ data: { ...ENTREPRISE, nom: "Baobab SARL", adresse: null } });
+    const utilisateur = afficher(["ADMIN"]);
+    await utilisateur.clear(screen.getByLabelText("Adresse"));
+    await utilisateur.type(screen.getByLabelText("Adresse"), "   ");
+    await utilisateur.click(screen.getByRole("button", { name: /Enregistrer/ }));
+
+    await waitFor(() => expect(screen.getByLabelText("Adresse")).toHaveValue(""));
   });
 
   it("empêche d'enregistrer sans nom", async () => {
