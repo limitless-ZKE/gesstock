@@ -20,9 +20,10 @@ import {
   WalletCards,
   X,
 } from "lucide-react";
+import ApprobationModal, { type Approbation } from "../components/ApprobationModal";
 import ReceiptModal, { type Sale } from "../components/ReceiptModal";
 import { api } from "../services/api";
-import { apiErrorMessage as messageFor } from "../services/apiError";
+import { apiErrorMessage as messageFor, parseApiError } from "../services/apiError";
 import { money as currency, moneyPrecise as money2 } from "../lib/format";
 
 type Category = { id: number; nom: string };
@@ -133,6 +134,7 @@ export default function CaissePage() {
   const [paymentMode, setPaymentMode] = useState<PaymentMode>("ESPECES");
   const [amountReceived, setAmountReceived] = useState("");
   const [checkoutBusy, setCheckoutBusy] = useState(false);
+  const [approbationDemandee, setApprobationDemandee] = useState<{ message: string; erreur: string } | null>(null);
   const [pendingDraft, setPendingDraft] = useState<SaleResponse | null>(null);
   const [receipt, setReceipt] = useState<SaleResponse | null>(null);
   const [notice, setNotice] = useState("");
@@ -301,6 +303,11 @@ export default function CaissePage() {
 
   async function checkout(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    await envoyerVente();
+  }
+
+  /** Enregistre puis valide la vente. Avec l'accord d'un responsable quand le serveur l'a demandé (remise au-delà du plafond, prix sous le coût). */
+  async function envoyerVente(approbation?: Approbation) {
     if (!session || cart.length === 0) return;
     const invalidLine = cart.find((line) => negotiatedPriceError(line) !== null);
     if (invalidLine) {
@@ -325,6 +332,7 @@ export default function CaissePage() {
         tauxTva: fiscal.tauxTva,
         modeReglement: paymentMode,
         montantRecu: received,
+        approbation,
         lignes: cart.map((line) => ({
           articleId: line.article.id,
           quantite: line.quantite,
@@ -356,6 +364,12 @@ export default function CaissePage() {
       showNotice("Vente enregistrée et stock mis à jour.");
       void refreshSession().catch(() => setSession(null));
     } catch (error) {
+      const probleme = parseApiError(error);
+      if (probleme.code === "APPROBATION_REQUISE" || probleme.code === "APPROBATION_REFUSEE") {
+        // le serveur demande (ou a refusé) l'accord d'un responsable : on ouvre la fenêtre de saisie, la vente reste dans le panier
+        setApprobationDemandee({ message: probleme.message, erreur: probleme.code === "APPROBATION_REFUSEE" ? probleme.message : "" });
+        return;
+      }
       showNotice(
         draftAlreadyExists
           ? `Le brouillon reste enregistré. ${messageFor(error, "La validation a échoué.")} Corrigez le problème puis réessayez.`
@@ -632,6 +646,20 @@ export default function CaissePage() {
           onAmountReceived={setAmountReceived}
           onClose={() => setCheckoutOpen(false)}
           onSubmit={checkout}
+        />
+      )}
+
+      {approbationDemandee && (
+        <ApprobationModal
+          message={approbationDemandee.message}
+          erreur={approbationDemandee.erreur}
+          occupe={checkoutBusy}
+          libelleAction="Valider la vente"
+          onAnnuler={() => setApprobationDemandee(null)}
+          onSoumettre={(approbation) => {
+            setApprobationDemandee(null);
+            void envoyerVente(approbation);
+          }}
         />
       )}
       {receipt && <ReceiptModal sale={receipt} onClose={() => setReceipt(null)} />}

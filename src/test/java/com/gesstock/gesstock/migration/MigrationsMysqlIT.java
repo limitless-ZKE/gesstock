@@ -65,7 +65,7 @@ class MigrationsMysqlIT {
 
         try (ConfigurableApplicationContext contexte = demarrer(base, "--spring.flyway.baseline-on-migrate=false")) {
             JdbcTemplate jdbc = contexte.getBean(JdbcTemplate.class);
-            assertThat(versionsAppliquees(jdbc)).containsExactly("1", "2", "3", "4", "5", "6", "7", "8");
+            assertThat(versionsAppliquees(jdbc)).containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9");
             assertThat(migrationsEnEchec(jdbc)).isZero();
             assertThat(derives(contexte, base)).as("enum Java absents de la base").isEmpty();
         }
@@ -114,6 +114,9 @@ class MigrationsMysqlIT {
             .isEqualByComparingTo("600");
         assertThat(jdbc.queryForObject("SELECT cout_estime FROM lignes_vente WHERE article_id = ?", Boolean.class, articleId)).isTrue();
         assertThat(tableExiste(jdbc, base, "historique_prix_achat")).isTrue();
+        // V9 : trace de l'accord d'un responsable sur les remises exceptionnelles
+        assertThat(colonnesDe(jdbc, base, "lignes_vente")).contains("remise_approuvee_par_id");
+        assertThat(colonnesDe(jdbc, base, "lignes_proforma")).contains("remise_approuvee_par_id");
         assertThat(colonnesDe(jdbc, base, "vente")).doesNotContain("article_id", "promotion_id", "quantite", "prix_unit", "prix_total");
         assertThat(tableExiste(jdbc, base, "statistiques_journalieres")).isFalse();
         assertThat(indexDe(jdbc, base, "vente")).contains("idx_vente_statut_date", "idx_vente_session_statut");
@@ -143,7 +146,7 @@ class MigrationsMysqlIT {
         try (ConfigurableApplicationContext contexte = demarrer(base,
             "--spring.flyway.baseline-on-migrate=true", "--spring.flyway.baseline-version=3")) {
             JdbcTemplate jdbc = contexte.getBean(JdbcTemplate.class);
-            assertThat(versionsAppliquees(jdbc)).containsExactly("3", "4", "5", "6", "7", "8");
+            assertThat(versionsAppliquees(jdbc)).containsExactly("3", "4", "5", "6", "7", "8", "9");
             assertThat(migrationsEnEchec(jdbc)).isZero();
         }
     }

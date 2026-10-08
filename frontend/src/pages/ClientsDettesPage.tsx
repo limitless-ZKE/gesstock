@@ -25,7 +25,8 @@ import {
 } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
 import { api } from "../services/api";
-import { apiErrorMessage as errorMessage } from "../services/apiError";
+import { apiErrorMessage as errorMessage, parseApiError } from "../services/apiError";
+import ApprobationModal, { type Approbation } from "../components/ApprobationModal";
 import { money as currency } from "../lib/format";
 
 type Client = { id: number; nom: string; email: string | null; telephone: string | null; adresse: string | null; nombreAchats: number };
@@ -152,6 +153,7 @@ export default function ClientsDettesPage() {
   const [expirationDate, setExpirationDate] = useState("");
   const [draftLines, setDraftLines] = useState<DraftLine[]>([blankLine()]);
   const [proformaSaving, setProformaSaving] = useState(false);
+  const [approbationDemandee, setApprobationDemandee] = useState<{ message: string; erreur: string } | null>(null);
   const [busyProformaId, setBusyProformaId] = useState<number | null>(null);
   const [convertCreditId, setConvertCreditId] = useState<number | null>(null);
   const [cashProforma, setCashProforma] = useState<Proforma | null>(null);
@@ -307,6 +309,11 @@ export default function ClientsDettesPage() {
 
   async function saveProforma(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    await envoyerProforma();
+  }
+
+  /** Enregistre le proforma, avec l'accord d'un responsable quand le serveur l'a demandé (remise au-delà du plafond, prix sous le coût). */
+  async function envoyerProforma(approbation?: Approbation) {
     const validLines = draftLines.filter((line) => line.articleId && Number(line.quantite) > 0
       && Number(line.prixUnitaire) >= 0 && Number(line.prixUnitaire) <= (articles.find((article) => String(article.id) === line.articleId)?.prixVente ?? Infinity));
     if (!validLines.length) {
@@ -325,6 +332,7 @@ export default function ClientsDettesPage() {
           quantite: Number(line.quantite),
           prixUnitaire: round2(Number(line.prixUnitaire)),
         })),
+        approbation,
       };
       if (proformaModal === "new") await api.post("/proformas", request);
       else if (proformaModal) await api.put(`/proformas/${proformaModal.id}`, request);
@@ -332,6 +340,11 @@ export default function ClientsDettesPage() {
       showNotice(proformaModal === "new" ? "La facture proforma a été créée en brouillon." : "Le brouillon proforma a été modifié.");
       await loadData();
     } catch (error) {
+      const probleme = parseApiError(error);
+      if (probleme.code === "APPROBATION_REQUISE" || probleme.code === "APPROBATION_REFUSEE") {
+        setApprobationDemandee({ message: probleme.message, erreur: probleme.code === "APPROBATION_REFUSEE" ? probleme.message : "" });
+        return;
+      }
       showNotice(errorMessage(error, "L’enregistrement du proforma a échoué."), true);
     } finally {
       setProformaSaving(false);
@@ -577,6 +590,7 @@ export default function ClientsDettesPage() {
       <div className="mt-5 flex justify-end"><button onClick={() => { setClientDetail(null); openClientForm(clientDetail); }} className="button-secondary"><Pencil size={14} /> Modifier la fiche</button></div>
     </Modal>}
 
+    {approbationDemandee && <ApprobationModal message={approbationDemandee.message} erreur={approbationDemandee.erreur} occupe={proformaSaving} libelleAction="Enregistrer le proforma" onAnnuler={() => setApprobationDemandee(null)} onSoumettre={(approbation) => { setApprobationDemandee(null); void envoyerProforma(approbation); }} />}
     {cashProforma && <Modal title={`Règlement · ${cashProforma.numero}`} onClose={() => busyProformaId === null && setCashProforma(null)}>
       <div className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4"><p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Total à encaisser</p><p className="mt-1 text-xl font-extrabold text-emerald-900">{currency.format(cashProforma.montantTotal)}</p></div>
       <form onSubmit={(event) => void confirmCashConversion(event)} className="space-y-4">

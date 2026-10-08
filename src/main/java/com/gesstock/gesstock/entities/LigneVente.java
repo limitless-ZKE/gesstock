@@ -55,7 +55,14 @@ public class LigneVente {
     @Column(nullable = false)
     private boolean coutEstime = false;
 
+    /** Responsable qui a donné son accord à une remise au-delà du plafond du vendeur ou à un prix sous le coût ; null sinon. */
+    @ManyToOne
+    @JoinColumn(name = "remise_approuvee_par_id")
+    private Utilisateur remiseApprouveePar;
+
     // Getters et Setters
+    public Utilisateur getRemiseApprouveePar() { return remiseApprouveePar; }
+    public void setRemiseApprouveePar(Utilisateur remiseApprouveePar) { this.remiseApprouveePar = remiseApprouveePar; }
     public java.math.BigDecimal getCoutUnitaire() { return coutUnitaire; }
     public void setCoutUnitaire(java.math.BigDecimal coutUnitaire) { this.coutUnitaire = coutUnitaire; }
     public boolean isCoutEstime() { return coutEstime; }

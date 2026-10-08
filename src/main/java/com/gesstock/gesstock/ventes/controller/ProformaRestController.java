@@ -50,9 +50,10 @@ public class ProformaRestController {
     @PutMapping("/{id}")
     public ProformaResponse modifier(
         @PathVariable Long id,
-        @Valid @RequestBody ProformaRequest request
+        @Valid @RequestBody ProformaRequest request,
+        @AuthenticationPrincipal UserDetails principal
     ) {
-        return gestionVentesService.modifierProforma(id, request);
+        return gestionVentesService.modifierProforma(id, request, principal.getUsername());
     }
 
     @PatchMapping("/{id}/statut")

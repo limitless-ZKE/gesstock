@@ -35,7 +35,7 @@ Depuis VS Code (Spring Boot Dashboard, « Run »), ajouter `SPRING_PROFILES_ACTI
     ./mvnw test -Dtest=MigrationsMysqlIT
   ```
 
-  Il vérifie l'installation neuve (V1 à V7 puis validation Hibernate, y compris les valeurs d'enum MySQL que Hibernate
+  Il vérifie l'installation neuve (V1 à V9 puis validation Hibernate, y compris les valeurs d'enum MySQL que Hibernate
   ne contrôle pas), la mise à jour depuis V3 avec des données, et la reprise d'une base existante. La CI le lance
   sur MySQL 8.4.
 
@@ -81,6 +81,15 @@ Seuls ces quatre rôles existent. Les anciens rôles `VENDEUR` et `USER` sont fu
 - Une vente au comptant, y compris issue d'un proforma, exige un mode de règlement et un montant reçu : c'est ce qui
   alimente le solde théorique de la caisse. Le « montant encaissé » est le total de la vente, pas la somme remise.
 
+- **Remises** : un prix négocié plus bas que le prix catalogue est plafonné selon le rôle du vendeur (CAISSIER 5 %,
+  GESTIONNAIRE 10 %, MANAGER 25 %, ADMIN 100 %, réglables par `APP_REMISES_PLAFOND_<RÔLE>`). Au-delà, ou sous le coût de
+  revient (`APP_REMISES_MARGE_PLANCHER`, 0 % par défaut), le serveur répond `409 APPROBATION_REQUISE` : un AUTRE responsable
+  (MANAGER ou ADMIN) saisit son identifiant et son mot de passe au comptoir, la même demande est renvoyée avec
+  `approbation: { username, motDePasse }`. Le serveur vérifie le mot de passe sans ouvrir de session (mêmes limites d'essais
+  que la connexion), garde le nom du responsable sur la ligne de vente ou de proforma et écrit une ligne au journal. Les
+  promotions ne comptent pas dans le plafond.
+- **Coût du stock** : le coût d'un article est son coût moyen pondéré (CMP), recalculé à chaque réception ; chaque ligne de
+  vente mémorise le coût du moment, donc la marge d'une vente passée ne bouge plus. `historique_prix_achat` garde l'évolution.
 - **TVA** : le taux est imposé par le serveur (`APP_TVA_TAUX`, 0 par défaut : aucune TVA), jamais saisi à la caisse
   (un autre taux envoyé est refusé). Pour l'activer sans migration : `APP_TVA_TAUX=18`, et `APP_TVA_PRIX_TTC=true` si les
   prix du catalogue sont TTC (la taxe en est extraite : le client paie le prix affiché) ou `false` s'ils sont HT (la taxe
@@ -120,6 +129,9 @@ Le contrôle de santé de Docker interroge `http://127.0.0.1:8081/actuator/healt
   colonnes héritées de `vente` (article, promotion, quantité, prix) et la table `statistiques_journalieres` disparaissent.
 - `V7__roles_source_unique.sql` : les droits ne viennent plus que de `utilisateur_roles` ; la colonne `utilisateurs.role`
   disparaît après avoir été reportée dans `utilisateur_roles` (rôle créé au besoin s'il fait partie des quatre connus).
+- `V8__cout_moyen_pondere.sql` : coût moyen pondéré des articles, coût mémorisé sur les lignes de vente (estimé pour les
+  ventes déjà enregistrées) et sur les mouvements de stock, historique des prix d'achat.
+- `V9__approbation_remises.sql` : responsable ayant approuvé une remise, sur les lignes de vente et de proforma.
 - Une migration déjà appliquée ne se modifie jamais : toute évolution du schéma est un nouveau fichier
   `V<n>__description.sql`.
 - Une base créée à la main par `ddl-auto=update` n'est **pas** reprise automatiquement (`V3` échouerait : colonne
