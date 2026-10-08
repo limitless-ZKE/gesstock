@@ -13,6 +13,7 @@ const CaissePage = lazy(() => import("./pages/CaissePage"));
 const CaisseMouvementsPage = lazy(() => import("./pages/CaisseMouvementsPage"));
 const ClientsDettesPage = lazy(() => import("./pages/ClientsDettesPage"));
 const DashboardPage = lazy(() => import("./pages/DashboardPage"));
+const EntreprisePage = lazy(() => import("./pages/EntreprisePage"));
 const FournisseursPage = lazy(() => import("./pages/FournisseursPage"));
 const InventairesPage = lazy(() => import("./pages/InventairesPage"));
 const RetoursFournisseursPage = lazy(() => import("./pages/RetoursFournisseursPage"));
@@ -53,6 +54,7 @@ export default function App() {
             <Route path="/fournisseurs" element={<FournisseursPage />} />
             <Route path="/retours-fournisseurs" element={<RetoursFournisseursPage />} />
             <Route path="/inventaires" element={<InventairesPage />} />
+            <Route path="/entreprise" element={<EntreprisePage />} />
             <Route path="/admin/utilisateurs" element={<AdminUsersPage />} />
             <Route path="/clients-dettes" element={<ClientsDettesPage />} />
             <Route path="/statistiques" element={<StatistiquesPage />} />

@@ -39,8 +39,17 @@ morceau « socle » stable, qui reste en cache d'une version à l'autre.
 
 `/login`, `/dashboard`, `/caisse`, `/historique-ventes`, `/caisse/mouvements`, `/articles`, `/inventaires`,
 `/approvisionnements`, `/fournisseurs` (avec le compte de chaque fournisseur), `/retours-fournisseurs`, `/clients-dettes`,
-`/statistiques` et `/admin/utilisateurs`. Le menu n'affiche que ce que le rôle de la personne connectée peut utiliser ; le serveur
+`/statistiques`, `/entreprise` et `/admin/utilisateurs`. Le menu n'affiche que ce que le rôle de la personne connectée peut utiliser ; le serveur
 refuse de toute façon le reste.
+
+## Documents imprimables : en-tête de l'entreprise
+
+Nom, coordonnées et logo viennent de l'écran **Entreprise** (ADMIN et MANAGER), jamais du code. `EntrepriseProvider` les charge après
+la connexion ; `EnTeteDocument` les affiche : variante `ticket` (colonne centrée, papier thermique 80 mm) ou `a4` (logo à gauche,
+coordonnées à droite). Chaque variante demande au serveur le logo à sa taille (`taille=ticket` ou `taille=entete`) et le borne en
+millimètres à l'impression. `imprimer()` (`lib/impression.ts`) attend le chargement du logo avant d'ouvrir la boîte d'impression, sans
+jamais bloquer plus de 3 secondes. Pour un nouveau document (facture, bon de livraison) : poser `<EnTeteDocument variante="a4" />` en tête
+et imprimer avec `imprimer(zone)`.
 
 ## Choix volontairement différés
 

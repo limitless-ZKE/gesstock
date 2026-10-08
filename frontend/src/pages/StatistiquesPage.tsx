@@ -13,6 +13,7 @@ import {
 import { api } from "../services/api";
 import { apiErrorMessage as messageFor } from "../services/apiError";
 import { money } from "../lib/format";
+import EnTeteDocument from "../components/EnTeteDocument";
 
 type CategoryMargin = {
   categorieId: number | null;
@@ -160,6 +161,7 @@ export default function StatistiquesPage() {
   const maxArticleMargin = useMemo(() => Math.max(0, ...(report?.margesParArticle.map((item) => Math.max(0, item.margeBrute)) ?? [])), [report]);
 
   return <div className="space-y-6">
+    <div className="hidden print:block"><EnTeteDocument variante="a4" /></div>
     <header className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
       <div><p className="mb-1 text-xs font-bold uppercase tracking-[0.16em] text-emerald-600">Pilotage financier</p><h1 className="text-3xl font-bold tracking-tight text-slate-900">Rapports & statistiques</h1><p className="mt-1.5 text-sm text-slate-500">Analysez le chiffre d’affaires, les marges et les sessions de caisse.</p><p className="mt-1 text-[10px] text-slate-400">Le chiffre d’affaires est TTC ; les marges produit sont calculées hors TVA, après remises.</p></div>
       <div className="flex flex-wrap gap-2"><button disabled={!!exporting || !report} onClick={() => void download("excel")} className="button-secondary h-10"><FileSpreadsheet size={15} />{exporting === "excel" ? "Export…" : "Excel"}</button><button disabled={!!exporting || !report} onClick={() => void download("pdf")} className="button-secondary h-10"><FileText size={15} />{exporting === "pdf" ? "Export…" : "PDF"}</button></div>
@@ -215,7 +217,7 @@ export default function StatistiquesPage() {
         <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left"><thead className="bg-slate-50 text-[9px] font-bold uppercase tracking-wider text-slate-400"><tr><th className="px-5 py-3">Date et heure</th><th className="px-4 py-3">Opération</th><th className="px-4 py-3">Élément</th><th className="px-4 py-3">Utilisateur</th><th className="px-5 py-3">Détails</th></tr></thead><tbody className="divide-y divide-slate-100">{report.journalActivites.length ? [...report.journalActivites].reverse().map((activity) => <tr key={activity.id} className="hover:bg-slate-50/70"><td className="whitespace-nowrap px-5 py-3 text-xs text-slate-600">{dateTimeLabel(activity.dateActivite)}</td><td className="px-4 py-3"><span className="rounded-full bg-slate-100 px-2 py-1 text-[9px] font-bold text-slate-600">{activity.action}</span></td><td className="px-4 py-3 text-xs font-semibold text-slate-700">{activity.entite}{activity.entiteId == null ? "" : ` #${activity.entiteId}`}</td><td className="px-4 py-3 text-xs text-slate-600">{activity.utilisateur || "Système"}</td><td className="max-w-sm px-5 py-3 text-xs text-slate-500">{activity.details || "—"}</td></tr>) : <tr><td colSpan={5} className="h-28 text-center text-xs text-slate-400">Aucune opération journalisée sur cette période.</td></tr>}</tbody></table></div>
       </section>
     </>}
-    <div className="hidden print:block"><p className="text-xs text-slate-500">Rapport GesStock généré le {new Date().toLocaleString("fr-FR")}</p></div>
+    <div className="hidden print:block"><p className="text-xs text-slate-500">Rapport généré le {new Date().toLocaleString("fr-FR")}</p></div>
   </div>;
 }
 
