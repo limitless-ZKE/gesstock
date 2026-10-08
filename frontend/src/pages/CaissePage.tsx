@@ -20,8 +20,11 @@ import {
   WalletCards,
   X,
 } from "lucide-react";
+import ApprobationModal, { type Approbation } from "../components/ApprobationModal";
 import ReceiptModal, { type Sale } from "../components/ReceiptModal";
 import { api } from "../services/api";
+import { apiErrorMessage as messageFor, parseApiError } from "../services/apiError";
+import { money as currency, moneyPrecise as money2 } from "../lib/format";
 
 type Category = { id: number; nom: string };
 type Article = {
@@ -65,7 +68,6 @@ type PaymentMode = "ESPECES" | "MOBILE_MONEY" | "CARTE" | "VIREMENT";
 // prixNegocie : prix convenu avec le client pour cette ligne (texte saisi) ; vide = prix catalogue.
 type CartLine = { article: Article; quantite: number; promotionId: number | null; prixNegocie: string };
 
-const money2 = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "XOF", minimumFractionDigits: 0, maximumFractionDigits: 2 });
 const round2 = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
 const round4 = (value: number) => Math.round((value + Number.EPSILON) * 10000) / 10000;
 
@@ -90,11 +92,6 @@ function basePrice(line: CartLine): number {
   return negotiatedPriceError(line) === null ? parseNegotiatedPrice(line.prixNegocie) ?? line.article.prixVente : line.article.prixVente;
 }
 
-const currency = new Intl.NumberFormat("fr-FR", {
-  style: "currency",
-  currency: "XOF",
-  maximumFractionDigits: 0,
-});
 
 const paymentModes: { value: PaymentMode; label: string; icon: typeof Banknote }[] = [
   { value: "ESPECES", label: "Espèces", icon: Banknote },
@@ -102,13 +99,6 @@ const paymentModes: { value: PaymentMode; label: string; icon: typeof Banknote }
   { value: "CARTE", label: "Carte", icon: CreditCard },
   { value: "VIREMENT", label: "Virement", icon: WalletCards },
 ];
-
-function messageFor(error: unknown, fallback: string) {
-  if (axios.isAxiosError<{ message?: string }>(error)) {
-    return error.response?.data?.message ?? fallback;
-  }
-  return fallback;
-}
 
 /** Date d'une journée de caisse (AAAA-MM-JJ) au format local, sans décalage de fuseau. */
 function formatDay(value: string) {
@@ -135,10 +125,8 @@ export default function CaissePage() {
   const [categoryId, setCategoryId] = useState("all");
   const [cart, setCart] = useState<CartLine[]>([]);
   const [clientId, setClientId] = useState("");
-  const [tvaRate, setTvaRate] = useState(() => {
-    const configured = Number(import.meta.env.VITE_TVA_RATE ?? "0");
-    return Number.isFinite(configured) && configured >= 0 && configured <= 100 ? configured : 0;
-  });
+  // Régime de TVA imposé par le serveur : la caisse l'affiche, elle ne le décide pas (0 % tant que la TVA n'est pas activée).
+  const [fiscal, setFiscal] = useState({ tauxTva: 0, prixTtc: false });
   const [openingAmount, setOpeningAmount] = useState("");
   const [closingAmount, setClosingAmount] = useState("");
   const [sessionBusy, setSessionBusy] = useState(false);
@@ -146,6 +134,7 @@ export default function CaissePage() {
   const [paymentMode, setPaymentMode] = useState<PaymentMode>("ESPECES");
   const [amountReceived, setAmountReceived] = useState("");
   const [checkoutBusy, setCheckoutBusy] = useState(false);
+  const [approbationDemandee, setApprobationDemandee] = useState<{ message: string; erreur: string } | null>(null);
   const [pendingDraft, setPendingDraft] = useState<SaleResponse | null>(null);
   const [receipt, setReceipt] = useState<SaleResponse | null>(null);
   const [notice, setNotice] = useState("");
@@ -172,9 +161,22 @@ export default function CaissePage() {
       const unitDiscount = round4(basePrice(line) * rate / 100);
       return total + (basePrice(line) - unitDiscount) * line.quantite;
     }, 0);
-    const tax = round4(subtotal * tvaRate / 100);
-    return { subtotal: round4(subtotal), tax, total: round4(subtotal + tax) };
-  }, [cart, promotions, tvaRate]);
+    // Mêmes formules que le serveur (CalculTva) : le total affiché est exactement le total facturé.
+    const net = round4(subtotal);
+    if (fiscal.tauxTva === 0) return { subtotal: net, tax: 0, total: net };
+    if (fiscal.prixTtc) {
+      const hors = round4(net / (1 + fiscal.tauxTva / 100));
+      return { subtotal: hors, tax: round4(net - hors), total: net };
+    }
+    const tax = round4(net * fiscal.tauxTva / 100);
+    return { subtotal: net, tax, total: round4(net + tax) };
+  }, [cart, promotions, fiscal]);
+
+  useEffect(() => {
+    api.get<{ tauxTva: number; prixTtc: boolean }>("/caisse/parametres")
+      .then(({ data }) => setFiscal(data))
+      .catch(() => undefined); // à défaut, 0 % : le serveur refusera un taux différent avec un message explicite
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -301,6 +303,11 @@ export default function CaissePage() {
 
   async function checkout(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    await envoyerVente();
+  }
+
+  /** Enregistre puis valide la vente. Avec l'accord d'un responsable quand le serveur l'a demandé (remise au-delà du plafond, prix sous le coût). */
+  async function envoyerVente(approbation?: Approbation) {
     if (!session || cart.length === 0) return;
     const invalidLine = cart.find((line) => negotiatedPriceError(line) !== null);
     if (invalidLine) {
@@ -309,11 +316,11 @@ export default function CaissePage() {
     }
     const received = Number(amountReceived);
     if (!Number.isFinite(received) || received < cartTotals.total) {
-      showNotice("Le montant reçu doit être supérieur ou égal au total TTC.", true);
+      showNotice("Le montant reçu doit être supérieur ou égal au total à payer.", true);
       return;
     }
     if (paymentMode !== "ESPECES" && received !== cartTotals.total) {
-      showNotice("Pour un règlement sans espèces, saisissez exactement le total TTC.", true);
+      showNotice("Pour un règlement sans espèces, saisissez exactement le total à payer.", true);
       return;
     }
     setCheckoutBusy(true);
@@ -322,9 +329,10 @@ export default function CaissePage() {
       const request = {
         clientId: clientId ? Number(clientId) : null,
         aCredit: false,
-        tauxTva: tvaRate,
+        tauxTva: fiscal.tauxTva,
         modeReglement: paymentMode,
         montantRecu: received,
+        approbation,
         lignes: cart.map((line) => ({
           articleId: line.article.id,
           quantite: line.quantite,
@@ -356,6 +364,12 @@ export default function CaissePage() {
       showNotice("Vente enregistrée et stock mis à jour.");
       void refreshSession().catch(() => setSession(null));
     } catch (error) {
+      const probleme = parseApiError(error);
+      if (probleme.code === "APPROBATION_REQUISE" || probleme.code === "APPROBATION_REFUSEE") {
+        // le serveur demande (ou a refusé) l'accord d'un responsable : on ouvre la fenêtre de saisie, la vente reste dans le panier
+        setApprobationDemandee({ message: probleme.message, erreur: probleme.code === "APPROBATION_REFUSEE" ? probleme.message : "" });
+        return;
+      }
       showNotice(
         draftAlreadyExists
           ? `Le brouillon reste enregistré. ${messageFor(error, "La validation a échoué.")} Corrigez le problème puis réessayez.`
@@ -596,25 +610,14 @@ export default function CaissePage() {
               <div className="flex items-center justify-between text-xs text-slate-500">
                 <span>Sous-total après promotions</span><span className="font-semibold text-slate-700">{currency.format(cartTotals.subtotal)}</span>
               </div>
-              <label className="mt-3 flex items-center justify-between gap-3 text-xs text-slate-500">
-                <span className="flex items-center gap-1.5">TVA (%) <span title="Le taux dépend de votre paramétrage fiscal." className="cursor-help text-slate-400">ⓘ</span></span>
-                <input
-                  aria-label="Taux de TVA en pourcentage"
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.01"
-                  value={tvaRate}
-                  onChange={(event) => setTvaRate(Math.min(100, Math.max(0, Number(event.target.value) || 0)))}
-                  className="w-20 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-right text-xs font-semibold text-slate-700 outline-none focus:border-emerald-500"
-                />
-              </label>
-              <div className="mt-2 flex items-center justify-between text-xs text-slate-500">
-                <span>Montant TVA</span><span className="font-semibold text-slate-700">{currency.format(cartTotals.tax)}</span>
-              </div>
+              {fiscal.tauxTva > 0 && (
+                <div className="mt-2 flex items-center justify-between text-xs text-slate-500">
+                  <span>TVA ({fiscal.tauxTva} %{fiscal.prixTtc ? ", incluse" : ""})</span><span className="font-semibold text-slate-700">{currency.format(cartTotals.tax)}</span>
+                </div>
+              )}
               <div className="my-3 border-t border-dashed border-slate-200" />
               <div className="flex items-center justify-between">
-                <span className="text-sm font-bold text-slate-800">Total TTC</span>
+                <span className="text-sm font-bold text-slate-800">{fiscal.tauxTva > 0 ? "Total TTC" : "Total à payer"}</span>
                 <span className="text-xl font-extrabold tracking-tight text-slate-900">{currency.format(cartTotals.total)}</span>
               </div>
             </div>
@@ -643,6 +646,20 @@ export default function CaissePage() {
           onAmountReceived={setAmountReceived}
           onClose={() => setCheckoutOpen(false)}
           onSubmit={checkout}
+        />
+      )}
+
+      {approbationDemandee && (
+        <ApprobationModal
+          message={approbationDemandee.message}
+          erreur={approbationDemandee.erreur}
+          occupe={checkoutBusy}
+          libelleAction="Valider la vente"
+          onAnnuler={() => setApprobationDemandee(null)}
+          onSoumettre={(approbation) => {
+            setApprobationDemandee(null);
+            void envoyerVente(approbation);
+          }}
         />
       )}
       {receipt && <ReceiptModal sale={receipt} onClose={() => setReceipt(null)} />}

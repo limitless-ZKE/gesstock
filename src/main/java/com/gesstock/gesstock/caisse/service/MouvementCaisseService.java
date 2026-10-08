@@ -67,11 +67,7 @@ public class MouvementCaisseService {
         if (!utilisateur.isActif()) {
             throw new ConflitRessourceException("Un utilisateur désactivé ne peut pas enregistrer une sortie de caisse");
         }
-        BigDecimal disponible = session.getFondDeCaisse()
-            .add(valeurOuZero(venteRepository.encaissementsEspecesSession(
-                session.getId(), StatutVente.VALIDEE, ModeReglement.ESPECES)))
-            .add(valeurOuZero(reglementRepository.totalParSessionEtMode(session.getId(), ModeReglement.ESPECES)))
-            .subtract(valeurOuZero(mouvementRepository.totalSorties(session.getId())));
+        BigDecimal disponible = soldeEspecesDisponible(session);
         if (request.montant().compareTo(disponible) > 0) {
             throw new ConflitRessourceException(
                 "La sortie dépasse le solde théorique disponible de " + disponible.toPlainString());
@@ -87,6 +83,20 @@ public class MouvementCaisseService {
         journalService.enregistrer("SORTIE_CAISSE", "SESSION_CAISSE", session.getId(),
             request.motif().trim() + " · " + request.beneficiaire().trim() + " · " + request.montant(), username);
         return toResponse(saved);
+    }
+
+    /**
+     * Espèces que la caisse est censée contenir : fond de caisse, encaissements des ventes validées en espèces, règlements
+     * clients en espèces, moins les sorties. Une vente annulée n'y figure plus : son remboursement n'est donc PAS une sortie à
+     * enregistrer en plus (ce serait la déduire deux fois).
+     */
+    @Transactional(readOnly = true)
+    public BigDecimal soldeEspecesDisponible(SessionCaisse session) {
+        return session.getFondDeCaisse()
+            .add(valeurOuZero(venteRepository.encaissementsEspecesSession(
+                session.getId(), StatutVente.VALIDEE, ModeReglement.ESPECES)))
+            .add(valeurOuZero(reglementRepository.totalParSessionEtMode(session.getId(), ModeReglement.ESPECES)))
+            .subtract(valeurOuZero(mouvementRepository.totalSorties(session.getId())));
     }
 
     private SessionCaisse trouverSession(Long id) {

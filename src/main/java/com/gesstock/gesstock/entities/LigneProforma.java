@@ -64,4 +64,9 @@ public class LigneProforma {
     /** Prix catalogue à l'émission : sert à afficher la remise négociée. Null sur les anciennes lignes. */
     @Column(precision = 19, scale = 4)
     private BigDecimal prixCatalogue;
+
+    /** Responsable qui a donné son accord à une remise au-delà du plafond du vendeur ou à un prix sous le coût ; null sinon. */
+    @ManyToOne
+    @JoinColumn(name = "remise_approuvee_par_id")
+    private Utilisateur remiseApprouveePar;
 }

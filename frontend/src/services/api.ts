@@ -1,4 +1,5 @@
 import axios, { AxiosError } from "axios";
+import { parseApiError } from "./apiError";
 
 export const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080/api";
@@ -14,23 +15,17 @@ export const api = axios.create({
 
 api.interceptors.response.use(
   (response) => response,
-  (error: AxiosError<{ message?: string }>) => {
-    const status = error.response?.status;
-    const message =
-      error.response?.data?.message ??
-      (status === 403
-        ? "Vous n’avez pas les droits nécessaires pour cette action."
-        : status === 500
-          ? "Une erreur serveur est survenue. Réessayez plus tard."
-          : error.message);
+  (error: AxiosError) => {
+    const apiError = parseApiError(error);
 
-    if (status === 401) {
+    // Session expirée ou absente : AuthContext renvoie l'utilisateur vers la connexion.
+    if (apiError.status === 401) {
       window.dispatchEvent(new CustomEvent("gesstock:unauthorized"));
     }
-    if (status === 403 || status === 500) {
-      window.dispatchEvent(
-        new CustomEvent("gesstock:api-error", { detail: message }),
-      );
+    // Erreurs que l'écran ne peut pas traiter lui-même : droits, serveur, réseau.
+    if (apiError.status === 403 || apiError.code === "RESEAU" || (apiError.status ?? 0) >= 500) {
+      const reference = apiError.requestId ? ` (réf. ${apiError.requestId.slice(0, 8)})` : "";
+      window.dispatchEvent(new CustomEvent("gesstock:api-error", { detail: apiError.message + reference }));
     }
 
     return Promise.reject(error);

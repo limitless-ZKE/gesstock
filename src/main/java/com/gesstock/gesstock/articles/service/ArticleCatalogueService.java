@@ -3,17 +3,23 @@ package com.gesstock.gesstock.articles.service;
 import com.gesstock.gesstock.articles.dto.ArticleRequest;
 import com.gesstock.gesstock.articles.dto.ArticleResponse;
 import com.gesstock.gesstock.common.exception.ConflitRessourceException;
+import com.gesstock.gesstock.common.exception.RequeteInvalideException;
 import com.gesstock.gesstock.common.exception.RessourceIntrouvableException;
 import com.gesstock.gesstock.articles.mapper.CatalogueMapper;
 import com.gesstock.gesstock.entities.Article;
 import com.gesstock.gesstock.entities.CategorieArticle;
+import com.gesstock.gesstock.entities.MouvementStock;
+import com.gesstock.gesstock.entities.TypeMouvementStock;
 import com.gesstock.gesstock.entities.UniteMesure;
 import com.gesstock.gesstock.repositories.ArticleRepository;
 import com.gesstock.gesstock.repositories.CategorieArticleRepository;
+import com.gesstock.gesstock.repositories.MouvementStockRepository;
 import com.gesstock.gesstock.repositories.UniteMesureRepository;
+import com.gesstock.gesstock.repositories.UtilisateurRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -23,15 +29,21 @@ public class ArticleCatalogueService {
     private final ArticleRepository articleRepository;
     private final CategorieArticleRepository categorieRepository;
     private final UniteMesureRepository uniteMesureRepository;
+    private final MouvementStockRepository mouvementStockRepository;
+    private final UtilisateurRepository utilisateurRepository;
 
     public ArticleCatalogueService(
         ArticleRepository articleRepository,
         CategorieArticleRepository categorieRepository,
-        UniteMesureRepository uniteMesureRepository
+        UniteMesureRepository uniteMesureRepository,
+        MouvementStockRepository mouvementStockRepository,
+        UtilisateurRepository utilisateurRepository
     ) {
         this.articleRepository = articleRepository;
         this.categorieRepository = categorieRepository;
         this.uniteMesureRepository = uniteMesureRepository;
+        this.mouvementStockRepository = mouvementStockRepository;
+        this.utilisateurRepository = utilisateurRepository;
     }
 
     @Transactional(readOnly = true)
@@ -53,16 +65,44 @@ public class ArticleCatalogueService {
     }
 
     public ArticleResponse creer(ArticleRequest request) {
+        return creer(request, null);
+    }
+
+    /** Crée l'article ; un stock de départ non nul laisse un mouvement STOCK_INITIAL (la somme des mouvements explique le stock). */
+    public ArticleResponse creer(ArticleRequest request, String username) {
         verifierReferenceDisponible(request.reference(), null);
         Article article = new Article();
-        remplir(article, request);
-        return CatalogueMapper.toResponse(articleRepository.save(article));
+        remplir(article, request, true);
+        Article enregistre = articleRepository.save(article);
+        if (enregistre.getQuantiteStock() > 0) {
+            MouvementStock mouvement = new MouvementStock();
+            mouvement.setType(TypeMouvementStock.STOCK_INITIAL);
+            mouvement.setQuantite(enregistre.getQuantiteStock());
+            mouvement.setStockAvant(0);
+            mouvement.setStockApres(enregistre.getQuantiteStock());
+            mouvement.setCoutUnitaire(enregistre.getCmp());
+            mouvement.setDateMouvement(LocalDateTime.now());
+            mouvement.setReferenceDocument("STOCK-INITIAL");
+            mouvement.setCommentaire("Stock de départ saisi à la création de l'article");
+            mouvement.setArticle(enregistre);
+            if (username != null) {
+                utilisateurRepository.findByUsername(username).ifPresent(mouvement::setEffectuePar);
+            }
+            mouvementStockRepository.save(mouvement);
+        }
+        return CatalogueMapper.toResponse(enregistre);
     }
 
     public ArticleResponse modifier(Long id, ArticleRequest request) {
         Article article = trouver(id);
         verifierReferenceDisponible(request.reference(), id);
-        remplir(article, request);
+        // Le stock ne se corrige JAMAIS ici : toute variation doit laisser un mouvement (ajustement de stock), sinon
+        // la somme des mouvements ne correspond plus au stock et l'erreur ou la fraude devient invisible.
+        if (request.quantiteStock() != null && request.quantiteStock() != article.getQuantiteStock()) {
+            throw new RequeteInvalideException(
+                "Le stock ne se modifie pas depuis la fiche article : utilisez « Ajuster le stock » (motif obligatoire)");
+        }
+        remplir(article, request, false);
         return CatalogueMapper.toResponse(articleRepository.save(article));
     }
 
@@ -70,14 +110,17 @@ public class ArticleCatalogueService {
         articleRepository.delete(trouver(id));
     }
 
-    private void remplir(Article article, ArticleRequest request) {
+    private void remplir(Article article, ArticleRequest request, boolean creation) {
         article.setReference(request.reference().trim());
         article.setDesignation(request.designation().trim());
         article.setPrixAchat(request.prixAchat());
         article.setPrix(request.prixVente());
         article.setSeuilAlerte(request.seuilAlerteStock());
-        if (request.quantiteStock() != null) {
-            article.setQuantiteStock(request.quantiteStock());
+        if (creation && request.quantiteStock() != null) {
+            article.setQuantiteStock(request.quantiteStock()); // stock de départ, à la création uniquement
+        }
+        if (creation) {
+            article.setCmp(request.prixAchat()); // premier coût connu ; ensuite seules les entrées en stock le font évoluer
         }
         article.setCategorie(request.categorieId() == null ? null : trouverCategorie(request.categorieId()));
         article.setUniteMesure(request.uniteMesureId() == null ? null : trouverUnite(request.uniteMesureId()));

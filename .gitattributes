@@ -1,2 +1,7 @@
+# Fins de ligne normalisées dans le dépôt quel que soit le poste (Windows, Linux, CI).
+* text=auto
 /mvnw text eol=lf
 *.cmd text eol=crlf
+*.sh text eol=lf
+# Les migrations Flyway restent identiques d'un poste à l'autre.
+*.sql text eol=lf

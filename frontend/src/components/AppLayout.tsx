@@ -1,12 +1,14 @@
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import {
   Boxes,
   Building2,
   ChartNoAxesCombined,
   ChevronRight,
+  ClipboardList,
   LayoutDashboard,
   LogOut,
   Menu,
+  PackageMinus,
   PackagePlus,
   PanelLeftClose,
   PanelLeftOpen,
@@ -27,8 +29,10 @@ const navigation = [
   { to: "/historique-ventes", label: "Historique des ventes", icon: ReceiptText },
   { to: "/caisse/mouvements", label: "Mouvements de caisse", icon: SlidersHorizontal },
   { to: "/articles", label: "Articles", icon: Boxes },
+  { to: "/inventaires", label: "Inventaires", icon: ClipboardList },
   { to: "/approvisionnements", label: "Approvisionnements", icon: PackagePlus },
   { to: "/fournisseurs", label: "Fournisseurs", icon: Building2 },
+  { to: "/retours-fournisseurs", label: "Retours fournisseurs", icon: PackageMinus },
   { to: "/clients-dettes", label: "Clients & dettes", icon: UsersRound },
   { to: "/statistiques", label: "Statistiques", icon: ChartNoAxesCombined },
   { to: "/admin/utilisateurs", label: "Administration", icon: ShieldCheck },
@@ -78,11 +82,13 @@ export default function AppLayout() {
   const normalizedRoles = user?.roles.map((role) => role.toUpperCase().replace(/^ROLE_/, "")) ?? [];
   const visibleNavigation = navigation.filter(({ to }) => {
     if (to === "/admin/utilisateurs") return normalizedRoles.includes("ADMIN");
-    if (["/approvisionnements", "/fournisseurs"].includes(to)) {
+    if (["/approvisionnements", "/fournisseurs", "/retours-fournisseurs", "/inventaires"].includes(to)) {
       return normalizedRoles.some((role) => ["ADMIN", "MANAGER", "GESTIONNAIRE"].includes(role));
     }
     if (to === "/statistiques") return normalizedRoles.some((role) => ["ADMIN", "MANAGER", "GESTIONNAIRE"].includes(role));
-    if (to === "/caisse/mouvements") return normalizedRoles.some((role) => ["ADMIN", "MANAGER", "GESTIONNAIRE", "CAISSIER", "VENDEUR"].includes(role));
+    if (to === "/caisse/mouvements") return normalizedRoles.some((role) => ["ADMIN", "MANAGER", "GESTIONNAIRE", "CAISSIER"].includes(role));
+    // Le tableau de bord lit des statistiques, et le catalogue se modifie : ni l'un ni l'autre ne concerne le caissier.
+    if (["/dashboard", "/articles"].includes(to)) return normalizedRoles.some((role) => ["ADMIN", "MANAGER", "GESTIONNAIRE"].includes(role));
     return true;
   });
 
@@ -225,7 +231,10 @@ export default function AppLayout() {
           </div>
         </header>
         <main className="mx-auto w-full max-w-[1440px] p-4 md:p-8">
-          <Outlet />
+          {/* Le menu reste affiché pendant le chargement d'un écran. */}
+          <Suspense fallback={<p role="status" className="py-24 text-center text-sm font-medium text-slate-400">Chargement…</p>}>
+            <Outlet />
+          </Suspense>
         </main>
       </div>
     </div>

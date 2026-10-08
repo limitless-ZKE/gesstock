@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
-import axios from "axios";
 import {
   Banknote,
   Check,
@@ -26,8 +25,11 @@ import {
 } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
 import { api } from "../services/api";
+import { apiErrorMessage as errorMessage, parseApiError } from "../services/apiError";
+import ApprobationModal, { type Approbation } from "../components/ApprobationModal";
+import { money as currency } from "../lib/format";
 
-type Client = { id: number; nom: string; email: string | null; telephone: string | null; adresse: string | null };
+type Client = { id: number; nom: string; email: string | null; telephone: string | null; adresse: string | null; nombreAchats: number };
 type Article = { id: number; reference: string; designation: string; prixVente: number; quantiteStock: number };
 type SaleLine = {
   articleId: number;
@@ -96,7 +98,6 @@ type Payment = {
 type DraftLine = { articleId: string; quantite: string; prixUnitaire: string; remise: string };
 type ClientForm = { nom: string; email: string; telephone: string; adresse: string };
 
-const currency = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "XOF", maximumFractionDigits: 0 });
 const today = new Date().toISOString().slice(0, 10);
 const blankClient: ClientForm = { nom: "", email: "", telephone: "", adresse: "" };
 /** Arrondi à deux décimales (remises en %, prix négociés). */
@@ -110,11 +111,6 @@ const paymentModes: { value: PaymentMode; label: string; icon: typeof Banknote }
   { value: "CHEQUE", label: "Chèque", icon: FileText },
   { value: "AUTRE", label: "Autre", icon: CircleDollarSign },
 ];
-
-function errorMessage(error: unknown, fallback: string) {
-  if (axios.isAxiosError<{ message?: string }>(error)) return error.response?.data?.message ?? fallback;
-  return fallback;
-}
 
 function dateLabel(value: string | null) {
   if (!value) return "—";
@@ -131,11 +127,13 @@ function makeProformaNumber() {
 
 export default function ClientsDettesPage() {
   const { user } = useAuth();
-  const canCancelSales = (user?.roles ?? []).some((role) => ["ADMIN", "MANAGER", "GESTIONNAIRE"].includes(role.toUpperCase().replace(/^ROLE_/, "")));
+  // Annuler une vente (stock, dette, remboursement) est réservé aux responsables : voir SecurityConfig.
+  const canCancelSales = (user?.roles ?? []).some((role) => ["ADMIN", "MANAGER"].includes(role.toUpperCase().replace(/^ROLE_/, "")));
   const [cancellingSaleId, setCancellingSaleId] = useState<number | null>(null);
   const [clients, setClients] = useState<Client[]>([]);
   const [articles, setArticles] = useState<Article[]>([]);
-  const [sales, setSales] = useState<Sale[]>([]);
+  // Historique d'achats du client dont la fiche est ouverte : les 20 dernières ventes, chargées à l'ouverture
+  const [clientSales, setClientSales] = useState<Sale[]>([]);
   const [proformas, setProformas] = useState<Proforma[]>([]);
   const [debts, setDebts] = useState<Debt[]>([]);
   const [loading, setLoading] = useState(true);
@@ -155,8 +153,12 @@ export default function ClientsDettesPage() {
   const [expirationDate, setExpirationDate] = useState("");
   const [draftLines, setDraftLines] = useState<DraftLine[]>([blankLine()]);
   const [proformaSaving, setProformaSaving] = useState(false);
+  const [approbationDemandee, setApprobationDemandee] = useState<{ message: string; erreur: string } | null>(null);
   const [busyProformaId, setBusyProformaId] = useState<number | null>(null);
   const [convertCreditId, setConvertCreditId] = useState<number | null>(null);
+  const [cashProforma, setCashProforma] = useState<Proforma | null>(null);
+  const [cashMode, setCashMode] = useState<PaymentMode>("ESPECES");
+  const [cashReceived, setCashReceived] = useState("");
   const [paymentDebt, setPaymentDebt] = useState<Debt | null>(null);
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentMode, setPaymentMode] = useState<PaymentMode>("ESPECES");
@@ -170,16 +172,14 @@ export default function ClientsDettesPage() {
     setLoading(true);
     setLoadError("");
     try {
-      const [clientResult, articleResult, saleResult, proformaResult, debtResult] = await Promise.all([
+      const [clientResult, articleResult, proformaResult, debtResult] = await Promise.all([
         api.get<Client[]>("/clients"),
         api.get<Article[]>("/articles"),
-        api.get<Sale[]>("/ventes"),
         api.get<Proforma[]>("/proformas"),
         api.get<Debt[]>("/dettes-clients"),
       ]);
       setClients(clientResult.data);
       setArticles(articleResult.data);
-      setSales(saleResult.data);
       setProformas(proformaResult.data);
       setDebts(debtResult.data);
     } catch (error) {
@@ -190,6 +190,21 @@ export default function ClientsDettesPage() {
   }
 
   useEffect(() => { void loadData(); }, []);
+
+  async function loadClientSales(clientId: number) {
+    try {
+      const { data } = await api.get<Sale[]>("/ventes", { params: { clientId, size: 20 } });
+      setClientSales(data.filter((sale) => sale.statut === "VALIDEE"));
+    } catch (error) {
+      showNotice(errorMessage(error, "L’historique d’achats du client est indisponible."), true);
+    }
+  }
+
+  function openClientDetail(client: Client) {
+    setClientDetail(client);
+    setClientSales([]);
+    void loadClientSales(client.id);
+  }
 
   const totalDue = useMemo(() => debts.reduce((sum, debt) => sum + Math.max(0, debt.solde), 0), [debts]);
   const unpaidDebtCount = debts.filter((debt) => debt.solde > 0 && debt.statut !== "ANNULEE").length;
@@ -294,6 +309,11 @@ export default function ClientsDettesPage() {
 
   async function saveProforma(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    await envoyerProforma();
+  }
+
+  /** Enregistre le proforma, avec l'accord d'un responsable quand le serveur l'a demandé (remise au-delà du plafond, prix sous le coût). */
+  async function envoyerProforma(approbation?: Approbation) {
     const validLines = draftLines.filter((line) => line.articleId && Number(line.quantite) > 0
       && Number(line.prixUnitaire) >= 0 && Number(line.prixUnitaire) <= (articles.find((article) => String(article.id) === line.articleId)?.prixVente ?? Infinity));
     if (!validLines.length) {
@@ -312,6 +332,7 @@ export default function ClientsDettesPage() {
           quantite: Number(line.quantite),
           prixUnitaire: round2(Number(line.prixUnitaire)),
         })),
+        approbation,
       };
       if (proformaModal === "new") await api.post("/proformas", request);
       else if (proformaModal) await api.put(`/proformas/${proformaModal.id}`, request);
@@ -319,6 +340,11 @@ export default function ClientsDettesPage() {
       showNotice(proformaModal === "new" ? "La facture proforma a été créée en brouillon." : "Le brouillon proforma a été modifié.");
       await loadData();
     } catch (error) {
+      const probleme = parseApiError(error);
+      if (probleme.code === "APPROBATION_REQUISE" || probleme.code === "APPROBATION_REFUSEE") {
+        setApprobationDemandee({ message: probleme.message, erreur: probleme.code === "APPROBATION_REFUSEE" ? probleme.message : "" });
+        return;
+      }
       showNotice(errorMessage(error, "L’enregistrement du proforma a échoué."), true);
     } finally {
       setProformaSaving(false);
@@ -355,15 +381,47 @@ export default function ClientsDettesPage() {
   }
 
   async function convertProforma(proforma: Proforma, aCredit: boolean) {
-    if (!window.confirm(`Convertir ${proforma.numero} en vente validée ? Le stock sera déduit et une journée de caisse ouverte est requise.`)) return;
+    if (!aCredit) {
+      // Au comptant, le règlement est obligatoire : sans lui l'argent encaissé serait invisible dans la caisse.
+      setCashMode("ESPECES");
+      setCashReceived(String(proforma.montantTotal));
+      setCashProforma(proforma);
+      return;
+    }
+    if (!window.confirm(`Convertir ${proforma.numero} en vente à crédit ? Le stock sera déduit, la créance client enregistrée, et une journée de caisse ouverte est requise.`)) return;
+    await sendConversion(proforma, { aCredit: true });
+  }
+
+  async function confirmCashConversion(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!cashProforma) return;
+    const received = Number(cashReceived);
+    if (!Number.isFinite(received) || received < cashProforma.montantTotal) {
+      showNotice("Le montant reçu doit couvrir le total du proforma.", true);
+      return;
+    }
+    if (cashMode !== "ESPECES" && received !== cashProforma.montantTotal) {
+      showNotice("Un règlement sans espèces doit correspondre exactement au total.", true);
+      return;
+    }
+    const converted = await sendConversion(cashProforma, { aCredit: false, modeReglement: cashMode, montantRecu: received });
+    if (converted) setCashProforma(null);
+  }
+
+  async function sendConversion(
+    proforma: Proforma,
+    body: { aCredit: boolean; modeReglement?: PaymentMode; montantRecu?: number },
+  ): Promise<boolean> {
     setBusyProformaId(proforma.id);
     try {
-      const { data: sale } = await api.post<Sale>(`/proformas/${proforma.id}/conversion`, { aCredit });
-      showNotice(`Vente ${sale.code} validée. Le stock a été déduit${sale.aCredit ? " et la créance client enregistrée" : ""}.`);
+      const { data: sale } = await api.post<Sale>(`/proformas/${proforma.id}/conversion`, body);
+      showNotice(`Vente ${sale.code} validée. Le stock a été déduit${sale.aCredit ? " et la créance client enregistrée" : ", le règlement est enregistré en caisse"}.`);
       setConvertCreditId(null);
       await loadData();
+      return true;
     } catch (error) {
       showNotice(errorMessage(error, "La conversion du proforma a échoué."), true);
+      return false;
     } finally {
       setBusyProformaId(null);
     }
@@ -397,6 +455,7 @@ export default function ClientsDettesPage() {
             : ""),
       );
       await loadData();
+      if (clientDetail) await loadClientSales(clientDetail.id);
     } catch (error) {
       showNotice(errorMessage(error, "L’annulation de la vente a échoué."), true);
     } finally {
@@ -447,7 +506,6 @@ export default function ClientsDettesPage() {
     }
   }
 
-  const clientSales = clientDetail ? sales.filter((sale) => sale.clientId === clientDetail.id && sale.statut === "VALIDEE") : [];
   const clientDebts = clientDetail ? debts.filter((debt) => debt.clientId === clientDetail.id) : [];
 
   return <>
@@ -476,7 +534,7 @@ export default function ClientsDettesPage() {
         </div>
         {loadError && <div role="alert" className="m-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-800">{loadError}<button onClick={() => void loadData()} className="ml-2 underline">Réessayer</button></div>}
         <div className="overflow-x-auto">
-          {tab === "clients" && <ClientsTable clients={filteredClients} sales={sales} loading={loading} onDetail={setClientDetail} onEdit={openClientForm} onDelete={(client) => void deleteClient(client)} />}
+          {tab === "clients" && <ClientsTable clients={filteredClients} loading={loading} onDetail={openClientDetail} onEdit={openClientForm} onDelete={(client) => void deleteClient(client)} />}
           {tab === "proformas" && <ProformasTable proformas={filteredProformas} loading={loading} busyId={busyProformaId} convertCreditId={convertCreditId} onConvertCredit={setConvertCreditId} onEdit={openProformaForm} onStatus={(proforma, status) => void updateProformaStatus(proforma, status)} onConvert={(proforma) => void convertProforma(proforma, convertCreditId === proforma.id)} onDelete={(proforma) => void deleteProforma(proforma)} />}
           {tab === "debts" && <DebtsTable debts={filteredDebts} loading={loading} onPay={(debt) => void openPaymentForm(debt)} />}
         </div>
@@ -525,13 +583,26 @@ export default function ClientsDettesPage() {
         <div className="flex gap-2 text-xs text-slate-600"><Mail size={15} className="shrink-0 text-slate-400" />{clientDetail.email || clientDetail.telephone || "Aucun contact"}</div>
         <div className="flex gap-2 text-xs text-slate-600"><MapPin size={15} className="shrink-0 text-slate-400" />{clientDetail.adresse || "Adresse non renseignée"}</div>
       </div>
-      <div className="mb-5 flex items-center justify-between"><h3 className="text-sm font-bold text-slate-800">Historique d’achats</h3><span className="text-[11px] text-slate-500">{clientSales.length} vente(s) validée(s)</span></div>
+      <div className="mb-5 flex items-center justify-between"><h3 className="text-sm font-bold text-slate-800">Historique d’achats</h3><span className="text-[11px] text-slate-500">{(clients.find((client) => client.id === clientDetail.id) ?? clientDetail).nombreAchats} vente(s) validée(s){clientSales.length < (clients.find((client) => client.id === clientDetail.id) ?? clientDetail).nombreAchats ? ` · ${clientSales.length} dernière(s) affichée(s)` : ""}</span></div>
       {clientSales.length ? <div className="max-h-56 overflow-auto rounded-xl border border-slate-200"><table className="w-full text-left"><thead className="sticky top-0 bg-slate-50 text-[9px] font-bold uppercase text-slate-400"><tr><th className="px-3 py-2">Vente</th><th className="px-3 py-2">Date</th><th className="px-3 py-2">Articles</th><th className="px-3 py-2 text-right">Total</th>{canCancelSales && <th className="px-3 py-2 text-right">Action</th>}</tr></thead><tbody className="divide-y divide-slate-100">{clientSales.map((sale) => <tr key={sale.id}><td className="px-3 py-2.5 text-xs font-bold text-slate-700">{sale.code}</td><td className="px-3 py-2.5 text-xs text-slate-500">{dateTimeLabel(sale.dateVente)}</td><td className="px-3 py-2.5 text-xs text-slate-500">{sale.lignes.length}</td><td className="px-3 py-2.5 text-right text-xs font-bold text-slate-800">{currency.format(sale.montantTotal)}</td>{canCancelSales && <td className="px-3 py-2.5 text-right">{sale.aCredit ? <button disabled={cancellingSaleId === sale.id} onClick={() => void cancelCreditSale(sale)} className="text-[10px] font-bold text-rose-600 hover:text-rose-800 disabled:opacity-50">{cancellingSaleId === sale.id ? "Annulation…" : "Annuler"}</button> : <span className="text-[10px] text-slate-300">—</span>}</td>}</tr>)}</tbody></table></div> : <Empty>Pas encore d’achat validé pour ce client.</Empty>}
       <div className="mb-3 mt-6 flex items-center justify-between"><h3 className="text-sm font-bold text-slate-800">Situation du compte</h3><span className="text-xs font-bold text-orange-700">{currency.format(clientDebts.reduce((sum, debt) => sum + Math.max(0, debt.solde), 0))} dû</span></div>
       {clientDebts.length ? <div className="max-h-40 overflow-auto rounded-xl border border-slate-200"><table className="w-full text-left"><tbody className="divide-y divide-slate-100">{clientDebts.map((debt) => <tr key={debt.id}><td className="px-3 py-2.5 text-xs font-semibold text-slate-700">{debt.numeroVente}</td><td className="px-3 py-2.5 text-xs text-slate-500">{dateLabel(debt.dateCreation)}</td><td className="px-3 py-2.5"><DebtBadge status={debt.statut} /></td><td className="px-3 py-2.5 text-right text-xs font-bold text-slate-800">{currency.format(debt.solde)}</td></tr>)}</tbody></table></div> : <Empty>Aucune dette client.</Empty>}
       <div className="mt-5 flex justify-end"><button onClick={() => { setClientDetail(null); openClientForm(clientDetail); }} className="button-secondary"><Pencil size={14} /> Modifier la fiche</button></div>
     </Modal>}
 
+    {approbationDemandee && <ApprobationModal message={approbationDemandee.message} erreur={approbationDemandee.erreur} occupe={proformaSaving} libelleAction="Enregistrer le proforma" onAnnuler={() => setApprobationDemandee(null)} onSoumettre={(approbation) => { setApprobationDemandee(null); void envoyerProforma(approbation); }} />}
+    {cashProforma && <Modal title={`Règlement · ${cashProforma.numero}`} onClose={() => busyProformaId === null && setCashProforma(null)}>
+      <div className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4"><p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Total à encaisser</p><p className="mt-1 text-xl font-extrabold text-emerald-900">{currency.format(cashProforma.montantTotal)}</p></div>
+      <form onSubmit={(event) => void confirmCashConversion(event)} className="space-y-4">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Mode de règlement"><select className="input-field" value={cashMode} onChange={(event) => { const mode = event.target.value as PaymentMode; setCashMode(mode); if (mode !== "ESPECES") setCashReceived(String(cashProforma.montantTotal)); }}>{paymentModes.map((mode) => <option key={mode.value} value={mode.value}>{mode.label}</option>)}</select></Field>
+          <Field label="Montant reçu"><input required autoFocus type="number" min={cashProforma.montantTotal} step="any" className="input-field" value={cashReceived} onChange={(event) => setCashReceived(event.target.value)} /></Field>
+        </div>
+        {cashMode === "ESPECES" && Number(cashReceived) > cashProforma.montantTotal && <p className="rounded-xl bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-800">Monnaie à rendre : {currency.format(Number(cashReceived) - cashProforma.montantTotal)}</p>}
+        <p className="text-[10px] text-slate-500">La vente sera validée, le stock déduit et le montant ajouté à la caisse de la journée ouverte.</p>
+        <ModalActions busy={busyProformaId !== null} submitLabel="Encaisser et convertir" onCancel={() => setCashProforma(null)} />
+      </form>
+    </Modal>}
     {paymentDebt && <Modal wide title={`Règlement · ${paymentDebt.client}`} onClose={() => !paymentSaving && setPaymentDebt(null)}>
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-orange-200 bg-orange-50 p-4"><div><p className="text-[10px] font-bold uppercase tracking-wider text-orange-700">Solde restant · vente {paymentDebt.numeroVente}</p><p className="mt-1 text-xl font-extrabold text-orange-900">{currency.format(paymentDebt.solde)}</p></div><DebtBadge status={paymentDebt.statut} /></div>
       <form onSubmit={(event) => void savePayment(event)} className="space-y-4">
@@ -579,10 +650,10 @@ function TabButton({ active, onClick, icon, children }: { active: boolean; onCli
   return <button onClick={onClick} className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-[11px] font-bold transition ${active ? "bg-white text-emerald-700 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}>{icon}{children}</button>;
 }
 
-function ClientsTable({ clients, sales, loading, onDetail, onEdit, onDelete }: { clients: Client[]; sales: Sale[]; loading: boolean; onDetail: (client: Client) => void; onEdit: (client: Client) => void; onDelete: (client: Client) => void }) {
+function ClientsTable({ clients, loading, onDetail, onEdit, onDelete }: { clients: Client[]; loading: boolean; onDetail: (client: Client) => void; onEdit: (client: Client) => void; onDelete: (client: Client) => void }) {
   return <table className="w-full min-w-[760px] text-left">
     <thead className="bg-slate-50/80 text-[10px] font-bold uppercase tracking-wider text-slate-400"><tr><th className="px-5 py-3">Client</th><th className="px-4 py-3">Téléphone</th><th className="px-4 py-3">Adresse</th><th className="px-4 py-3">Achats validés</th><th className="px-5 py-3 text-right">Actions</th></tr></thead>
-    <tbody className="divide-y divide-slate-100">{loading ? <LoadingRow cols={5} /> : clients.length ? clients.map((client) => <tr key={client.id} className="hover:bg-slate-50/70"><td className="px-5 py-3.5"><button onClick={() => onDetail(client)} className="flex items-center gap-2.5 text-left"><span className="grid size-9 place-items-center rounded-xl bg-emerald-50 text-emerald-700"><UserRound size={16} /></span><span><span className="block text-xs font-bold text-slate-800">{client.nom}</span><span className="mt-1 block text-[10px] text-slate-400">{client.email || "E-mail non renseigné"}</span></span></button></td><td className="px-4 py-3.5 text-xs text-slate-600">{client.telephone || "—"}</td><td className="max-w-56 truncate px-4 py-3.5 text-xs text-slate-600">{client.adresse || "—"}</td><td className="px-4 py-3.5 text-xs font-semibold text-slate-700">{sales.filter((sale) => sale.clientId === client.id && sale.statut === "VALIDEE").length}</td><td className="px-5 py-3.5"><div className="flex justify-end gap-1"><button onClick={() => onDetail(client)} title="Historique et fiche client" className="icon-button text-slate-400 hover:text-emerald-700"><History size={15} /></button><button onClick={() => onEdit(client)} title="Modifier" className="icon-button text-slate-400 hover:text-emerald-700"><Pencil size={15} /></button><button onClick={() => onDelete(client)} title="Supprimer" className="icon-button text-slate-400 hover:bg-rose-50 hover:text-rose-600"><Trash2 size={15} /></button></div></td></tr>) : <EmptyRow cols={5} message="Aucun client trouvé." />}</tbody>
+    <tbody className="divide-y divide-slate-100">{loading ? <LoadingRow cols={5} /> : clients.length ? clients.map((client) => <tr key={client.id} className="hover:bg-slate-50/70"><td className="px-5 py-3.5"><button onClick={() => onDetail(client)} className="flex items-center gap-2.5 text-left"><span className="grid size-9 place-items-center rounded-xl bg-emerald-50 text-emerald-700"><UserRound size={16} /></span><span><span className="block text-xs font-bold text-slate-800">{client.nom}</span><span className="mt-1 block text-[10px] text-slate-400">{client.email || "E-mail non renseigné"}</span></span></button></td><td className="px-4 py-3.5 text-xs text-slate-600">{client.telephone || "—"}</td><td className="max-w-56 truncate px-4 py-3.5 text-xs text-slate-600">{client.adresse || "—"}</td><td className="px-4 py-3.5 text-xs font-semibold text-slate-700">{client.nombreAchats}</td><td className="px-5 py-3.5"><div className="flex justify-end gap-1"><button onClick={() => onDetail(client)} title="Historique et fiche client" className="icon-button text-slate-400 hover:text-emerald-700"><History size={15} /></button><button onClick={() => onEdit(client)} title="Modifier" className="icon-button text-slate-400 hover:text-emerald-700"><Pencil size={15} /></button><button onClick={() => onDelete(client)} title="Supprimer" className="icon-button text-slate-400 hover:bg-rose-50 hover:text-rose-600"><Trash2 size={15} /></button></div></td></tr>) : <EmptyRow cols={5} message="Aucun client trouvé." />}</tbody>
   </table>;
 }
 

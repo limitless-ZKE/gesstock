@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
-import axios from "axios";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   ArrowDownToLine,
   Banknote,
@@ -12,6 +11,8 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { api } from "../services/api";
+import { apiErrorMessage as messageFor } from "../services/apiError";
+import { money } from "../lib/format";
 
 type CategoryMargin = {
   categorieId: number | null;
@@ -67,14 +68,8 @@ type Report = {
 };
 type PeriodPreset = "today" | "month" | "custom";
 
-const money = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "XOF", maximumFractionDigits: 0 });
 const isoToday = () => new Date().toISOString().slice(0, 10);
 const monthStart = () => `${isoToday().slice(0, 7)}-01`;
-
-function messageFor(error: unknown, fallback: string) {
-  if (axios.isAxiosError<{ message?: string }>(error)) return error.response?.data?.message ?? fallback;
-  return fallback;
-}
 
 function dateLabel(value: string) {
   return new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium" }).format(new Date(`${value.slice(0, 10)}T00:00:00`));
@@ -95,7 +90,8 @@ export default function StatistiquesPage() {
   const [error, setError] = useState("");
   const [exportError, setExportError] = useState("");
 
-  async function loadReport(start = startDate, end = endDate) {
+  // N'utilise que des setters (stables) : la période est passée en paramètre, jamais lue dans l'état.
+  const loadReport = useCallback(async (start: string, end: string) => {
     if (!start || !end || end < start) {
       setError("La date de fin doit être égale ou postérieure à la date de début.");
       return;
@@ -111,9 +107,10 @@ export default function StatistiquesPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
-  useEffect(() => { void loadReport(); }, []);
+  // Premier chargement : la période par défaut est celle des états initiaux ci-dessus (début du mois → aujourd'hui).
+  useEffect(() => { void loadReport(monthStart(), isoToday()); }, [loadReport]);
 
   function selectPreset(next: PeriodPreset) {
     setPreset(next);
@@ -174,14 +171,14 @@ export default function StatistiquesPage() {
         <PresetButton active={preset === "month"} onClick={() => selectPreset("month")}>Ce mois</PresetButton>
         <PresetButton active={preset === "custom"} onClick={() => setPreset("custom")}>Personnalisée</PresetButton>
       </div></div>
-      <form onSubmit={(event) => { event.preventDefault(); void loadReport(); }} className="flex flex-col gap-2 sm:flex-row sm:items-end">
+      <form onSubmit={(event) => { event.preventDefault(); void loadReport(startDate, endDate); }} className="flex flex-col gap-2 sm:flex-row sm:items-end">
         <label className="block"><span className="mb-1 block text-[9px] font-bold text-slate-500">Du</span><span className="relative block"><CalendarDays size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input type="date" required value={startDate} onChange={(event) => { setStartDate(event.target.value); setPreset("custom"); }} className="input-field h-10 pl-9" /></span></label>
         <label className="block"><span className="mb-1 block text-[9px] font-bold text-slate-500">Au</span><span className="relative block"><CalendarDays size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input type="date" required min={startDate} value={endDate} onChange={(event) => { setEndDate(event.target.value); setPreset("custom"); }} className="input-field h-10 pl-9" /></span></label>
         <button disabled={loading} className="button-primary h-10 min-w-36">{loading ? <LoaderCircle size={15} className="animate-spin" /> : <ChartNoAxesCombined size={15} />}Analyser</button>
       </form>
     </section>
 
-    {error && <div role="alert" className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-800"><CircleAlert size={15} />{error}<button onClick={() => void loadReport()} className="ml-auto underline">Réessayer</button></div>}
+    {error && <div role="alert" className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-800"><CircleAlert size={15} />{error}<button onClick={() => void loadReport(startDate, endDate)} className="ml-auto underline">Réessayer</button></div>}
     {exportError && <div role="alert" className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-800"><CircleAlert size={15} />{exportError}<button onClick={() => setExportError("")} className="ml-auto underline">Fermer</button></div>}
 
     <section className="grid gap-3 sm:grid-cols-3">

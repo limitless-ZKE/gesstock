@@ -1,0 +1,32 @@
+# Profil de DÉVELOPPEMENT : à activer explicitement (SPRING_PROFILES_ACTIVE=dev), jamais par défaut.
+# Il crée les données de démonstration (DataSeeder : admin / caissier / gestionnaire) et ouvre Swagger aux ADMIN.
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/gesstock_db?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}
+  jpa:
+    properties:
+      hibernate:
+        format_sql: true
+  # Le schéma est créé par Flyway comme en production (application.yml : Flyway actif, Hibernate en « validate »).
+  # Une modification d'entité sans migration fait donc échouer le démarrage en dev, pas seulement en production.
+
+logging:
+  level:
+    org.hibernate.SQL: DEBUG
+  pattern:
+    level: "%5p [%X{requestId:-}]"   # l'identifiant de requête figure sur chaque ligne de log
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+
+app:
+  cors:
+    allowed-origins: http://localhost:5173
+  security:
+    cookies:
+      secure: false      # http://localhost : pas de TLS en développement

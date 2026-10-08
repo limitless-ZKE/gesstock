@@ -29,7 +29,7 @@ import java.util.List;
 import java.util.Set;
 
 @Component
-@Profile("!prod")
+@Profile({"dev", "test"})
 public class DataSeeder implements CommandLineRunner {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(DataSeeder.class);
@@ -150,7 +150,6 @@ public class DataSeeder implements CommandLineRunner {
         Utilisateur utilisateur = new Utilisateur();
         utilisateur.setUsername(username);
         utilisateur.setPassword(passwordEncoder.encode(rawPassword));
-        utilisateur.setRole(role.getName());
         utilisateur.setActif(true);
         utilisateur.setRoles(Set.of(role));
         utilisateurRepository.save(utilisateur);
@@ -185,6 +184,7 @@ public class DataSeeder implements CommandLineRunner {
         article.setReference(reference);
         article.setNom(nom);
         article.setPrixAchat(new BigDecimal(prixAchat));
+        article.setCmp(new BigDecimal(prixAchat));
         article.setPrix(new BigDecimal(prixVente));
         article.setSeuilAlerte(seuilAlerte);
         article.setQuantite(quantite);

@@ -45,7 +45,28 @@ public class LigneVente {
     @Column(precision = 19, scale = 4)
     private java.math.BigDecimal prixCatalogue;
 
+    /**
+     * Coût de revient d'UNE unité vendue (CMP de l'article × facteur de l'unité) au moment de la vente : la marge d'une vente
+     * passée ne bouge plus quand le prix d'achat change. Estimé pour les lignes antérieures au suivi du coût moyen.
+     */
+    @Column(precision = 19, scale = 4)
+    private java.math.BigDecimal coutUnitaire;
+
+    @Column(nullable = false)
+    private boolean coutEstime = false;
+
+    /** Responsable qui a donné son accord à une remise au-delà du plafond du vendeur ou à un prix sous le coût ; null sinon. */
+    @ManyToOne
+    @JoinColumn(name = "remise_approuvee_par_id")
+    private Utilisateur remiseApprouveePar;
+
     // Getters et Setters
+    public Utilisateur getRemiseApprouveePar() { return remiseApprouveePar; }
+    public void setRemiseApprouveePar(Utilisateur remiseApprouveePar) { this.remiseApprouveePar = remiseApprouveePar; }
+    public java.math.BigDecimal getCoutUnitaire() { return coutUnitaire; }
+    public void setCoutUnitaire(java.math.BigDecimal coutUnitaire) { this.coutUnitaire = coutUnitaire; }
+    public boolean isCoutEstime() { return coutEstime; }
+    public void setCoutEstime(boolean coutEstime) { this.coutEstime = coutEstime; }
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public int getQuantite() { return quantite; }

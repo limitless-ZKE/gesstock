@@ -1,20 +1,13 @@
-import axios from "axios";
-import { API_BASE_URL, api } from "../services/api";
+import { api } from "../services/api";
 
 export interface CurrentUser {
   username: string;
   roles: string[];
 }
 
-const backendBaseUrl = API_BASE_URL.replace(/\/api\/?$/, "");
-
+/** Connexion : 204 si réussie, 401 « problem+json » (code IDENTIFIANTS_INVALIDES) sinon ; plus aucune redirection HTML. */
 export async function signIn(username: string, password: string) {
-  const form = new URLSearchParams({ username, password });
-  await axios.post(`${backendBaseUrl}/login`, form, {
-    withCredentials: true,
-    withXSRFToken: true,
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-  });
+  await api.post("/auth/login", new URLSearchParams({ username, password }));
   return getCurrentUser();
 }
 
@@ -24,13 +17,5 @@ export async function getCurrentUser() {
 }
 
 export async function signOut() {
-  await axios.post(
-    `${backendBaseUrl}/logout`,
-    new URLSearchParams(),
-    {
-      withCredentials: true,
-      withXSRFToken: true,
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    },
-  );
+  await api.post("/auth/logout");
 }

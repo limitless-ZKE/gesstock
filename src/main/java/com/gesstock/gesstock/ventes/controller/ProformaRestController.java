@@ -50,9 +50,10 @@ public class ProformaRestController {
     @PutMapping("/{id}")
     public ProformaResponse modifier(
         @PathVariable Long id,
-        @Valid @RequestBody ProformaRequest request
+        @Valid @RequestBody ProformaRequest request,
+        @AuthenticationPrincipal UserDetails principal
     ) {
-        return gestionVentesService.modifierProforma(id, request);
+        return gestionVentesService.modifierProforma(id, request, principal.getUsername());
     }
 
     @PatchMapping("/{id}/statut")
@@ -76,7 +77,9 @@ public class ProformaRestController {
         @RequestBody(required = false) ConversionProformaRequest request,
         @AuthenticationPrincipal UserDetails principal
     ) {
+        ConversionProformaRequest conversion = request == null
+            ? new ConversionProformaRequest(false, null, null) : request;
         return gestionVentesService.convertirProformaEnVente(
-            id, request != null && request.aCredit(), principal.getUsername());
+            id, conversion.aCredit(), conversion.modeReglement(), conversion.montantRecu(), principal.getUsername());
     }
 }

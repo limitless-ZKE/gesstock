@@ -2,6 +2,7 @@ package com.gesstock.gesstock.ventes;
 
 import com.gesstock.gesstock.common.exception.ConflitRessourceException;
 import com.gesstock.gesstock.entities.Article;
+import com.gesstock.gesstock.entities.ModeReglement;
 import com.gesstock.gesstock.entities.StatutProforma;
 import com.gesstock.gesstock.entities.StatutVente;
 import com.gesstock.gesstock.referentiels.dto.OuvertureSessionRequest;
@@ -79,7 +80,7 @@ class ProformaServiceTests {
     void proformaNonAccepteNePeutPasEtreConverti() {
         ProformaResponse cree = ventesService.creerProforma(proforma("PF-003", 1), ADMIN);
 
-        assertThatThrownBy(() -> ventesService.convertirProformaEnVente(cree.id(), false, ADMIN))
+        assertThatThrownBy(() -> ventesService.convertirProformaEnVente(cree.id(), false, ModeReglement.ESPECES, new BigDecimal("1000000"), ADMIN))
             .isInstanceOf(ConflitRessourceException.class);
     }
 
@@ -88,7 +89,7 @@ class ProformaServiceTests {
         ProformaResponse acceptee = proformaAcceptee("PF-004", 2);
         int stockAvant = telephone().getQuantiteStock();
 
-        assertThatThrownBy(() -> ventesService.convertirProformaEnVente(acceptee.id(), false, ADMIN))
+        assertThatThrownBy(() -> ventesService.convertirProformaEnVente(acceptee.id(), false, ModeReglement.ESPECES, new BigDecimal("1000000"), ADMIN))
             .isInstanceOf(ConflitRessourceException.class)
             .hasMessageContaining("journée de caisse");
         assertThat(telephone().getQuantiteStock()).isEqualTo(stockAvant);
@@ -100,7 +101,7 @@ class ProformaServiceTests {
         ProformaResponse acceptee = proformaAcceptee("PF-005", 2);
         int stockAvant = telephone().getQuantiteStock();
 
-        VenteResponse vente = ventesService.convertirProformaEnVente(acceptee.id(), false, ADMIN);
+        VenteResponse vente = ventesService.convertirProformaEnVente(acceptee.id(), false, ModeReglement.ESPECES, new BigDecimal("1000000"), ADMIN);
 
         assertThat(vente.statut()).isEqualTo(StatutVente.VALIDEE);
         assertThat(vente.proformaId()).isEqualTo(acceptee.id());
@@ -108,7 +109,7 @@ class ProformaServiceTests {
         assertThat(ventesService.obtenirProforma(acceptee.id()).statut()).isEqualTo(StatutProforma.CONVERTIE);
 
         // un proforma déjà converti ne peut pas l'être une seconde fois (pas de double déstockage)
-        assertThatThrownBy(() -> ventesService.convertirProformaEnVente(acceptee.id(), false, ADMIN))
+        assertThatThrownBy(() -> ventesService.convertirProformaEnVente(acceptee.id(), false, ModeReglement.ESPECES, new BigDecimal("1000000"), ADMIN))
             .isInstanceOf(ConflitRessourceException.class);
         assertThat(telephone().getQuantiteStock()).isEqualTo(stockAvant - 2);
     }

@@ -1,4 +1,5 @@
 import { CheckCircle2, Printer, X } from "lucide-react";
+import { formatPercent, moneyPrecise as money } from "../lib/format";
 
 export type ReceiptPaymentMode = "ESPECES" | "MOBILE_MONEY" | "CARTE" | "VIREMENT" | "CHEQUE" | "AUTRE";
 
@@ -42,12 +43,6 @@ const paymentLabels: Record<ReceiptPaymentMode, string> = {
 };
 
 // Jusqu'à deux décimales : un prix négocié peut comporter des centimes.
-const money = new Intl.NumberFormat("fr-FR", {
-  style: "currency",
-  currency: "XOF",
-  minimumFractionDigits: 0,
-  maximumFractionDigits: 2,
-});
 
 function formatDateTime(value: string) {
   return new Intl.DateTimeFormat("fr-FR", { dateStyle: "short", timeStyle: "short" }).format(new Date(value));
@@ -116,7 +111,7 @@ export default function ReceiptModal({ sale, onClose, duplicata = false }: Recei
                   {negociee > 0 && (
                     <p className="text-[9px] text-slate-500">
                       Prix catalogue {money.format(catalogue)} · remise négociée −{money.format(negociee)}/u
-                      {" "}(−{round2(negociee / catalogue * 100)} %)
+                      {" "}(−{formatPercent(round2(negociee / catalogue * 100))} %)
                     </p>
                   )}
                   {(line.remiseUnitaire ?? 0) > 0 && (
@@ -131,9 +126,9 @@ export default function ReceiptModal({ sale, onClose, duplicata = false }: Recei
             {remises.negociee > 0 && <ReceiptRow label="Remise négociée" value={`−${money.format(remises.negociee)}`} />}
             {remises.promotions > 0 && <ReceiptRow label="Remise promotions" value={`−${money.format(remises.promotions)}`} />}
             {remises.total > 0 && <ReceiptRow label="Total des remises" value={`−${money.format(remises.total)}`} />}
-            <ReceiptRow label="Sous-total HT" value={money.format(sale.montantHT)} />
-            <ReceiptRow label={`TVA (${sale.tauxTva}%)`} value={money.format(sale.montantTva)} />
-            <ReceiptRow label="TOTAL TTC" value={money.format(sale.montantTotal)} strong />
+            {sale.tauxTva > 0 && <ReceiptRow label="Sous-total HT" value={money.format(sale.montantHT)} />}
+            {sale.tauxTva > 0 && <ReceiptRow label={`TVA (${sale.tauxTva}%)`} value={money.format(sale.montantTva)} />}
+            <ReceiptRow label={sale.tauxTva > 0 ? "TOTAL TTC" : "TOTAL"} value={money.format(sale.montantTotal)} strong />
             {sale.aCredit ? (
               <ReceiptRow label="Vente à crédit" value="à régler" />
             ) : (

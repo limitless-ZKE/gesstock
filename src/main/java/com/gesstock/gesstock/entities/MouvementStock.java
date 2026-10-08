@@ -1,6 +1,7 @@
 package com.gesstock.gesstock.entities;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -54,6 +55,11 @@ public class MouvementStock {
     @Size(max = 500)
     private String commentaire;
 
+    /** Coût unitaire (par unité de stock) auquel ce mouvement valorise le stock : prix d'achat à l'entrée, CMP à la sortie. */
+    @DecimalMin("0.0")
+    @Column(precision = 19, scale = 4)
+    private java.math.BigDecimal coutUnitaire;
+
     @NotNull
     @ManyToOne(optional = false)
     @JoinColumn(name = "article_id", nullable = false)
@@ -74,4 +80,14 @@ public class MouvementStock {
     @ManyToOne
     @JoinColumn(name = "vente_id")
     private Vente vente;
+
+    /** Inventaire à l'origine de l'ajustement, le cas échéant. */
+    @ManyToOne
+    @JoinColumn(name = "inventaire_id")
+    private Inventaire inventaire;
+
+    /** Retour au fournisseur à l'origine de la sortie, le cas échéant. */
+    @ManyToOne
+    @JoinColumn(name = "retour_fournisseur_id")
+    private RetourFournisseur retourFournisseur;
 }

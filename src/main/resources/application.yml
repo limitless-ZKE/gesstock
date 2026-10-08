@@ -1,0 +1,88 @@
+# Configuration COMMUNE : elle doit être sûre pour la production même si aucun profil n'est activé.
+# Tout ce qui sert au développement (données de démonstration, Swagger, cookies non sécurisés…) est dans
+# application-dev.yml et ne s'active qu'avec le profil « dev » (jamais par défaut).
+spring:
+  application:
+    name: gesstock
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      pool-name: gesstock-pool
+      maximum-pool-size: ${DB_POOL_SIZE:10}
+      minimum-idle: 2
+      connection-timeout: 5000         # ms : échouer vite plutôt que bloquer les requêtes
+      max-lifetime: 1500000            # 25 min, inférieur au wait_timeout de MySQL
+      leak-detection-threshold: 60000  # ms : trace les connexions gardées trop longtemps (> migrations courantes)
+      # Mode SQL strict sur TOUTES les connexions : le MySQL de WampServer a sql_mode vide et accepterait en silence une
+      # valeur d'enum inconnue ou un texte tronqué, qu'un MySQL standard (Docker, CI) refuse. Même comportement partout.
+      connection-init-sql: "SET SESSION sql_mode='STRICT_ALL_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_ZERO_DATE,NO_ZERO_IN_DATE,NO_ENGINE_SUBSTITUTION'"
+  jpa:
+    open-in-view: false
+    show-sql: false
+    hibernate:
+      ddl-auto: validate               # le schéma est la propriété de Flyway ; Hibernate ne fait que vérifier
+  flyway:
+    enabled: true
+    baseline-on-migrate: false         # à n'activer qu'une fois, pour reprendre une base existante (voir le guide)
+    validate-on-migrate: true
+    clean-disabled: true
+  web:
+    locale: fr
+    locale-resolver: fixed             # messages de validation en français quel que soit le navigateur ou le serveur
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+
+server:
+  port: ${SERVER_PORT:8080}
+  shutdown: graceful
+  forward-headers-strategy: framework  # derrière un proxy TLS : respecte X-Forwarded-Proto / -For
+  servlet:
+    session:
+      timeout: 30m
+      cookie:
+        http-only: true
+        secure: ${app.security.cookies.secure}
+        same-site: lax
+  error:
+    include-message: never
+    include-stacktrace: never
+    include-binding-errors: never
+    include-exception: false
+
+management:
+  server:
+    port: ${MANAGEMENT_PORT:8081}
+    address: 127.0.0.1                 # supervision jamais exposée au réseau
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+app:
+  # Fuseau du commerce : il décide quand la journée de caisse change (jamais le fuseau de la machine ou du conteneur).
+  zone-horaire: ${APP_ZONE_HORAIRE:Africa/Dakar}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS}
+  security:
+    cookies:
+      # Cookies de session et CSRF réservés au HTTPS. Ne passer à false (COOKIES_SECURE=false) que pour un
+      # déploiement volontairement servi en HTTP : le navigateur refuse sinon de renvoyer les cookies et la connexion échoue.
+      secure: ${COOKIES_SECURE:true}
+  bootstrap:
+    admin:
+      username: ${APP_ADMIN_USERNAME:}
+      password: ${APP_ADMIN_PASSWORD:}

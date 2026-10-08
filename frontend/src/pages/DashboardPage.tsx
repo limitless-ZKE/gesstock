@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import axios from "axios";
 import {
   ArrowDownRight,
   ArrowUpRight,
@@ -14,6 +13,8 @@ import {
 import { Link } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { api } from "../services/api";
+import { apiErrorMessage } from "../services/apiError";
+import { money } from "../lib/format";
 
 type DailyPoint = { journee: string; nombreVentes: number; chiffreAffaires: number };
 type TopArticle = { articleId: number; reference: string; designation: string; quantiteVendue: number };
@@ -27,7 +28,6 @@ type DashboardStats = {
   topArticles: TopArticle[];
 };
 
-const money = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "XOF", maximumFractionDigits: 0 });
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -41,9 +41,7 @@ export default function DashboardPage() {
       .then(({ data }) => { if (active) setStats(data); })
       .catch((reason: unknown) => {
         if (!active) return;
-        setError(axios.isAxiosError<{ message?: string }>(reason)
-          ? reason.response?.data?.message ?? "Les statistiques ne sont pas accessibles pour ce compte ou le serveur est indisponible."
-          : "Impossible de charger le tableau de bord.");
+        setError(apiErrorMessage(reason, "Les statistiques ne sont pas accessibles pour ce compte ou le serveur est indisponible."));
       })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };

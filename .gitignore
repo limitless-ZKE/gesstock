@@ -39,3 +39,6 @@ frontend/tsconfig.tsbuildinfo
 
 ### Fichier npm vide créé à la racine par erreur (le vrai est frontend/package-lock.json) ###
 /package-lock.json
+
+### RÃ©glages locaux de Claude Code ###
+.claude/settings.local.json

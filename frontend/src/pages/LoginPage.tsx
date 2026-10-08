@@ -3,6 +3,7 @@ import axios from "axios";
 import { ArrowRight, Boxes, Eye, EyeOff, LockKeyhole } from "lucide-react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
+import { pageDAccueil } from "../lib/routes";
 
 export default function LoginPage() {
   const { user, login, loading } = useAuth();
@@ -15,7 +16,7 @@ export default function LoginPage() {
   const [error, setError] = useState("");
 
   if (loading) return <div className="grid min-h-screen place-items-center">Chargement…</div>;
-  if (user) return <Navigate to="/dashboard" replace />;
+  if (user) return <Navigate to={pageDAccueil(user.roles)} replace />;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -24,10 +25,12 @@ export default function LoginPage() {
     try {
       await login(username, password);
       const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname;
-      navigate(from ?? "/dashboard", { replace: true });
+      navigate(from ?? "/", { replace: true });
     } catch (loginError) {
       if (axios.isAxiosError(loginError) && loginError.response?.status === 401) {
         setError("Identifiant ou mot de passe incorrect.");
+      } else if (axios.isAxiosError<{ detail?: string }>(loginError) && loginError.response?.status === 429) {
+        setError(loginError.response.data?.detail ?? "Trop de tentatives de connexion. Réessayez dans quelques minutes.");
       } else if (axios.isAxiosError(loginError) && !loginError.response) {
         setError("Le serveur GesStock est injoignable. Vérifiez qu’il est démarré puis réessayez.");
       } else {

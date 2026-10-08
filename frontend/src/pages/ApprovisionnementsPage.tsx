@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
-import axios from "axios";
 import {
   AlertTriangle,
   ArrowDownToLine,
@@ -19,6 +18,8 @@ import {
   X,
 } from "lucide-react";
 import { api } from "../services/api";
+import { apiErrorMessage as errorMessage } from "../services/apiError";
+import { money } from "../lib/format";
 
 type Article = {
   id: number;
@@ -51,14 +52,8 @@ type Supply = {
 };
 type DraftLine = { articleId: string; quantite: string; prixUnitaire: string };
 
-const money = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "XOF", maximumFractionDigits: 0 });
 const today = new Date().toISOString().slice(0, 10);
 const blankLine = (): DraftLine => ({ articleId: "", quantite: "1", prixUnitaire: "" });
-
-function errorMessage(error: unknown, fallback: string) {
-  if (axios.isAxiosError<{ message?: string }>(error)) return error.response?.data?.message ?? fallback;
-  return fallback;
-}
 
 function dateLabel(date: string) {
   return new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium" }).format(new Date(`${date}T00:00:00`));

@@ -1,18 +1,23 @@
-import { useEffect, useState } from "react";
+import { lazy, useEffect, useState } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import AppLayout from "./components/AppLayout";
 import ProtectedRoute from "./components/ProtectedRoute";
-import ApprovisionnementsPage from "./pages/ApprovisionnementsPage";
-import AdminUsersPage from "./pages/AdminUsersPage";
-import ArticlesPage from "./pages/ArticlesPage";
-import CaissePage from "./pages/CaissePage";
-import CaisseMouvementsPage from "./pages/CaisseMouvementsPage";
-import ClientsDettesPage from "./pages/ClientsDettesPage";
-import DashboardPage from "./pages/DashboardPage";
-import FournisseursPage from "./pages/FournisseursPage";
+import HomeRedirect from "./components/HomeRedirect";
 import LoginPage from "./pages/LoginPage";
-import StatistiquesPage from "./pages/StatistiquesPage";
-import VentesHistoriquePage from "./pages/VentesHistoriquePage";
+
+// Chaque écran est un morceau à part, chargé à la première visite : la connexion n'embarque pas la caisse, l'inventaire, etc.
+const ApprovisionnementsPage = lazy(() => import("./pages/ApprovisionnementsPage"));
+const AdminUsersPage = lazy(() => import("./pages/AdminUsersPage"));
+const ArticlesPage = lazy(() => import("./pages/ArticlesPage"));
+const CaissePage = lazy(() => import("./pages/CaissePage"));
+const CaisseMouvementsPage = lazy(() => import("./pages/CaisseMouvementsPage"));
+const ClientsDettesPage = lazy(() => import("./pages/ClientsDettesPage"));
+const DashboardPage = lazy(() => import("./pages/DashboardPage"));
+const FournisseursPage = lazy(() => import("./pages/FournisseursPage"));
+const InventairesPage = lazy(() => import("./pages/InventairesPage"));
+const RetoursFournisseursPage = lazy(() => import("./pages/RetoursFournisseursPage"));
+const StatistiquesPage = lazy(() => import("./pages/StatistiquesPage"));
+const VentesHistoriquePage = lazy(() => import("./pages/VentesHistoriquePage"));
 
 export default function App() {
   const [notification, setNotification] = useState("");
@@ -38,7 +43,7 @@ export default function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route element={<ProtectedRoute />}>
           <Route element={<AppLayout />}>
-            <Route index element={<Navigate to="/dashboard" replace />} />
+            <Route index element={<HomeRedirect />} />
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/caisse" element={<CaissePage />} />
             <Route path="/historique-ventes" element={<VentesHistoriquePage />} />
@@ -46,12 +51,14 @@ export default function App() {
             <Route path="/articles" element={<ArticlesPage />} />
             <Route path="/approvisionnements" element={<ApprovisionnementsPage />} />
             <Route path="/fournisseurs" element={<FournisseursPage />} />
+            <Route path="/retours-fournisseurs" element={<RetoursFournisseursPage />} />
+            <Route path="/inventaires" element={<InventairesPage />} />
             <Route path="/admin/utilisateurs" element={<AdminUsersPage />} />
             <Route path="/clients-dettes" element={<ClientsDettesPage />} />
             <Route path="/statistiques" element={<StatistiquesPage />} />
           </Route>
         </Route>
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>
   );

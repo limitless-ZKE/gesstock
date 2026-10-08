@@ -27,6 +27,7 @@ public final class CatalogueMapper {
             article.getReference(),
             article.getDesignation(),
             article.getPrixAchat(),
+            article.getCmp(),
             article.getPrix(),
             article.getQuantiteStock(),
             article.getSeuilAlerte(),

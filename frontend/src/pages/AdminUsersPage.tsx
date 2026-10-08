@@ -1,29 +1,25 @@
 import { useEffect, useState, type FormEvent } from "react";
-import axios from "axios";
 import { Check, LoaderCircle, Pencil, Plus, Search, ShieldCheck, UserRound, UserRoundX, X } from "lucide-react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { api } from "../services/api";
+import { apiErrorMessage as errorMessage } from "../services/apiError";
 
 type Role = { id: number; name: string };
 type User = { id: number; username: string; actif: boolean; roles: Role[] };
 type UserForm = { username: string; password: string; roleIds: number[]; actif: boolean };
 
-const knownRoles = ["ADMIN", "CAISSIER", "GESTIONNAIRE"];
+const knownRoles = ["ADMIN", "MANAGER", "GESTIONNAIRE", "CAISSIER"];
 const accessMatrix: { module: string; roles: string[] }[] = [
-  { module: "Tableau de bord", roles: ["ADMIN", "MANAGER", "GESTIONNAIRE", "CAISSIER", "VENDEUR", "USER"] },
-  { module: "Caisse et ventes", roles: ["ADMIN", "MANAGER", "GESTIONNAIRE", "CAISSIER", "VENDEUR", "USER"] },
-  { module: "Articles", roles: ["ADMIN", "MANAGER", "GESTIONNAIRE", "VENDEUR"] },
+  { module: "Tableau de bord, statistiques et journal", roles: ["ADMIN", "MANAGER", "GESTIONNAIRE"] },
+  { module: "Caisse et ventes", roles: ["ADMIN", "MANAGER", "GESTIONNAIRE", "CAISSIER"] },
+  { module: "Annulation d’une vente (remboursement)", roles: ["ADMIN", "MANAGER"] },
+  { module: "Articles : consultation", roles: ["ADMIN", "MANAGER", "GESTIONNAIRE", "CAISSIER"] },
+  { module: "Articles : création et modification", roles: ["ADMIN", "MANAGER", "GESTIONNAIRE"] },
   { module: "Approvisionnements / fournisseurs", roles: ["ADMIN", "MANAGER", "GESTIONNAIRE"] },
-  { module: "Clients, proformas et dettes", roles: ["ADMIN", "MANAGER", "GESTIONNAIRE", "CAISSIER", "VENDEUR", "USER"] },
-  { module: "Statistiques et journal", roles: ["ADMIN", "MANAGER", "GESTIONNAIRE"] },
+  { module: "Clients, proformas et dettes", roles: ["ADMIN", "MANAGER", "GESTIONNAIRE", "CAISSIER"] },
   { module: "Administration des comptes", roles: ["ADMIN"] },
 ];
-
-function errorMessage(error: unknown, fallback: string) {
-  if (axios.isAxiosError<{ detail?: string; message?: string }>(error)) return error.response?.data?.detail ?? error.response?.data?.message ?? fallback;
-  return fallback;
-}
 
 function normalizeRole(name: string) {
   return name.toUpperCase().replace(/^ROLE_/, "");
@@ -133,6 +129,6 @@ function accessSummary(roles: Role[]) {
   const assigned = roles.map((role) => normalizeRole(role.name));
   if (assigned.includes("ADMIN")) return "Tous les modules";
   if (assigned.some((role) => ["MANAGER", "GESTIONNAIRE"].includes(role))) return "Gestion, caisse et rapports";
-  if (assigned.some((role) => ["CAISSIER", "VENDEUR", "USER"].includes(role))) return "Caisse et clients";
+  if (assigned.includes("CAISSIER")) return "Caisse et clients";
   return "Accès limités";
 }

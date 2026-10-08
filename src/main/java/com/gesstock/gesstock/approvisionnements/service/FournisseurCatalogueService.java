@@ -6,6 +6,7 @@ import com.gesstock.gesstock.common.exception.ConflitRessourceException;
 import com.gesstock.gesstock.common.exception.RessourceIntrouvableException;
 import com.gesstock.gesstock.approvisionnements.mapper.ApprovisionnementMapper;
 import com.gesstock.gesstock.entities.Fournisseur;
+import com.gesstock.gesstock.repositories.AvoirFournisseurRepository;
 import com.gesstock.gesstock.repositories.FournisseurRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,9 +18,11 @@ import java.util.List;
 public class FournisseurCatalogueService {
 
     private final FournisseurRepository fournisseurRepository;
+    private final AvoirFournisseurRepository avoirRepository;
 
-    public FournisseurCatalogueService(FournisseurRepository fournisseurRepository) {
+    public FournisseurCatalogueService(FournisseurRepository fournisseurRepository, AvoirFournisseurRepository avoirRepository) {
         this.fournisseurRepository = fournisseurRepository;
+        this.avoirRepository = avoirRepository;
     }
 
     @Transactional(readOnly = true)
@@ -52,6 +55,9 @@ public class FournisseurCatalogueService {
         if (fournisseur.getApprovisionnements() != null && !fournisseur.getApprovisionnements().isEmpty()) {
             throw new ConflitRessourceException(
                 "Ce fournisseur est référencé par des approvisionnements et ne peut pas être supprimé");
+        }
+        if (avoirRepository.existsByFournisseurId(id)) {
+            throw new ConflitRessourceException("Ce fournisseur a des avoirs et ne peut pas être supprimé");
         }
         fournisseurRepository.delete(fournisseur);
     }
