@@ -16,13 +16,8 @@ import {
 import ReceiptModal, { remisesDeLaVente, type Sale } from "../components/ReceiptModal";
 import { api } from "../services/api";
 import { apiErrorMessage as errorMessage } from "../services/apiError";
+import { moneyPrecise as money } from "../lib/format";
 
-const money = new Intl.NumberFormat("fr-FR", {
-  style: "currency",
-  currency: "XOF",
-  minimumFractionDigits: 0,
-  maximumFractionDigits: 2,
-});
 
 const paymentLabels: Record<string, string> = {
   ESPECES: "Espèces",

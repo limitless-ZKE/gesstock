@@ -14,6 +14,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { api } from "../services/api";
 import { apiErrorMessage } from "../services/apiError";
+import { money } from "../lib/format";
 
 type DailyPoint = { journee: string; nombreVentes: number; chiffreAffaires: number };
 type TopArticle = { articleId: number; reference: string; designation: string; quantiteVendue: number };
@@ -27,7 +28,6 @@ type DashboardStats = {
   topArticles: TopArticle[];
 };
 
-const money = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "XOF", maximumFractionDigits: 0 });
 
 export default function DashboardPage() {
   const { user } = useAuth();

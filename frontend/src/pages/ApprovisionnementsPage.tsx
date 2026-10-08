@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { api } from "../services/api";
 import { apiErrorMessage as errorMessage } from "../services/apiError";
+import { money } from "../lib/format";
 
 type Article = {
   id: number;
@@ -51,7 +52,6 @@ type Supply = {
 };
 type DraftLine = { articleId: string; quantite: string; prixUnitaire: string };
 
-const money = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "XOF", maximumFractionDigits: 0 });
 const today = new Date().toISOString().slice(0, 10);
 const blankLine = (): DraftLine => ({ articleId: "", quantite: "1", prixUnitaire: "" });
 

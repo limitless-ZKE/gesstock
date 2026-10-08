@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { api } from "../services/api";
 import { apiErrorMessage as errorMessage } from "../services/apiError";
+import { money } from "../lib/format";
 
 type Category = { id: number; nom: string; description: string | null; active: boolean; parentId: number | null };
 type Unit = { id: number; code: string; libelle: string };
@@ -58,7 +59,6 @@ type ArticleForm = {
   uniteMesureId: string;
 };
 
-const money = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "XOF", maximumFractionDigits: 0 });
 const PAGE_SIZE = 10;
 const blankArticle: ArticleForm = {
   reference: "", designation: "", prixAchat: "", prixVente: "", seuilAlerteStock: "0",

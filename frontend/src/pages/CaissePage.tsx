@@ -23,6 +23,7 @@ import {
 import ReceiptModal, { type Sale } from "../components/ReceiptModal";
 import { api } from "../services/api";
 import { apiErrorMessage as messageFor } from "../services/apiError";
+import { money as currency, moneyPrecise as money2 } from "../lib/format";
 
 type Category = { id: number; nom: string };
 type Article = {
@@ -66,7 +67,6 @@ type PaymentMode = "ESPECES" | "MOBILE_MONEY" | "CARTE" | "VIREMENT";
 // prixNegocie : prix convenu avec le client pour cette ligne (texte saisi) ; vide = prix catalogue.
 type CartLine = { article: Article; quantite: number; promotionId: number | null; prixNegocie: string };
 
-const money2 = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "XOF", minimumFractionDigits: 0, maximumFractionDigits: 2 });
 const round2 = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
 const round4 = (value: number) => Math.round((value + Number.EPSILON) * 10000) / 10000;
 
@@ -91,11 +91,6 @@ function basePrice(line: CartLine): number {
   return negotiatedPriceError(line) === null ? parseNegotiatedPrice(line.prixNegocie) ?? line.article.prixVente : line.article.prixVente;
 }
 
-const currency = new Intl.NumberFormat("fr-FR", {
-  style: "currency",
-  currency: "XOF",
-  maximumFractionDigits: 0,
-});
 
 const paymentModes: { value: PaymentMode; label: string; icon: typeof Banknote }[] = [
   { value: "ESPECES", label: "Espèces", icon: Banknote },

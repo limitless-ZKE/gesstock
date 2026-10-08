@@ -1,4 +1,5 @@
 import { CheckCircle2, Printer, X } from "lucide-react";
+import { formatPercent, moneyPrecise as money } from "../lib/format";
 
 export type ReceiptPaymentMode = "ESPECES" | "MOBILE_MONEY" | "CARTE" | "VIREMENT" | "CHEQUE" | "AUTRE";
 
@@ -42,12 +43,6 @@ const paymentLabels: Record<ReceiptPaymentMode, string> = {
 };
 
 // Jusqu'à deux décimales : un prix négocié peut comporter des centimes.
-const money = new Intl.NumberFormat("fr-FR", {
-  style: "currency",
-  currency: "XOF",
-  minimumFractionDigits: 0,
-  maximumFractionDigits: 2,
-});
 
 function formatDateTime(value: string) {
   return new Intl.DateTimeFormat("fr-FR", { dateStyle: "short", timeStyle: "short" }).format(new Date(value));
@@ -116,7 +111,7 @@ export default function ReceiptModal({ sale, onClose, duplicata = false }: Recei
                   {negociee > 0 && (
                     <p className="text-[9px] text-slate-500">
                       Prix catalogue {money.format(catalogue)} · remise négociée −{money.format(negociee)}/u
-                      {" "}(−{round2(negociee / catalogue * 100)} %)
+                      {" "}(−{formatPercent(round2(negociee / catalogue * 100))} %)
                     </p>
                   )}
                   {(line.remiseUnitaire ?? 0) > 0 && (

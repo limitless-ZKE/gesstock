@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { api } from "../services/api";
 import { apiErrorMessage as messageFor } from "../services/apiError";
+import { money } from "../lib/format";
 
 type CategoryMargin = {
   categorieId: number | null;
@@ -67,7 +68,6 @@ type Report = {
 };
 type PeriodPreset = "today" | "month" | "custom";
 
-const money = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "XOF", maximumFractionDigits: 0 });
 const isoToday = () => new Date().toISOString().slice(0, 10);
 const monthStart = () => `${isoToday().slice(0, 7)}-01`;
 
