@@ -109,7 +109,7 @@ class PrixNegocieHistoriqueEtJourneeTests {
         ventesService.modifierStatutProforma(proforma.id(), StatutProforma.ENVOYEE, ADMIN);
         ventesService.modifierStatutProforma(proforma.id(), StatutProforma.ACCEPTEE, ADMIN);
 
-        VenteResponse vente = ventesService.convertirProformaEnVente(proforma.id(), false, ADMIN);
+        VenteResponse vente = ventesService.convertirProformaEnVente(proforma.id(), false, ModeReglement.ESPECES, new BigDecimal("1000000"), ADMIN);
 
         assertThat(vente.lignes().get(0).prixUnitaire()).isEqualByComparingTo("200000");
         assertThat(vente.lignes().get(0).prixCatalogue()).isEqualByComparingTo("245000");

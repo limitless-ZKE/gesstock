@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
-import axios from "axios";
 import {
   Banknote,
   Check,
@@ -26,6 +25,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
 import { api } from "../services/api";
+import { apiErrorMessage as errorMessage } from "../services/apiError";
 
 type Client = { id: number; nom: string; email: string | null; telephone: string | null; adresse: string | null };
 type Article = { id: number; reference: string; designation: string; prixVente: number; quantiteStock: number };
@@ -111,11 +111,6 @@ const paymentModes: { value: PaymentMode; label: string; icon: typeof Banknote }
   { value: "AUTRE", label: "Autre", icon: CircleDollarSign },
 ];
 
-function errorMessage(error: unknown, fallback: string) {
-  if (axios.isAxiosError<{ message?: string }>(error)) return error.response?.data?.message ?? fallback;
-  return fallback;
-}
-
 function dateLabel(value: string | null) {
   if (!value) return "—";
   return new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium" }).format(new Date(`${value.slice(0, 10)}T00:00:00`));
@@ -157,6 +152,9 @@ export default function ClientsDettesPage() {
   const [proformaSaving, setProformaSaving] = useState(false);
   const [busyProformaId, setBusyProformaId] = useState<number | null>(null);
   const [convertCreditId, setConvertCreditId] = useState<number | null>(null);
+  const [cashProforma, setCashProforma] = useState<Proforma | null>(null);
+  const [cashMode, setCashMode] = useState<PaymentMode>("ESPECES");
+  const [cashReceived, setCashReceived] = useState("");
   const [paymentDebt, setPaymentDebt] = useState<Debt | null>(null);
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentMode, setPaymentMode] = useState<PaymentMode>("ESPECES");
@@ -355,15 +353,47 @@ export default function ClientsDettesPage() {
   }
 
   async function convertProforma(proforma: Proforma, aCredit: boolean) {
-    if (!window.confirm(`Convertir ${proforma.numero} en vente validée ? Le stock sera déduit et une journée de caisse ouverte est requise.`)) return;
+    if (!aCredit) {
+      // Au comptant, le règlement est obligatoire : sans lui l'argent encaissé serait invisible dans la caisse.
+      setCashMode("ESPECES");
+      setCashReceived(String(proforma.montantTotal));
+      setCashProforma(proforma);
+      return;
+    }
+    if (!window.confirm(`Convertir ${proforma.numero} en vente à crédit ? Le stock sera déduit, la créance client enregistrée, et une journée de caisse ouverte est requise.`)) return;
+    await sendConversion(proforma, { aCredit: true });
+  }
+
+  async function confirmCashConversion(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!cashProforma) return;
+    const received = Number(cashReceived);
+    if (!Number.isFinite(received) || received < cashProforma.montantTotal) {
+      showNotice("Le montant reçu doit couvrir le total du proforma.", true);
+      return;
+    }
+    if (cashMode !== "ESPECES" && received !== cashProforma.montantTotal) {
+      showNotice("Un règlement sans espèces doit correspondre exactement au total.", true);
+      return;
+    }
+    const converted = await sendConversion(cashProforma, { aCredit: false, modeReglement: cashMode, montantRecu: received });
+    if (converted) setCashProforma(null);
+  }
+
+  async function sendConversion(
+    proforma: Proforma,
+    body: { aCredit: boolean; modeReglement?: PaymentMode; montantRecu?: number },
+  ): Promise<boolean> {
     setBusyProformaId(proforma.id);
     try {
-      const { data: sale } = await api.post<Sale>(`/proformas/${proforma.id}/conversion`, { aCredit });
-      showNotice(`Vente ${sale.code} validée. Le stock a été déduit${sale.aCredit ? " et la créance client enregistrée" : ""}.`);
+      const { data: sale } = await api.post<Sale>(`/proformas/${proforma.id}/conversion`, body);
+      showNotice(`Vente ${sale.code} validée. Le stock a été déduit${sale.aCredit ? " et la créance client enregistrée" : ", le règlement est enregistré en caisse"}.`);
       setConvertCreditId(null);
       await loadData();
+      return true;
     } catch (error) {
       showNotice(errorMessage(error, "La conversion du proforma a échoué."), true);
+      return false;
     } finally {
       setBusyProformaId(null);
     }
@@ -532,6 +562,18 @@ export default function ClientsDettesPage() {
       <div className="mt-5 flex justify-end"><button onClick={() => { setClientDetail(null); openClientForm(clientDetail); }} className="button-secondary"><Pencil size={14} /> Modifier la fiche</button></div>
     </Modal>}
 
+    {cashProforma && <Modal title={`Règlement · ${cashProforma.numero}`} onClose={() => busyProformaId === null && setCashProforma(null)}>
+      <div className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4"><p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Total à encaisser</p><p className="mt-1 text-xl font-extrabold text-emerald-900">{currency.format(cashProforma.montantTotal)}</p></div>
+      <form onSubmit={(event) => void confirmCashConversion(event)} className="space-y-4">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Mode de règlement"><select className="input-field" value={cashMode} onChange={(event) => { const mode = event.target.value as PaymentMode; setCashMode(mode); if (mode !== "ESPECES") setCashReceived(String(cashProforma.montantTotal)); }}>{paymentModes.map((mode) => <option key={mode.value} value={mode.value}>{mode.label}</option>)}</select></Field>
+          <Field label="Montant reçu"><input required autoFocus type="number" min={cashProforma.montantTotal} step="any" className="input-field" value={cashReceived} onChange={(event) => setCashReceived(event.target.value)} /></Field>
+        </div>
+        {cashMode === "ESPECES" && Number(cashReceived) > cashProforma.montantTotal && <p className="rounded-xl bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-800">Monnaie à rendre : {currency.format(Number(cashReceived) - cashProforma.montantTotal)}</p>}
+        <p className="text-[10px] text-slate-500">La vente sera validée, le stock déduit et le montant ajouté à la caisse de la journée ouverte.</p>
+        <ModalActions busy={busyProformaId !== null} submitLabel="Encaisser et convertir" onCancel={() => setCashProforma(null)} />
+      </form>
+    </Modal>}
     {paymentDebt && <Modal wide title={`Règlement · ${paymentDebt.client}`} onClose={() => !paymentSaving && setPaymentDebt(null)}>
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-orange-200 bg-orange-50 p-4"><div><p className="text-[10px] font-bold uppercase tracking-wider text-orange-700">Solde restant · vente {paymentDebt.numeroVente}</p><p className="mt-1 text-xl font-extrabold text-orange-900">{currency.format(paymentDebt.solde)}</p></div><DebtBadge status={paymentDebt.statut} /></div>
       <form onSubmit={(event) => void savePayment(event)} className="space-y-4">

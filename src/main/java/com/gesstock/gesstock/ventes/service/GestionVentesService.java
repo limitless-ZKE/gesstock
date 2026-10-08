@@ -296,7 +296,9 @@ public class GestionVentesService {
             VentesMapper.toResponse(saved), montantRembourse, remboursementEspeces, remboursementAutres);
     }
 
-    public VenteResponse convertirProformaEnVente(Long proformaId, boolean aCredit, String username) {
+    public VenteResponse convertirProformaEnVente(
+        Long proformaId, boolean aCredit, ModeReglement modeReglement, BigDecimal montantRecu, String username
+    ) {
         Proforma proforma = proformaRepository.findByIdForUpdate(proformaId)
             .orElseThrow(() -> new RessourceIntrouvableException("Proforma introuvable: " + proformaId));
         if (proforma.getStatut() != StatutProforma.ACCEPTEE || proforma.getVente() != null) {
@@ -330,6 +332,14 @@ public class GestionVentesService {
             vente.getLignesVente().add(ligne);
         }
         vente.setMontantTotal(proforma.getMontantTotal());
+        // Un proforma n'a pas de TVA : HT = total et TVA = 0, posés explicitement (sinon le reçu afficherait un HT à 0).
+        vente.setMontantHT(proforma.getMontantTotal());
+        vente.setMontantTva(BigDecimal.ZERO);
+        vente.setTauxTva(BigDecimal.ZERO);
+        // Au comptant, le règlement est obligatoire : sans lui, le cash encaissé serait invisible dans la caisse.
+        vente.setModeReglement(aCredit ? null : modeReglement);
+        vente.setMontantRecu(aCredit ? null : montantRecu);
+        validerMontantRecu(vente);
         vente = venteRepository.save(vente);
         proforma.setVente(vente);
 
@@ -540,6 +550,9 @@ public class GestionVentesService {
         if (vente.getModeReglement() == null) {
             if (vente.getMontantRecu() != null) {
                 throw new ConflitRessourceException("Un mode de règlement est requis pour enregistrer un montant reçu");
+            }
+            if (!vente.isVenteACredit()) {
+                throw new ConflitRessourceException("Une vente au comptant exige un mode de règlement et le montant reçu");
             }
             return;
         }

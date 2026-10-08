@@ -124,7 +124,7 @@ class CaisseRapportEtDettesTests {
         ventesService.modifierStatutProforma(proforma.id(), StatutProforma.ENVOYEE, ADMIN);
         ventesService.modifierStatutProforma(proforma.id(), StatutProforma.ACCEPTEE, ADMIN);
 
-        VenteResponse vente = ventesService.convertirProformaEnVente(proforma.id(), true, ADMIN);
+        VenteResponse vente = ventesService.convertirProformaEnVente(proforma.id(), true, null, null, ADMIN);
         entityManager.flush();
         entityManager.clear();
 

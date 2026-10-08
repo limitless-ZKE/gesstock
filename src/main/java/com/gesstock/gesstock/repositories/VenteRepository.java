@@ -51,8 +51,9 @@ public interface VenteRepository extends JpaRepository<Vente, Long> {
         "where v.sessionCaisse.id = :sessionId and v.statut = :statut")
     java.math.BigDecimal chiffreAffairesSession(@Param("sessionId") Long sessionId, @Param("statut") StatutVente statut);
 
-    @Query("select coalesce(sum(coalesce(v.montantRecu, " +
-        "case when v.venteACredit = true then 0 else v.montantTotal end)), 0) from Vente v " +
+    // Ce que la vente a réellement rapporté : son total, jamais la somme remise par le client (la monnaie rendue
+    // n'est pas un encaissement). Une vente à crédit n'a rien rapporté tant qu'elle n'est pas réglée.
+    @Query("select coalesce(sum(case when v.venteACredit = true then 0 else v.montantTotal end), 0) from Vente v " +
         "where v.sessionCaisse.id = :sessionId and v.statut = :statut")
     java.math.BigDecimal encaissementsSession(@Param("sessionId") Long sessionId, @Param("statut") StatutVente statut);
 
