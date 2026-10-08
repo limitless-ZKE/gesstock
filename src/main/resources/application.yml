@@ -16,6 +16,9 @@ spring:
       connection-timeout: 5000         # ms : échouer vite plutôt que bloquer les requêtes
       max-lifetime: 1500000            # 25 min, inférieur au wait_timeout de MySQL
       leak-detection-threshold: 60000  # ms : trace les connexions gardées trop longtemps (> migrations courantes)
+      # Mode SQL strict sur TOUTES les connexions : le MySQL de WampServer a sql_mode vide et accepterait en silence une
+      # valeur d'enum inconnue ou un texte tronqué, qu'un MySQL standard (Docker, CI) refuse. Même comportement partout.
+      connection-init-sql: "SET SESSION sql_mode='STRICT_ALL_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_ZERO_DATE,NO_ZERO_IN_DATE,NO_ENGINE_SUBSTITUTION'"
   jpa:
     open-in-view: false
     show-sql: false
@@ -70,6 +73,8 @@ springdoc:
     enabled: false
 
 app:
+  # Fuseau du commerce : il décide quand la journée de caisse change (jamais le fuseau de la machine ou du conteneur).
+  zone-horaire: ${APP_ZONE_HORAIRE:Africa/Dakar}
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS}
   security:

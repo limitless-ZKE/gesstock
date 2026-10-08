@@ -2,17 +2,15 @@
 # Il crée les données de démonstration (DataSeeder : admin / caissier / gestionnaire) et ouvre Swagger aux ADMIN.
 spring:
   datasource:
-    url: ${DB_URL:jdbc:mysql://localhost:3306/gesstock_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true}
+    url: ${DB_URL:jdbc:mysql://localhost:3306/gesstock_db?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true}
     username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD:}
   jpa:
-    hibernate:
-      ddl-auto: update   # transitoire : la base de dev suit les entités tant qu'elle n'est pas reprise par Flyway
     properties:
       hibernate:
         format_sql: true
-  flyway:
-    enabled: false
+  # Le schéma est créé par Flyway comme en production (application.yml : Flyway actif, Hibernate en « validate »).
+  # Une modification d'entité sans migration fait donc échouer le démarrage en dev, pas seulement en production.
 
 logging:
   level:

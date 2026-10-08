@@ -35,6 +35,8 @@ services:
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173}
       # Cookies réservés au HTTPS (derrière un proxy TLS). false seulement pour un déploiement volontairement en HTTP.
       COOKIES_SECURE: ${COOKIES_SECURE:-true}
+      # Fuseau du commerce : décide quand la journée de caisse change (le conteneur, lui, est en UTC).
+      APP_ZONE_HORAIRE: ${APP_ZONE_HORAIRE:-Africa/Dakar}
     ports:
       - "${APP_PORT:-8080}:8080"
     healthcheck:
