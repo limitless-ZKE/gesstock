@@ -18,7 +18,11 @@ public interface DetteFournisseurRepository extends JpaRepository<DetteFournisse
         + "where d.fournisseur.id = :fournisseurId order by d.dateCreation desc, d.id desc")
     List<DetteFournisseur> findDuFournisseur(@Param("fournisseurId") Long fournisseurId);
 
-    /** Dettes encore à régler, les plus anciennes d'abord : c'est l'ordre d'imputation des avoirs. */
+    /**
+     * Dettes encore à régler, les plus anciennes d'abord : c'est l'ordre d'imputation des avoirs. Lecture verrouillée donc à jour
+     * (sous REPEATABLE READ, une lecture simple pourrait voir l'état d'avant une imputation validée entre-temps).
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select d from DetteFournisseur d where d.fournisseur.id = :fournisseurId "
         + "and d.statut in (com.gesstock.gesstock.entities.StatutDette.EN_COURS, "
         + "com.gesstock.gesstock.entities.StatutDette.PARTIELLEMENT_REGLEE) order by d.dateCreation asc, d.id asc")

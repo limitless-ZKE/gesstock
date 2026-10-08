@@ -109,6 +109,12 @@ Seuls ces quatre rôles existent. Les anciens rôles `VENDEUR` et `USER` sont fu
   par ADMIN ou MANAGER, ou par un retour de marchandise) s'impute de lui-même sur les dettes les plus anciennes ; ce qui reste
   en crédit s'impute sur les prochains bons dès leur réception. Les écritures d'un même fournisseur sont sérialisées par un verrou
   sur sa ligne. Un paiement enregistré ne s'annule pas (pas d'écran de correction pour l'instant).
+- **Retour au fournisseur** (`/api/retours-fournisseurs`) : on part d'un bon REÇU et de ses lignes (`GET /bons/{id}/lignes` donne ce qui
+  reste retournable). Préparer ou annuler un brouillon : ADMIN, MANAGER, GESTIONNAIRE ; valider : ADMIN et MANAGER. La validation
+  compte les unités rendues sur la ligne du bon par un UPDATE conditionnel (jamais plus que reçu, même avec deux validations
+  simultanées ; un CHECK en base le garantit aussi), refuse ce qui n'est plus en rayon, sort le stock au coût du bon (mouvement
+  `RETOUR_FOURNISSEUR`), recalcule le coût moyen et crédite le fournisseur d'un avoir égal à quantité × coût du bon, qui s'impute
+  aussitôt sur ses dettes. Un retour validé ne s'annule pas.
 - **Coût du stock** : le coût d'un article est son coût moyen pondéré (CMP), recalculé à chaque réception ; chaque ligne de
   vente mémorise le coût du moment, donc la marge d'une vente passée ne bouge plus. `historique_prix_achat` garde l'évolution.
 - **TVA** : le taux est imposé par le serveur (`APP_TVA_TAUX`, 0 par défaut : aucune TVA), jamais saisi à la caisse
@@ -157,6 +163,8 @@ Le contrôle de santé de Docker interroge `http://127.0.0.1:8081/actuator/healt
   unique sur une colonne générée), type de mouvement `STOCK_INITIAL`, lien mouvement de stock → inventaire.
 - `V11__compte_fournisseur.sql` : dettes fournisseurs (une par bon reçu), règlements (paiement ou avoir imputé) et avoirs, avec
   les contraintes de montants tenues par la base.
+- `V12__retours_fournisseurs.sql` : retours au fournisseur et leurs lignes, compteur `quantite_retournee` (avec CHECK) sur les
+  lignes de bon, lien mouvement de stock → retour.
 - Une migration déjà appliquée ne se modifie jamais : toute évolution du schéma est un nouveau fichier
   `V<n>__description.sql`.
 - Une base créée à la main par `ddl-auto=update` n'est **pas** reprise automatiquement (`V3` échouerait : colonne

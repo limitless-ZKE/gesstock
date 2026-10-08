@@ -111,6 +111,9 @@ public class SecurityConfig {
                 .requestMatchers(POST, "/api/fournisseurs/*/avoirs").hasAnyRole(ADMIN, MANAGER)
                 .requestMatchers("/api/fournisseurs/**", "/api/approvisionnements/**")
                     .hasAnyRole(ADMIN, MANAGER, GESTIONNAIRE)
+                // Un retour au fournisseur sort du stock et crée un avoir : le préparer est un travail de stock, le valider une décision de responsable.
+                .requestMatchers(POST, "/api/retours-fournisseurs/*/validation").hasAnyRole(ADMIN, MANAGER)
+                .requestMatchers("/api/retours-fournisseurs/**").hasAnyRole(ADMIN, MANAGER, GESTIONNAIRE)
                 // Inventaire : le comptage est un travail de stock ; appliquer les écarts au stock est une décision de responsable.
                 .requestMatchers(POST, "/api/inventaires/*/validation", "/api/inventaires/*/annulation", "/api/inventaires/*/reprise")
                     .hasAnyRole(ADMIN, MANAGER)

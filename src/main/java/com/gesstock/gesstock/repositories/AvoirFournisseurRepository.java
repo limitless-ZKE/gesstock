@@ -1,7 +1,9 @@
 package com.gesstock.gesstock.repositories;
 
 import com.gesstock.gesstock.entities.AvoirFournisseur;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -15,7 +17,8 @@ public interface AvoirFournisseurRepository extends JpaRepository<AvoirFournisse
 
     boolean existsByFournisseurId(Long fournisseurId);
 
-    /** Avoirs dont il reste du crédit, les plus anciens d'abord. */
+    /** Avoirs dont il reste du crédit, les plus anciens d'abord. Lecture verrouillée donc à jour (voir DetteFournisseurRepository). */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select a from AvoirFournisseur a where a.fournisseur.id = :fournisseurId and a.montant > a.montantUtilise "
         + "order by a.dateCreation asc, a.id asc")
     List<AvoirFournisseur> findDisponibles(@Param("fournisseurId") Long fournisseurId);

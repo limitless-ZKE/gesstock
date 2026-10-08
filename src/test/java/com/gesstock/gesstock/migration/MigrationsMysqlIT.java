@@ -65,7 +65,7 @@ class MigrationsMysqlIT {
 
         try (ConfigurableApplicationContext contexte = demarrer(base, "--spring.flyway.baseline-on-migrate=false")) {
             JdbcTemplate jdbc = contexte.getBean(JdbcTemplate.class);
-            assertThat(versionsAppliquees(jdbc)).containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11");
+            assertThat(versionsAppliquees(jdbc)).containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12");
             assertThat(migrationsEnEchec(jdbc)).isZero();
             assertThat(derives(contexte, base)).as("enum Java absents de la base").isEmpty();
 
@@ -160,7 +160,7 @@ class MigrationsMysqlIT {
         try (ConfigurableApplicationContext contexte = demarrer(base,
             "--spring.flyway.baseline-on-migrate=true", "--spring.flyway.baseline-version=3")) {
             JdbcTemplate jdbc = contexte.getBean(JdbcTemplate.class);
-            assertThat(versionsAppliquees(jdbc)).containsExactly("3", "4", "5", "6", "7", "8", "9", "10", "11");
+            assertThat(versionsAppliquees(jdbc)).containsExactly("3", "4", "5", "6", "7", "8", "9", "10", "11", "12");
             assertThat(migrationsEnEchec(jdbc)).isZero();
         }
     }
@@ -241,6 +241,29 @@ class MigrationsMysqlIT {
         assertThatThrownBy(() -> jdbc.update(avoir, fournisseurId, 100, 150, utilisateurId))
             .as("avoir consommé au-delà de son montant").isInstanceOf(org.springframework.dao.DataAccessException.class);
         jdbc.update(avoir, fournisseurId, 100, 40, utilisateurId);
+
+        retoursGarantisParLaBase(jdbc, fournisseurId, bon1, utilisateurId);
+    }
+
+    /** V12 : « jamais plus rendu que reçu » et « un retour validé a son validateur » sont tenus par la BASE. */
+    private void retoursGarantisParLaBase(JdbcTemplate jdbc, Long fournisseurId, Long bonId, Long utilisateurId) {
+        jdbc.update("INSERT INTO article (prix, prix_achat, quantite, seuil_alerte, reference, nom) VALUES (150, 100, 5, 1, 'IT-RET', 'Article IT')");
+        Long articleId = jdbc.queryForObject("SELECT id FROM article WHERE reference = 'IT-RET'", Long.class);
+        jdbc.update("INSERT INTO ligne_approvisionnements (prix_unitaire, quantite, approvisionnement_id, article_id) VALUES (100, 5, ?, ?)", bonId, articleId);
+        Long ligneId = jdbc.queryForObject("SELECT id FROM ligne_approvisionnements WHERE approvisionnement_id = ? AND article_id = ?", Long.class, bonId, articleId);
+        assertThat(jdbc.queryForObject("SELECT quantite_retournee FROM ligne_approvisionnements WHERE id = ?", Integer.class, ligneId))
+            .as("rien n'est rendu par défaut").isZero();
+        assertThat(jdbc.update("UPDATE ligne_approvisionnements SET quantite_retournee = 5 WHERE id = ?", ligneId)).isEqualTo(1);
+        assertThatThrownBy(() -> jdbc.update("UPDATE ligne_approvisionnements SET quantite_retournee = 6 WHERE id = ?", ligneId))
+            .as("rendu au-delà de la quantité reçue").isInstanceOf(org.springframework.dao.DataAccessException.class);
+
+        String retour = "INSERT INTO retours_fournisseurs (numero, statut, fournisseur_id, approvisionnement_id, motif, date_creation, "
+            + "cree_par_id, montant_total, version) VALUES (?, ?, ?, ?, 'IT', NOW(), ?, 0, 0)";
+        assertThatThrownBy(() -> jdbc.update(retour, "RF-IT-1", "VALIDE", fournisseurId, bonId, utilisateurId))
+            .as("un retour validé sans date ni validateur").isInstanceOf(org.springframework.dao.DataAccessException.class);
+        jdbc.update(retour, "RF-IT-1", "BROUILLON", fournisseurId, bonId, utilisateurId);
+        assertThatThrownBy(() -> jdbc.update(retour, "RF-IT-1", "BROUILLON", fournisseurId, bonId, utilisateurId))
+            .as("numéro de retour unique").isInstanceOf(org.springframework.dao.DuplicateKeyException.class);
     }
 
     private List<String> versionsAppliquees(JdbcTemplate jdbc) {

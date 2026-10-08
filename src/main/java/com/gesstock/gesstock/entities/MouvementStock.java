@@ -85,4 +85,9 @@ public class MouvementStock {
     @ManyToOne
     @JoinColumn(name = "inventaire_id")
     private Inventaire inventaire;
+
+    /** Retour au fournisseur à l'origine de la sortie, le cas échéant. */
+    @ManyToOne
+    @JoinColumn(name = "retour_fournisseur_id")
+    private RetourFournisseur retourFournisseur;
 }
