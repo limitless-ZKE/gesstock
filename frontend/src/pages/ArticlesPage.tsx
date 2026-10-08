@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
-import axios from "axios";
 import {
   AlertTriangle,
   ArrowDown,
@@ -15,10 +14,12 @@ import {
   Plus,
   Search,
   Settings2,
+  SlidersHorizontal,
   Trash2,
   X,
 } from "lucide-react";
 import { api } from "../services/api";
+import { apiErrorMessage as errorMessage } from "../services/apiError";
 
 type Category = { id: number; nom: string; description: string | null; active: boolean; parentId: number | null };
 type Unit = { id: number; code: string; libelle: string };
@@ -64,10 +65,15 @@ const blankArticle: ArticleForm = {
   quantiteStock: "0", categorieId: "", uniteMesureId: "",
 };
 
-function errorMessage(error: unknown, fallback: string) {
-  if (axios.isAxiosError<{ message?: string }>(error)) return error.response?.data?.message ?? fallback;
-  return fallback;
-}
+const adjustmentReasons = [
+  { value: "CASSE", label: "Casse" },
+  { value: "VOL", label: "Vol" },
+  { value: "PEREMPTION", label: "Péremption" },
+  { value: "ERREUR_DE_SAISIE", label: "Erreur de saisie" },
+  { value: "ECART_DE_COMPTAGE", label: "Écart de comptage" },
+  { value: "AUTRE", label: "Autre (préciser)" },
+];
+const blankAdjustment = { nouveauStock: "", motif: "", commentaire: "" };
 
 export default function ArticlesPage() {
   const [articles, setArticles] = useState<Article[]>([]);
@@ -84,6 +90,9 @@ export default function ArticlesPage() {
   const [articleModal, setArticleModal] = useState<Article | "new" | null>(null);
   const [articleForm, setArticleForm] = useState<ArticleForm>(blankArticle);
   const [savingArticle, setSavingArticle] = useState(false);
+  const [adjustArticle, setAdjustArticle] = useState<Article | null>(null);
+  const [adjustForm, setAdjustForm] = useState(blankAdjustment);
+  const [savingAdjustment, setSavingAdjustment] = useState(false);
   const [categoryModal, setCategoryModal] = useState(false);
   const [categoryForm, setCategoryForm] = useState({ nom: "", description: "", parentId: "" });
   const [savingCategory, setSavingCategory] = useState(false);
@@ -172,7 +181,8 @@ export default function ArticlesPage() {
       prixAchat: Number(articleForm.prixAchat),
       prixVente: Number(articleForm.prixVente),
       seuilAlerteStock: Number(articleForm.seuilAlerteStock),
-      quantiteStock: Number(articleForm.quantiteStock),
+      // Le stock initial ne se fixe qu'à la création ; ensuite seul « Ajuster le stock » le modifie (avec trace).
+      quantiteStock: articleModal === "new" ? Number(articleForm.quantiteStock) : undefined,
       categorieId: articleForm.categorieId ? Number(articleForm.categorieId) : null,
       uniteMesureId: articleForm.uniteMesureId ? Number(articleForm.uniteMesureId) : null,
     };
@@ -186,6 +196,33 @@ export default function ArticlesPage() {
       notify(errorMessage(saveError, "Enregistrement de l’article impossible."), true);
     } finally {
       setSavingArticle(false);
+    }
+  }
+
+  function startAdjustment(article: Article) {
+    setAdjustForm({ ...blankAdjustment, nouveauStock: String(article.quantiteStock) });
+    setAdjustArticle(article);
+  }
+
+  async function saveAdjustment(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!adjustArticle) return;
+    setSavingAdjustment(true);
+    try {
+      await api.post(`/articles/${adjustArticle.id}/ajustement-stock`, {
+        stockAffiche: adjustArticle.quantiteStock,
+        nouveauStock: Number(adjustForm.nouveauStock),
+        motif: adjustForm.motif,
+        commentaire: adjustForm.commentaire.trim() || null,
+      });
+      setAdjustArticle(null);
+      notify(`Stock de « ${adjustArticle.designation} » ajusté : ${adjustArticle.quantiteStock} → ${Number(adjustForm.nouveauStock)}.`);
+      await loadData();
+    } catch (adjustError) {
+      notify(errorMessage(adjustError, "Ajustement du stock impossible."), true);
+      await loadData();
+    } finally {
+      setSavingAdjustment(false);
     }
   }
 
@@ -405,6 +442,7 @@ export default function ArticlesPage() {
                         <td className="px-4 py-3.5">
                           <div className="flex justify-end gap-1">
                             <button title="Unités de vente" onClick={() => void openSaleUnits(article)} className="icon-button"><Settings2 size={15} /></button>
+                            <button title="Ajuster le stock" onClick={() => startAdjustment(article)} className="icon-button"><SlidersHorizontal size={15} /></button>
                             <button title="Modifier" onClick={() => startArticleEdit(article)} className="icon-button"><Pencil size={15} /></button>
                             <button title="Supprimer" onClick={() => void deleteArticle(article)} className="icon-button text-slate-400 hover:bg-rose-50 hover:text-rose-600"><Trash2 size={15} /></button>
                           </div>
@@ -434,11 +472,29 @@ export default function ArticlesPage() {
               <Field label="Prix d’achat (XOF)"><input required min="0" step="any" type="number" className="input-field" value={articleForm.prixAchat} onChange={(event) => setArticleForm({ ...articleForm, prixAchat: event.target.value })} /></Field>
               <Field label="Prix de vente (XOF)"><input required min="0" step="any" type="number" className="input-field" value={articleForm.prixVente} onChange={(event) => setArticleForm({ ...articleForm, prixVente: event.target.value })} /></Field>
               <Field label="Seuil d’alerte"><input required min="0" step="1" type="number" className="input-field" value={articleForm.seuilAlerteStock} onChange={(event) => setArticleForm({ ...articleForm, seuilAlerteStock: event.target.value })} /></Field>
-              <Field label={articleModal === "new" ? "Stock initial" : "Stock actuel"}><input required min="0" step="1" type="number" className="input-field" value={articleForm.quantiteStock} onChange={(event) => setArticleForm({ ...articleForm, quantiteStock: event.target.value })} /><span className="mt-1 block text-[10px] text-slate-400">Les variations de stock doivent ensuite être enregistrées par réception ou vente.</span></Field>
+              <Field label={articleModal === "new" ? "Stock initial" : "Stock actuel (non modifiable ici)"}><input required min="0" step="1" type="number" readOnly={articleModal !== "new"} className="input-field read-only:bg-slate-50 read-only:text-slate-500" value={articleForm.quantiteStock} onChange={(event) => setArticleForm({ ...articleForm, quantiteStock: event.target.value })} /><span className="mt-1 block text-[10px] text-slate-400">{articleModal === "new" ? "Les variations de stock sont ensuite enregistrées par réception ou vente." : "Pour corriger le stock, utilisez « Ajuster le stock » dans la liste (motif obligatoire)."}</span></Field>
               <Field label="Catégorie"><select className="input-field" value={articleForm.categorieId} onChange={(event) => setArticleForm({ ...articleForm, categorieId: event.target.value })}><option value="">Sans catégorie</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.nom}</option>)}</select></Field>
               <Field label="Unité de mesure principale"><select className="input-field" value={articleForm.uniteMesureId} onChange={(event) => setArticleForm({ ...articleForm, uniteMesureId: event.target.value })}><option value="">Sans unité</option>{units.map((unit) => <option key={unit.id} value={unit.id}>{unit.libelle} ({unit.code})</option>)}</select></Field>
             </div>
             <ModalActions busy={savingArticle} onCancel={() => setArticleModal(null)} submitLabel="Enregistrer l’article" />
+          </form>
+        </Modal>
+      )}
+
+      {adjustArticle && (
+        <Modal title="Ajuster le stock" subtitle={`${adjustArticle.designation} (${adjustArticle.reference}) : stock enregistré ${adjustArticle.quantiteStock}`} onClose={() => setAdjustArticle(null)}>
+          <form onSubmit={saveAdjustment} className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Stock réel constaté"><input required autoFocus min="0" step="1" type="number" className="input-field" value={adjustForm.nouveauStock} onChange={(event) => setAdjustForm({ ...adjustForm, nouveauStock: event.target.value })} /></Field>
+              <Field label="Motif"><select required className="input-field" value={adjustForm.motif} onChange={(event) => setAdjustForm({ ...adjustForm, motif: event.target.value })}><option value="">Choisir un motif</option>{adjustmentReasons.map((reason) => <option key={reason.value} value={reason.value}>{reason.label}</option>)}</select></Field>
+            </div>
+            <Field label={adjustForm.motif === "AUTRE" ? "Commentaire (obligatoire)" : "Commentaire (facultatif)"}><input required={adjustForm.motif === "AUTRE"} maxLength={300} className="input-field" value={adjustForm.commentaire} onChange={(event) => setAdjustForm({ ...adjustForm, commentaire: event.target.value })} placeholder="Ex. : carton tombé pendant le déchargement" /></Field>
+            {Number(adjustForm.nouveauStock) !== adjustArticle.quantiteStock && adjustForm.nouveauStock !== "" && (
+              <p className="rounded-xl bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-800">
+                Le stock passera de {adjustArticle.quantiteStock} à {Number(adjustForm.nouveauStock)} ({Number(adjustForm.nouveauStock) - adjustArticle.quantiteStock > 0 ? "+" : ""}{Number(adjustForm.nouveauStock) - adjustArticle.quantiteStock}). Un mouvement de stock et une ligne de journal seront enregistrés à votre nom.
+              </p>
+            )}
+            <ModalActions busy={savingAdjustment} onCancel={() => setAdjustArticle(null)} submitLabel="Enregistrer l’ajustement" />
           </form>
         </Modal>
       )}

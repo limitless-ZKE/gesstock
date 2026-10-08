@@ -3,6 +3,7 @@ package com.gesstock.gesstock.articles.service;
 import com.gesstock.gesstock.articles.dto.ArticleRequest;
 import com.gesstock.gesstock.articles.dto.ArticleResponse;
 import com.gesstock.gesstock.common.exception.ConflitRessourceException;
+import com.gesstock.gesstock.common.exception.RequeteInvalideException;
 import com.gesstock.gesstock.common.exception.RessourceIntrouvableException;
 import com.gesstock.gesstock.articles.mapper.CatalogueMapper;
 import com.gesstock.gesstock.entities.Article;
@@ -55,14 +56,20 @@ public class ArticleCatalogueService {
     public ArticleResponse creer(ArticleRequest request) {
         verifierReferenceDisponible(request.reference(), null);
         Article article = new Article();
-        remplir(article, request);
+        remplir(article, request, true);
         return CatalogueMapper.toResponse(articleRepository.save(article));
     }
 
     public ArticleResponse modifier(Long id, ArticleRequest request) {
         Article article = trouver(id);
         verifierReferenceDisponible(request.reference(), id);
-        remplir(article, request);
+        // Le stock ne se corrige JAMAIS ici : toute variation doit laisser un mouvement (ajustement de stock), sinon
+        // la somme des mouvements ne correspond plus au stock et l'erreur ou la fraude devient invisible.
+        if (request.quantiteStock() != null && request.quantiteStock() != article.getQuantiteStock()) {
+            throw new RequeteInvalideException(
+                "Le stock ne se modifie pas depuis la fiche article : utilisez « Ajuster le stock » (motif obligatoire)");
+        }
+        remplir(article, request, false);
         return CatalogueMapper.toResponse(articleRepository.save(article));
     }
 
@@ -70,14 +77,14 @@ public class ArticleCatalogueService {
         articleRepository.delete(trouver(id));
     }
 
-    private void remplir(Article article, ArticleRequest request) {
+    private void remplir(Article article, ArticleRequest request, boolean creation) {
         article.setReference(request.reference().trim());
         article.setDesignation(request.designation().trim());
         article.setPrixAchat(request.prixAchat());
         article.setPrix(request.prixVente());
         article.setSeuilAlerte(request.seuilAlerteStock());
-        if (request.quantiteStock() != null) {
-            article.setQuantiteStock(request.quantiteStock());
+        if (creation && request.quantiteStock() != null) {
+            article.setQuantiteStock(request.quantiteStock()); // stock de départ, à la création uniquement
         }
         article.setCategorie(request.categorieId() == null ? null : trouverCategorie(request.categorieId()));
         article.setUniteMesure(request.uniteMesureId() == null ? null : trouverUnite(request.uniteMesureId()));

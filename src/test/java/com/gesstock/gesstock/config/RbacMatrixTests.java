@@ -50,6 +50,7 @@ class RbacMatrixTests {
         route(HttpMethod.GET, "/api/articles", null, TOUS),
         route(HttpMethod.POST, "/api/articles", "{}", STOCK),
         route(HttpMethod.DELETE, "/api/articles/" + INEXISTANT, null, STOCK),
+        route(HttpMethod.POST, "/api/articles/" + INEXISTANT + "/ajustement-stock", "{}", STOCK),
         route(HttpMethod.GET, "/api/articles/categories", null, TOUS),
         route(HttpMethod.GET, "/api/articles/alertes-stock", null, TOUS),
         route(HttpMethod.GET, "/api/referentiels/unites-mesure", null, TOUS),
