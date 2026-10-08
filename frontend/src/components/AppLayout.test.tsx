@@ -10,7 +10,7 @@ vi.mock("../services/api", () => ({ api: { get: vi.fn() } }));
 
 const TOUS_LES_LIENS = [
   "Tableau de bord", "Caisse & ventes", "Historique des ventes", "Mouvements de caisse", "Articles", "Inventaires",
-  "Approvisionnements", "Fournisseurs", "Retours fournisseurs", "Clients & dettes", "Statistiques", "Administration",
+  "Approvisionnements", "Fournisseurs", "Retours fournisseurs", "Clients & dettes", "Statistiques", "Entreprise", "Administration",
 ];
 
 function afficher(roles: string[]) {
@@ -43,13 +43,13 @@ describe("menu de navigation selon les rôles", () => {
     expect(liensVisibles()).toEqual(["Caisse & ventes", "Historique des ventes", "Mouvements de caisse", "Clients & dettes"]);
   });
 
-  it("le gestionnaire voit le stock, les fournisseurs et les inventaires, mais pas l'administration", async () => {
+  it("le gestionnaire voit le stock, les fournisseurs et les inventaires, mais ni l'entreprise ni l'administration", async () => {
     afficher(["GESTIONNAIRE"]);
     await screen.findByText("Caisse ouverte");
-    expect(liensVisibles()).toEqual(TOUS_LES_LIENS.filter((nom) => nom !== "Administration"));
+    expect(liensVisibles()).toEqual(TOUS_LES_LIENS.filter((nom) => !["Entreprise", "Administration"].includes(nom)));
   });
 
-  it("un responsable voit tout sauf l'administration des comptes", async () => {
+  it("un responsable voit tout, y compris l'entreprise (nom, logo), sauf l'administration des comptes", async () => {
     afficher(["ROLE_MANAGER"]);
     await screen.findByText("Caisse ouverte");
     expect(liensVisibles()).toEqual(TOUS_LES_LIENS.filter((nom) => nom !== "Administration"));

@@ -16,6 +16,7 @@ import {
   ShoppingCart,
   ShieldCheck,
   SlidersHorizontal,
+  Store,
   UsersRound,
   X,
 } from "lucide-react";
@@ -35,6 +36,7 @@ const navigation = [
   { to: "/retours-fournisseurs", label: "Retours fournisseurs", icon: PackageMinus },
   { to: "/clients-dettes", label: "Clients & dettes", icon: UsersRound },
   { to: "/statistiques", label: "Statistiques", icon: ChartNoAxesCombined },
+  { to: "/entreprise", label: "Entreprise", icon: Store },
   { to: "/admin/utilisateurs", label: "Administration", icon: ShieldCheck },
 ];
 
@@ -82,6 +84,7 @@ export default function AppLayout() {
   const normalizedRoles = user?.roles.map((role) => role.toUpperCase().replace(/^ROLE_/, "")) ?? [];
   const visibleNavigation = navigation.filter(({ to }) => {
     if (to === "/admin/utilisateurs") return normalizedRoles.includes("ADMIN");
+    if (to === "/entreprise") return normalizedRoles.some((role) => ["ADMIN", "MANAGER"].includes(role));
     if (["/approvisionnements", "/fournisseurs", "/retours-fournisseurs", "/inventaires"].includes(to)) {
       return normalizedRoles.some((role) => ["ADMIN", "MANAGER", "GESTIONNAIRE"].includes(role));
     }

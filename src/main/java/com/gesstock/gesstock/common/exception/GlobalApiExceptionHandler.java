@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 import java.net.URI;
@@ -129,8 +130,17 @@ public class GlobalApiExceptionHandler extends ResponseEntityExceptionHandler {
             "Le corps de la requête est absent ou mal formé", "CORPS_INVALIDE"));
     }
 
+    /** Envoi d'un fichier sans la partie attendue (le formulaire n'a pas joint de fichier). */
+    @Override
+    protected ResponseEntity<Object> handleMissingServletRequestPart(
+        MissingServletRequestPartException exception, HttpHeaders headers, HttpStatusCode status, WebRequest request
+    ) {
+        return ResponseEntity.badRequest().body(problem(HttpStatus.BAD_REQUEST,
+            "Aucun fichier n'a été envoyé (partie « " + exception.getRequestPartName() + " » absente)", "FICHIER_ABSENT"));
+    }
+
     /**
-     * Erreurs MVC standard (404, 405, 415, paramètre manquant…) : mêmes champs et textes en français. Le corps y est
+     * Erreurs MVC standard (404, 405, 413, 415, paramètre manquant…) : mêmes champs et textes en français. Le corps y est
      * construit par Spring juste avant cette méthode, d'où le point d'accroche {@code createResponseEntity}.
      */
     @Override
@@ -142,12 +152,14 @@ public class GlobalApiExceptionHandler extends ResponseEntityExceptionHandler {
             detail.setDetail(switch (statusCode.value()) {
                 case 404 -> "Ressource introuvable";
                 case 405 -> "Méthode non autorisée sur cette route";
+                case 413 -> "Le fichier envoyé est trop volumineux";
                 case 415 -> "Type de contenu non supporté";
                 default -> detail.getDetail() == null ? "Requête invalide" : detail.getDetail();
             });
             detail.setProperty("code", switch (statusCode.value()) {
                 case 404 -> "RESSOURCE_INTROUVABLE";
                 case 405 -> "METHODE_NON_AUTORISEE";
+                case 413 -> "FICHIER_TROP_VOLUMINEUX";
                 case 415 -> "TYPE_NON_SUPPORTE";
                 default -> "REQUETE_INVALIDE";
             });

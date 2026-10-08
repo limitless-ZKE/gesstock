@@ -1,5 +1,8 @@
 import { CheckCircle2, Printer, X } from "lucide-react";
+import { useEntreprise } from "../entreprise/EntrepriseContext";
 import { formatPercent, moneyPrecise as money } from "../lib/format";
+import { imprimer } from "../lib/impression";
+import EnTeteDocument from "./EnTeteDocument";
 
 export type ReceiptPaymentMode = "ESPECES" | "MOBILE_MONEY" | "CARTE" | "VIREMENT" | "CHEQUE" | "AUTRE";
 
@@ -74,6 +77,9 @@ export default function ReceiptModal({ sale, onClose, duplicata = false }: Recei
   const paymentLabel = sale.modeReglement ? paymentLabels[sale.modeReglement] : "Paiement";
   const remises = remisesDeLaVente(sale);
   const annulee = sale.statut === "ANNULEE";
+  const { entreprise } = useEntreprise();
+  // Message de fin de ticket choisi par l'entreprise ; avant le chargement de ses informations, le message d'usage.
+  const piedDePage = entreprise ? entreprise.piedDePage : "Merci de votre visite !";
   return (
     <div className="fixed inset-0 z-[60] grid place-items-center overflow-y-auto bg-slate-950/50 p-4">
       <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
@@ -86,8 +92,8 @@ export default function ReceiptModal({ sale, onClose, duplicata = false }: Recei
         </div>
         <div id="sales-receipt" className="receipt-content mx-auto max-w-xs font-mono text-[11px] text-slate-800">
           <div className="text-center">
-            <p className="text-base font-extrabold tracking-tight">GESSTOCK</p>
-            <p className="mt-1 text-[9px] uppercase tracking-[0.2em]">Ticket de vente</p>
+            <EnTeteDocument variante="ticket" />
+            <p className="mt-2 text-[9px] uppercase tracking-[0.2em]">Ticket de vente</p>
             {duplicata && <p className="mt-2 border border-slate-800 py-1 text-xs font-extrabold tracking-[0.3em]">DUPLICATA</p>}
             {annulee && <p className="mt-2 border border-rose-600 py-1 text-xs font-extrabold tracking-[0.2em] text-rose-700">VENTE ANNULÉE</p>}
             <p className="mt-3 border-y border-dashed border-slate-300 py-2">{sale.code}</p>
@@ -141,13 +147,13 @@ export default function ReceiptModal({ sale, onClose, duplicata = false }: Recei
             )}
           </div>
           {sale.client && <p className="mt-4">Client : {sale.client}</p>}
-          <p className="mt-5 text-center text-[9px] text-slate-500">Merci de votre visite !</p>
+          {piedDePage && <p className="mt-5 text-center text-[9px] text-slate-500">{piedDePage}</p>}
         </div>
         <div className="mt-6 flex gap-3 print:hidden">
           <button onClick={onClose} className="h-11 flex-1 rounded-xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50">
             {duplicata ? "Fermer" : "Terminer"}
           </button>
-          <button onClick={() => window.print()} className="flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 text-sm font-bold text-white hover:bg-emerald-700"><Printer size={16} /> Imprimer</button>
+          <button onClick={() => void imprimer(document.getElementById("sales-receipt"))} className="flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 text-sm font-bold text-white hover:bg-emerald-700"><Printer size={16} /> Imprimer</button>
         </div>
       </div>
       <style>{`@media print { body * { visibility: hidden !important; } #sales-receipt, #sales-receipt * { visibility: visible !important; } #sales-receipt { position: fixed; inset: 0 auto auto 0; width: 72mm; max-width: 72mm; padding: 4mm; color: #000 !important; background: #fff !important; } @page { size: 80mm auto; margin: 3mm; } }`}</style>

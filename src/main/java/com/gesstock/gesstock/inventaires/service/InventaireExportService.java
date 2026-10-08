@@ -1,5 +1,8 @@
 package com.gesstock.gesstock.inventaires.service;
 
+import com.gesstock.gesstock.entreprise.service.EnteteExcel;
+import com.gesstock.gesstock.entreprise.service.EntrepriseService;
+import com.gesstock.gesstock.entreprise.service.TailleLogo;
 import com.gesstock.gesstock.inventaires.dto.InventaireResponse;
 import com.gesstock.gesstock.inventaires.dto.LigneInventaireResponse;
 import org.apache.poi.ss.usermodel.CellStyle;
@@ -22,6 +25,12 @@ import java.util.List;
 @Service
 public class InventaireExportService {
 
+    private final EntrepriseService entrepriseService;
+
+    public InventaireExportService(EntrepriseService entrepriseService) {
+        this.entrepriseService = entrepriseService;
+    }
+
     public byte[] exporterExcel(InventaireResponse inventaire, List<LigneInventaireResponse> lignes) throws IOException {
         try (Workbook classeur = new XSSFWorkbook(); ByteArrayOutputStream sortie = new ByteArrayOutputStream()) {
             CellStyle entete = classeur.createCellStyle();
@@ -32,18 +41,20 @@ public class InventaireExportService {
             entete.setFont(gras);
 
             Sheet feuille = classeur.createSheet("Inventaire");
-            Row titre = feuille.createRow(0);
+            int debut = EnteteExcel.ecrire(classeur, feuille, entrepriseService.obtenir(),
+                entrepriseService.logo(TailleLogo.MINIATURE).map(EntrepriseService.LogoServi::contenu).orElse(null));
+            Row titre = feuille.createRow(debut);
             titre.createCell(0).setCellValue("Inventaire " + inventaire.code() + " — "
                 + (inventaire.categorie() == null ? "tout le catalogue" : "catégorie " + inventaire.categorie())
                 + " — ouvert par " + inventaire.ouvertPar());
-            Row ligneEntete = feuille.createRow(2);
+            Row ligneEntete = feuille.createRow(debut + 2);
             String[] colonnes = {"Référence", "Désignation", "Catégorie", "Unité", "Stock théorique", "Stock compté", "Écart", "Coût moyen", "Motif", "Commentaire"};
             for (int index = 0; index < colonnes.length; index++) {
                 var cellule = ligneEntete.createCell(index);
                 cellule.setCellValue(colonnes[index]);
                 cellule.setCellStyle(entete);
             }
-            int numero = 3;
+            int numero = debut + 3;
             for (LigneInventaireResponse ligne : lignes) {
                 Row row = feuille.createRow(numero);
                 row.createCell(0).setCellValue(ligne.reference());

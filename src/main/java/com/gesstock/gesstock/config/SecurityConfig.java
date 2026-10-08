@@ -129,6 +129,11 @@ public class SecurityConfig {
                 .requestMatchers("/api/clients/**", "/api/dettes-clients/**")
                     .hasAnyRole(ADMIN, MANAGER, GESTIONNAIRE, CAISSIER)
 
+                // Entreprise (nom, coordonnées, logo imprimés sur les documents) : tout le monde les lit, car un caissier
+                // imprime des tickets ; les modifier est une décision de responsable.
+                .requestMatchers(GET, "/api/entreprise", "/api/entreprise/logo").hasAnyRole(ADMIN, MANAGER, GESTIONNAIRE, CAISSIER)
+                .requestMatchers("/api/entreprise/**").hasAnyRole(ADMIN, MANAGER)
+
                 // Pilotage.
                 .requestMatchers(GET, "/api/promotions/**").hasAnyRole(ADMIN, MANAGER, GESTIONNAIRE, CAISSIER)
                 .requestMatchers("/api/promotions/**", "/api/statistiques/**", "/api/journal-activites/**")

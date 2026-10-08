@@ -118,6 +118,18 @@ Seuls ces quatre rôles existent. Les anciens rôles `VENDEUR` et `USER` sont fu
   simultanées ; un CHECK en base le garantit aussi), refuse ce qui n'est plus en rayon, sort le stock au coût du bon (mouvement
   `RETOUR_FOURNISSEUR`), recalcule le coût moyen et crédite le fournisseur d'un avoir égal à quantité × coût du bon, qui s'impute
   aussitôt sur ses dettes. Un retour validé ne s'annule pas.
+- **Entreprise et logo** (`/api/entreprise`, écran « Entreprise » du menu) : nom, adresse, téléphone, e-mail, RCCM / NINEA / SIRET,
+  site web et message de fin de ticket sont enregistrés en base (une seule ligne) et lus à CHAQUE impression : plus rien n'est écrit
+  en dur dans les documents. Les lire : tous les rôles connectés (un caissier imprime des tickets) ; les modifier : ADMIN et MANAGER.
+  Le logo est stocké en base (donc dans les sauvegardes, sans dossier ni volume à configurer). Un fichier envoyé n'est jamais
+  conservé tel quel : PNG ou JPEG seulement (reconnus à leur signature ; SVG, GIF et WebP refusés), 2 Mo et 4000 px de côté au
+  plus (`APP_LOGO_OCTETS_MAX`), dimensions lues avant décodage, puis ré-encodé en PNG par le serveur (métadonnées et contenu caché
+  supprimés) et réduit à 1000 px au plus. Chaque emplacement demande ensuite son format, calculé à la demande et mis en cache :
+  `GET /api/entreprise/logo?taille=miniature|ticket|entete|original` (160×80, 320×160, 720×300 px au plus ; proportions conservées,
+  jamais d'agrandissement). L'ETag est l'empreinte du logo : remplacer l'image la renouvelle partout dès l'impression suivante.
+  Documents concernés : ticket de vente, reçu de versement client, rapport de statistiques (écran, PDF, Excel) et feuille
+  d'inventaire Excel. Il n'existe pas encore de facture A4 ni de bon de livraison ; le composant `EnTeteDocument` (variante A4)
+  est prêt pour eux.
 - **Coût du stock** : le coût d'un article est son coût moyen pondéré (CMP), recalculé à chaque réception ; chaque ligne de
   vente mémorise le coût du moment, donc la marge d'une vente passée ne bouge plus. `historique_prix_achat` garde l'évolution.
 - **TVA** : le taux est imposé par le serveur (`APP_TVA_TAUX`, 0 par défaut : aucune TVA), jamais saisi à la caisse
@@ -168,6 +180,8 @@ Le contrôle de santé de Docker interroge `http://127.0.0.1:8081/actuator/healt
   les contraintes de montants tenues par la base.
 - `V12__retours_fournisseurs.sql` : retours au fournisseur et leurs lignes, compteur `quantite_retournee` (avec CHECK) sur les
   lignes de bon, lien mouvement de stock → retour.
+- `V13__parametres_entreprise.sql` : informations de l'entreprise et logo (une seule ligne chacune, garantie par la base ; le
+  logo dans une table à part pour ne pas être chargé avec les textes).
 - Une migration déjà appliquée ne se modifie jamais : toute évolution du schéma est un nouveau fichier
   `V<n>__description.sql`.
 - Une base créée à la main par `ddl-auto=update` n'est **pas** reprise automatiquement (`V3` échouerait : colonne
