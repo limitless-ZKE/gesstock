@@ -8,13 +8,18 @@ import com.gesstock.gesstock.common.exception.RessourceIntrouvableException;
 import com.gesstock.gesstock.articles.mapper.CatalogueMapper;
 import com.gesstock.gesstock.entities.Article;
 import com.gesstock.gesstock.entities.CategorieArticle;
+import com.gesstock.gesstock.entities.MouvementStock;
+import com.gesstock.gesstock.entities.TypeMouvementStock;
 import com.gesstock.gesstock.entities.UniteMesure;
 import com.gesstock.gesstock.repositories.ArticleRepository;
 import com.gesstock.gesstock.repositories.CategorieArticleRepository;
+import com.gesstock.gesstock.repositories.MouvementStockRepository;
 import com.gesstock.gesstock.repositories.UniteMesureRepository;
+import com.gesstock.gesstock.repositories.UtilisateurRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -24,15 +29,21 @@ public class ArticleCatalogueService {
     private final ArticleRepository articleRepository;
     private final CategorieArticleRepository categorieRepository;
     private final UniteMesureRepository uniteMesureRepository;
+    private final MouvementStockRepository mouvementStockRepository;
+    private final UtilisateurRepository utilisateurRepository;
 
     public ArticleCatalogueService(
         ArticleRepository articleRepository,
         CategorieArticleRepository categorieRepository,
-        UniteMesureRepository uniteMesureRepository
+        UniteMesureRepository uniteMesureRepository,
+        MouvementStockRepository mouvementStockRepository,
+        UtilisateurRepository utilisateurRepository
     ) {
         this.articleRepository = articleRepository;
         this.categorieRepository = categorieRepository;
         this.uniteMesureRepository = uniteMesureRepository;
+        this.mouvementStockRepository = mouvementStockRepository;
+        this.utilisateurRepository = utilisateurRepository;
     }
 
     @Transactional(readOnly = true)
@@ -54,10 +65,32 @@ public class ArticleCatalogueService {
     }
 
     public ArticleResponse creer(ArticleRequest request) {
+        return creer(request, null);
+    }
+
+    /** Crée l'article ; un stock de départ non nul laisse un mouvement STOCK_INITIAL (la somme des mouvements explique le stock). */
+    public ArticleResponse creer(ArticleRequest request, String username) {
         verifierReferenceDisponible(request.reference(), null);
         Article article = new Article();
         remplir(article, request, true);
-        return CatalogueMapper.toResponse(articleRepository.save(article));
+        Article enregistre = articleRepository.save(article);
+        if (enregistre.getQuantiteStock() > 0) {
+            MouvementStock mouvement = new MouvementStock();
+            mouvement.setType(TypeMouvementStock.STOCK_INITIAL);
+            mouvement.setQuantite(enregistre.getQuantiteStock());
+            mouvement.setStockAvant(0);
+            mouvement.setStockApres(enregistre.getQuantiteStock());
+            mouvement.setCoutUnitaire(enregistre.getCmp());
+            mouvement.setDateMouvement(LocalDateTime.now());
+            mouvement.setReferenceDocument("STOCK-INITIAL");
+            mouvement.setCommentaire("Stock de départ saisi à la création de l'article");
+            mouvement.setArticle(enregistre);
+            if (username != null) {
+                utilisateurRepository.findByUsername(username).ifPresent(mouvement::setEffectuePar);
+            }
+            mouvementStockRepository.save(mouvement);
+        }
+        return CatalogueMapper.toResponse(enregistre);
     }
 
     public ArticleResponse modifier(Long id, ArticleRequest request) {

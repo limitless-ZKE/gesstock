@@ -109,6 +109,10 @@ public class SecurityConfig {
                     .hasAnyRole(ADMIN, MANAGER, GESTIONNAIRE)
                 .requestMatchers("/api/fournisseurs/**", "/api/approvisionnements/**")
                     .hasAnyRole(ADMIN, MANAGER, GESTIONNAIRE)
+                // Inventaire : le comptage est un travail de stock ; appliquer les écarts au stock est une décision de responsable.
+                .requestMatchers(POST, "/api/inventaires/*/validation", "/api/inventaires/*/annulation", "/api/inventaires/*/reprise")
+                    .hasAnyRole(ADMIN, MANAGER)
+                .requestMatchers("/api/inventaires/**").hasAnyRole(ADMIN, MANAGER, GESTIONNAIRE)
 
                 // Caisse et ventes. L'annulation d'une vente (retour de stock, dette, remboursement) est réservée
                 // aux responsables : elle peut faire sortir de l'argent de la caisse.

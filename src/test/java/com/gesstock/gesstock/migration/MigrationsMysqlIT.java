@@ -65,9 +65,21 @@ class MigrationsMysqlIT {
 
         try (ConfigurableApplicationContext contexte = demarrer(base, "--spring.flyway.baseline-on-migrate=false")) {
             JdbcTemplate jdbc = contexte.getBean(JdbcTemplate.class);
-            assertThat(versionsAppliquees(jdbc)).containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9");
+            assertThat(versionsAppliquees(jdbc)).containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10");
             assertThat(migrationsEnEchec(jdbc)).isZero();
             assertThat(derives(contexte, base)).as("enum Java absents de la base").isEmpty();
+
+            // V10 : « un seul inventaire en cours » est garanti par la BASE (colonne générée + index unique), pas seulement par le code
+            jdbc.update("INSERT INTO utilisateurs (actif, username, password) VALUES (1, 'it-inventaire', 'x')");
+            Long utilisateurId = jdbc.queryForObject("SELECT id FROM utilisateurs WHERE username = 'it-inventaire'", Long.class);
+            String insertion = "INSERT INTO inventaires (code, statut, perimetre, ouvert_le, ouvert_par_id, version) "
+                + "VALUES (?, ?, 'TOUT', NOW(), ?, 0)";
+            jdbc.update(insertion, "INV-IT-1", "EN_SAISIE", utilisateurId);
+            assertThatThrownBy(() -> jdbc.update(insertion, "INV-IT-2", "SOUMIS", utilisateurId))
+                .as("un second inventaire en cours").isInstanceOf(org.springframework.dao.DuplicateKeyException.class);
+            jdbc.update("UPDATE inventaires SET statut = 'ANNULE' WHERE code = 'INV-IT-1'");
+            jdbc.update(insertion, "INV-IT-3", "EN_SAISIE", utilisateurId); // la voie est libre une fois le premier annulé
+            jdbc.update(insertion, "INV-IT-4", "VALIDE", utilisateurId);    // les inventaires terminés ne comptent pas
         }
     }
 
@@ -146,7 +158,7 @@ class MigrationsMysqlIT {
         try (ConfigurableApplicationContext contexte = demarrer(base,
             "--spring.flyway.baseline-on-migrate=true", "--spring.flyway.baseline-version=3")) {
             JdbcTemplate jdbc = contexte.getBean(JdbcTemplate.class);
-            assertThat(versionsAppliquees(jdbc)).containsExactly("3", "4", "5", "6", "7", "8", "9");
+            assertThat(versionsAppliquees(jdbc)).containsExactly("3", "4", "5", "6", "7", "8", "9", "10");
             assertThat(migrationsEnEchec(jdbc)).isZero();
         }
     }

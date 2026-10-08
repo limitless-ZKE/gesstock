@@ -1,5 +1,6 @@
 package com.gesstock.gesstock.articles.dto;
 
+import com.gesstock.gesstock.entities.MotifAjustementStock;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;

@@ -1,4 +1,4 @@
-package com.gesstock.gesstock.articles.dto;
+package com.gesstock.gesstock.entities;
 
 /** Pourquoi le stock réel diffère du stock enregistré. Le motif est obligatoire pour tout ajustement. */
 public enum MotifAjustementStock {

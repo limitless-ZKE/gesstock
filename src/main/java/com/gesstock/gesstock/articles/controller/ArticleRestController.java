@@ -43,8 +43,11 @@ public class ArticleRestController {
     }
 
     @PostMapping
-    public ResponseEntity<ArticleResponse> creer(@Valid @RequestBody ArticleRequest request) {
-        ArticleResponse response = articleService.creer(request);
+    public ResponseEntity<ArticleResponse> creer(
+        @Valid @RequestBody ArticleRequest request,
+        @AuthenticationPrincipal UserDetails principal
+    ) {
+        ArticleResponse response = articleService.creer(request, principal.getUsername());
         URI location = ServletUriComponentsBuilder.fromCurrentRequest().path("/{id}")
             .buildAndExpand(response.id()).toUri();
         return ResponseEntity.created(location).body(response);

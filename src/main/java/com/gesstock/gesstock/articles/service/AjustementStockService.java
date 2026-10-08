@@ -2,7 +2,7 @@ package com.gesstock.gesstock.articles.service;
 
 import com.gesstock.gesstock.articles.dto.AjustementStockRequest;
 import com.gesstock.gesstock.articles.dto.ArticleResponse;
-import com.gesstock.gesstock.articles.dto.MotifAjustementStock;
+import com.gesstock.gesstock.entities.MotifAjustementStock;
 import com.gesstock.gesstock.articles.mapper.CatalogueMapper;
 import com.gesstock.gesstock.common.exception.ConflitRessourceException;
 import com.gesstock.gesstock.common.exception.RequeteInvalideException;

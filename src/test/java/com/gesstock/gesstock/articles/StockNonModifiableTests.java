@@ -69,5 +69,22 @@ class StockNonModifiableTests {
             new BigDecimal("150"), 2, 40, null, null));
 
         assertThat(cree.quantiteStock()).isEqualTo(40);
+        // le stock de départ laisse un mouvement : la somme des mouvements explique le stock
+        assertThat(mouvementRepository.findAll()).filteredOn(m -> m.getArticle().getId().equals(cree.id()))
+            .singleElement().satisfies(m -> {
+                assertThat(m.getType()).isEqualTo(com.gesstock.gesstock.entities.TypeMouvementStock.STOCK_INITIAL);
+                assertThat(m.getQuantite()).isEqualTo(40);
+                assertThat(m.getStockAvant()).isZero();
+                assertThat(m.getStockApres()).isEqualTo(40);
+                assertThat(m.getCoutUnitaire()).isEqualByComparingTo("100");
+            });
+    }
+
+    @Test
+    void unArticleCreeSansStockDeDepartNeLaisseAucunMouvement() {
+        var cree = articleService.creer(new ArticleRequest("VIDE-001", "Article sans stock", new BigDecimal("100"),
+            new BigDecimal("150"), 2, 0, null, null));
+
+        assertThat(mouvementRepository.findAll()).noneMatch(m -> m.getArticle().getId().equals(cree.id()));
     }
 }

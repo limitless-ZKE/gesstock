@@ -94,6 +94,14 @@ Seuls ces quatre rôles existent. Les anciens rôles `VENDEUR` et `USER` sont fu
   le client est remboursé (en espèces, à condition que la caisse en contienne assez ; sinon par le même moyen de paiement). Le
   remboursement en espèces n'est pas une sortie de caisse séparée : la vente annulée quitte les encaissements, ce qui fait
   baisser le solde théorique du même montant. Après la clôture, une journée ne se rouvre pas.
+- **Inventaire physique** (`/api/inventaires`) : ouvrir (tout le catalogue ou une catégorie avec ses sous-catégories), compter
+  article par article, soumettre, puis valider. Ouvrir, compter et soumettre : ADMIN, MANAGER, GESTIONNAIRE ; valider, reprendre
+  en saisie ou annuler : ADMIN et MANAGER, et la validation exige une AUTRE personne que celle qui a ouvert. Un seul inventaire
+  est en cours à la fois. L'ouverture photographie le stock théorique et le coût moyen ; comme les ventes continuent pendant le
+  comptage, la validation applique l'ÉCART (compté − théorique) au stock du moment, jamais la valeur comptée, et refuse tout
+  si un écart ferait passer un stock sous zéro (article à recompter). Tout écart exige un motif à la soumission. Les articles non
+  comptés ne sont pas touchés. `GET /api/inventaires/{id}/export.xlsx` donne la feuille de comptage. Un stock de départ saisi
+  à la création d'un article laisse un mouvement `STOCK_INITIAL`.
 - **Coût du stock** : le coût d'un article est son coût moyen pondéré (CMP), recalculé à chaque réception ; chaque ligne de
   vente mémorise le coût du moment, donc la marge d'une vente passée ne bouge plus. `historique_prix_achat` garde l'évolution.
 - **TVA** : le taux est imposé par le serveur (`APP_TVA_TAUX`, 0 par défaut : aucune TVA), jamais saisi à la caisse
@@ -138,6 +146,8 @@ Le contrôle de santé de Docker interroge `http://127.0.0.1:8081/actuator/healt
 - `V8__cout_moyen_pondere.sql` : coût moyen pondéré des articles, coût mémorisé sur les lignes de vente (estimé pour les
   ventes déjà enregistrées) et sur les mouvements de stock, historique des prix d'achat.
 - `V9__approbation_remises.sql` : responsable ayant approuvé une remise, sur les lignes de vente et de proforma.
+- `V10__inventaire_physique.sql` : inventaires et leurs lignes (un seul inventaire en cours à la fois, garanti par un index
+  unique sur une colonne générée), type de mouvement `STOCK_INITIAL`, lien mouvement de stock → inventaire.
 - Une migration déjà appliquée ne se modifie jamais : toute évolution du schéma est un nouveau fichier
   `V<n>__description.sql`.
 - Une base créée à la main par `ddl-auto=update` n'est **pas** reprise automatiquement (`V3` échouerait : colonne

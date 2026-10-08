@@ -80,4 +80,9 @@ public class MouvementStock {
     @ManyToOne
     @JoinColumn(name = "vente_id")
     private Vente vente;
+
+    /** Inventaire à l'origine de l'ajustement, le cas échéant. */
+    @ManyToOne
+    @JoinColumn(name = "inventaire_id")
+    private Inventaire inventaire;
 }
