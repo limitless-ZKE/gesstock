@@ -22,9 +22,14 @@ public class LogoEntreprise {
     @Id
     private Integer id = ParametresEntreprise.ID_UNIQUE;
 
+    /**
+     * La longueur n'est pas une limite : elle fait choisir à Hibernate le type LONGBLOB de MySQL (au-delà de 16 777 215), celui
+     * de la migration V13. Sans elle il attend un TINYBLOB et le démarrage échoue à la validation du schéma — ce que la base
+     * de test H2 ne montre pas. Le poids réel est borné par {@code app.entreprise.logo-octets-max}.
+     */
     @NotNull
     @Lob
-    @Column(nullable = false)
+    @Column(nullable = false, length = 67_108_864)
     private byte[] contenu;
 
     @NotNull
@@ -42,6 +47,7 @@ public class LogoEntreprise {
     private String empreinte;
 
     @NotNull
-    @Column(nullable = false)
+    // nom explicite : le découpage automatique de « misAJourLe » ne donne pas « mis_a_jour_le » (colonne de la migration V13)
+    @Column(name = "mis_a_jour_le", nullable = false)
     private LocalDateTime misAJourLe = LocalDateTime.now();
 }

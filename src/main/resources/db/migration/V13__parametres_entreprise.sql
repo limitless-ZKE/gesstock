@@ -23,10 +23,11 @@ CREATE TABLE parametres_entreprise (
     PRIMARY KEY (id),
     CONSTRAINT ck_parametres_entreprise_unique CHECK (id = 1),
     CONSTRAINT ck_parametres_entreprise_nom CHECK (CHAR_LENGTH(TRIM(nom)) > 0),
-    -- l'empreinte et les dimensions du logo vont ensemble : tous renseignés ou tous absents
+    -- l'empreinte et les dimensions du logo vont ensemble : tous renseignés ou tous absents.
+    -- COALESCE est indispensable : un CHECK dont le résultat est NULL (« inconnu ») est ACCEPTÉ par MySQL, et NULL > 0 vaut NULL.
     CONSTRAINT ck_parametres_entreprise_logo CHECK (
         (logo_empreinte IS NULL AND logo_largeur IS NULL AND logo_hauteur IS NULL)
-        OR (logo_empreinte IS NOT NULL AND logo_largeur > 0 AND logo_hauteur > 0)),
+        OR (logo_empreinte IS NOT NULL AND COALESCE(logo_largeur, 0) > 0 AND COALESCE(logo_hauteur, 0) > 0)),
     CONSTRAINT fk_parametres_entreprise_utilisateur FOREIGN KEY (mis_a_jour_par_id) REFERENCES utilisateurs (id)
 ) ENGINE = InnoDB;
 

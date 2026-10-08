@@ -73,7 +73,8 @@ public class ParametresEntreprise {
     private Integer logoHauteur;
 
     @NotNull
-    @Column(nullable = false)
+    // nom explicite : le découpage automatique de « misAJourLe » ne donne pas « mis_a_jour_le » (colonne de la migration V13)
+    @Column(name = "mis_a_jour_le", nullable = false)
     private LocalDateTime misAJourLe = LocalDateTime.now();
 
     @ManyToOne
