@@ -1,9 +1,11 @@
 package com.gesstock.gesstock.config;
 
+import com.gesstock.gesstock.interfaceweb.InterfaceWeb;
 import com.gesstock.gesstock.security.LimiteConnexionsFilter;
 import com.gesstock.gesstock.security.LimiteurConnexions;
 import jakarta.servlet.DispatcherType;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnResource;
 import org.springframework.boot.security.autoconfigure.actuate.web.servlet.EndpointRequest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -72,8 +74,28 @@ public class SecurityConfig {
         return http.build();
     }
 
+    /**
+     * Interface embarquée (voir {@link InterfaceWeb}) : la page d'entrée, ses fichiers et ses pages, en LECTURE SEULE (GET) et
+     * pour tout le monde — c'est ce qui permet d'afficher l'écran de connexion. Aucun cookie, aucune session : ces requêtes ne
+     * touchent à rien. Le reste (l'API surtout) tombe dans la chaîne suivante et reste soumis à ses règles. Cette chaîne
+     * n'existe pas tant que l'interface n'est pas dans le programme : développement et tests refusent alors ces chemins comme avant.
+     */
     @Bean
     @Order(2)
+    @ConditionalOnResource(resources = InterfaceWeb.CONDITION_INDEX)
+    public SecurityFilterChain interfaceWeb(HttpSecurity http) throws Exception {
+        String[] chemins = java.util.stream.Stream.concat(java.util.Arrays.stream(InterfaceWeb.PAGES), java.util.Arrays.stream(InterfaceWeb.FICHIERS))
+            .toArray(String[]::new);
+        http
+            .securityMatchers(correspondance -> correspondance.requestMatchers(GET, chemins))
+            .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
+            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .csrf(csrf -> csrf.disable());
+        return http.build();
+    }
+
+    @Bean
+    @Order(3)
     public SecurityFilterChain filterChain(HttpSecurity http, ApiSecurityHandlers handlers, LimiteurConnexions limiteur) throws Exception {
         CookieCsrfTokenRepository csrfRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
         csrfRepository.setCookieCustomizer(cookie -> cookie.sameSite("Lax").secure(secureCookies));
