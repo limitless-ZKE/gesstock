@@ -44,6 +44,12 @@ server:
   port: ${SERVER_PORT:8080}
   shutdown: graceful
   forward-headers-strategy: framework  # derrière un proxy TLS : respecte X-Forwarded-Proto / -For
+  compression:
+    # Interface embarquée : ses fichiers (HTML, JS, CSS, SVG) passent de ~600 Ko à ~160 Ko sur le réseau. Les réponses JSON de l'API ne
+    # sont volontairement PAS compressées (une compression des réponses qui mêlent texte secret et texte choisi par l'attaquant expose à BREACH).
+    enabled: true
+    mime-types: text/html,text/css,application/javascript,text/javascript,image/svg+xml
+    min-response-size: 1KB
   servlet:
     session:
       timeout: 30m

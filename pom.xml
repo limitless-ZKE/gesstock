@@ -143,4 +143,64 @@
 		</plugins>
 	</build>
 
+	<profiles>
+		<!--
+			Embarque l'interface (frontend) dans le programme : le serveur la sert lui-même, à la même adresse que l'API.
+			Prérequis : avoir construit l'interface (cd frontend && npm run build). Voir scripts/construire-pour-le-reseau.cmd.
+			Commande : ./mvnw -Pinterface -DskipTests package
+		-->
+		<profile>
+			<id>interface</id>
+			<build>
+				<plugins>
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-enforcer-plugin</artifactId>
+						<executions>
+							<execution>
+								<id>interface-construite</id>
+								<phase>validate</phase>
+								<goals>
+									<goal>enforce</goal>
+								</goals>
+								<configuration>
+									<rules>
+										<requireFilesExist>
+											<files>
+												<file>${project.basedir}/frontend/dist/index.html</file>
+											</files>
+											<message>L'interface n'est pas construite : lancez d'abord  cd frontend &amp;&amp; npm install &amp;&amp; npm run build  (ou scripts/construire-pour-le-reseau.cmd).</message>
+										</requireFilesExist>
+									</rules>
+									<fail>true</fail>
+								</configuration>
+							</execution>
+						</executions>
+					</plugin>
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-resources-plugin</artifactId>
+						<executions>
+							<execution>
+								<id>copier-interface</id>
+								<phase>prepare-package</phase>
+								<goals>
+									<goal>copy-resources</goal>
+								</goals>
+								<configuration>
+									<outputDirectory>${project.build.outputDirectory}/static</outputDirectory>
+									<resources>
+										<resource>
+											<directory>${project.basedir}/frontend/dist</directory>
+										</resource>
+									</resources>
+								</configuration>
+							</execution>
+						</executions>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+	</profiles>
+
 </project>

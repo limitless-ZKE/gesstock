@@ -11,7 +11,8 @@ npm install
 npm run dev
 ```
 
-Ouvrir `http://localhost:5173`. Le backend doit autoriser cette origine (CORS `http://localhost:5173` en développement).
+Ouvrir `http://localhost:5173`. (Ce mode « développement » est réservé au développeur : pour plusieurs postes, voir « Plusieurs postes sur un réseau local »
+dans le README à la racine : le programme embarque alors l'interface et tout le monde ouvre la même adresse.) Le backend doit autoriser cette origine (CORS `http://localhost:5173` en développement).
 L'authentification utilise le cookie de session Spring Security et le jeton CSRF (`XSRF-TOKEN`, renvoyé par axios dans
 `X-XSRF-TOKEN`). `VITE_API_BASE_URL` change l'adresse de l'API (défaut `http://localhost:8080/api`) ; copier `.env.example`
 vers `.env.local` pour la fixer.
