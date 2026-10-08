@@ -256,6 +256,64 @@ public class GestionVentesService {
         return VentesMapper.toResponse(venteRepository.save(vente));
     }
 
+    /** Annule une vente validée, à crédit ou au comptant : chaque cas a ses propres conditions. */
+    public AnnulationVenteResponse annulerVente(Long id, String motif, boolean articlesRetournesEnEtat, String username) {
+        Vente vente = venteRepository.findById(id)
+            .orElseThrow(() -> new RessourceIntrouvableException("Vente introuvable: " + id));
+        return vente.isVenteACredit()
+            ? annulerVenteACredit(id, motif, articlesRetournesEnEtat, username)
+            : annulerVenteAuComptant(id, motif, articlesRetournesEnEtat, username);
+    }
+
+    /**
+     * Annule une vente au comptant : le client rapporte les articles en l'état et est remboursé.
+     *
+     * <p>Conditions : vente validée, articles rapportés en l'état, et journée de caisse de la vente encore ouverte (après la
+     * clôture le comptage est arrêté : on ne rouvre pas une journée). Un remboursement en espèces exige que la caisse en
+     * contienne assez. Le stock rentre au coût de la vente. Le remboursement en espèces n'est pas une « sortie de caisse »
+     * séparée : la vente annulée quitte les encaissements, ce qui fait baisser le solde théorique du même montant.
+     */
+    private AnnulationVenteResponse annulerVenteAuComptant(
+        Long id, String motif, boolean articlesRetournesEnEtat, String username
+    ) {
+        Vente vente = venteRepository.findByIdForUpdate(id)
+            .orElseThrow(() -> new RessourceIntrouvableException("Vente introuvable: " + id));
+        if (vente.getStatut() != StatutVente.VALIDEE) {
+            throw new ConflitRessourceException("Seule une vente validée peut être annulée");
+        }
+        if (!articlesRetournesEnEtat) {
+            throw new ConflitRessourceException("Une vente au comptant ne peut être annulée et remboursée que si le client "
+                + "rapporte les articles en l'état");
+        }
+        SessionCaisse session = sessionCaisseRepository.findByJourneeAndStatutForUpdate(
+                LocalDate.now(), StatutSessionCaisse.OUVERTE)
+            .filter(ouverte -> vente.getSessionCaisse() != null && ouverte.getId().equals(vente.getSessionCaisse().getId()))
+            .orElseThrow(() -> new ConflitRessourceException("La journée de caisse de cette vente est clôturée : une vente au "
+                + "comptant ne peut être annulée que pendant sa journée de caisse"));
+        BigDecimal montant = vente.getMontantTotal();
+        boolean especes = vente.getModeReglement() == ModeReglement.ESPECES;
+        if (especes) {
+            BigDecimal disponible = mouvementCaisseService.soldeEspecesDisponible(session);
+            if (montant.compareTo(disponible) > 0) {
+                throw new ConflitRessourceException("La caisse ne contient pas assez d'espèces pour rembourser "
+                    + montant.toPlainString() + " (disponible : " + disponible.toPlainString() + ")");
+            }
+        }
+        Utilisateur utilisateur = trouverUtilisateurActif(username);
+
+        remettreEnRayon(vente, motif, utilisateur);
+        vente.setStatut(StatutVente.ANNULEE);
+        Vente saved = venteRepository.save(vente);
+
+        String modeRemboursement = especes ? "espèces, sorties de la caisse du jour"
+            : "par le même moyen de paiement (" + (vente.getModeReglement() == null ? "inconnu" : vente.getModeReglement()) + ")";
+        journalActiviteService.enregistrer("ANNULATION", "VENTE", saved.getId(),
+            "Annulation de la vente au comptant " + saved.getCode() + " (" + motif.trim() + "), articles rapportés en l'état, "
+                + "stock remis en rayon, remboursement de " + montant.toPlainString() + " : " + modeRemboursement, username);
+        return new AnnulationVenteResponse(VentesMapper.toResponse(saved), montant,
+            especes ? montant : BigDecimal.ZERO, especes ? BigDecimal.ZERO : montant);
+    }
+
     /**
      * Annule une vente à crédit validée : le stock vendu est remis en rayon (mouvement RETOUR_CLIENT)
      * et la dette liée est annulée.

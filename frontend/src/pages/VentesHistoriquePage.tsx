@@ -13,6 +13,7 @@ import {
   ShoppingBag,
   Tag,
 } from "lucide-react";
+import { useAuth } from "../auth/AuthContext";
 import ReceiptModal, { remisesDeLaVente, type Sale } from "../components/ReceiptModal";
 import { api } from "../services/api";
 import { apiErrorMessage as errorMessage } from "../services/apiError";
@@ -60,6 +61,11 @@ export default function VentesHistoriquePage() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<StatusFilter>("all");
   const [receipt, setReceipt] = useState<Sale | null>(null);
+  const { user } = useAuth();
+  const [cancellingId, setCancellingId] = useState<number | null>(null);
+  const [notice, setNotice] = useState<{ text: string; isError: boolean } | null>(null);
+  // Annuler une vente (stock remis, client remboursé) est réservé aux responsables : voir SecurityConfig.
+  const canCancel = (user?.roles ?? []).some((role) => ["ADMIN", "MANAGER"].includes(role.toUpperCase().replace(/^ROLE_/, "")));
 
   const load = useCallback(async (selectedDay: string) => {
     setLoading(true);
@@ -76,6 +82,31 @@ export default function VentesHistoriquePage() {
   }, []);
 
   useEffect(() => { void load(day); }, [day, load]);
+
+  /** Annulation d'une vente au comptant, le jour même : le client rapporte les articles et est remboursé. */
+  async function cancelCashSale(sale: Sale) {
+    const motif = window.prompt(
+      `Annuler la vente au comptant ${sale.code} (${money.format(sale.montantTotal)}) ?\n`
+        + "Le stock sera remis en rayon et le client remboursé.\n\nMotif de l’annulation :",
+    )?.trim();
+    if (!motif) return;
+    const especes = sale.modeReglement === "ESPECES";
+    if (!window.confirm(
+      `Le client rapporte-t-il les articles de la vente ${sale.code} en l’état ?\n\n`
+        + `OK : vente annulée et ${money.format(sale.montantTotal)} remboursés${especes ? " (sortis de la caisse du jour)" : " (par le même moyen de paiement)"}.\n`
+        + "Annuler : rien n’est modifié.",
+    )) return;
+    setCancellingId(sale.id);
+    try {
+      await api.post(`/ventes/${sale.id}/annulation`, { motif, articlesRetournesEnEtat: true });
+      setNotice({ text: `La vente ${sale.code} est annulée : stock remis en rayon, ${money.format(sale.montantTotal)} remboursés.`, isError: false });
+      await load(day);
+    } catch (reason) {
+      setNotice({ text: errorMessage(reason, "L’annulation de la vente a échoué."), isError: true });
+    } finally {
+      setCancellingId(null);
+    }
+  }
 
   const filtered = useMemo(() => {
     const query = search.trim().toLocaleLowerCase("fr");
@@ -123,6 +154,12 @@ export default function VentesHistoriquePage() {
       {error && (
         <div role="alert" className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-800">
           <CircleAlert size={16} /> {error}
+        </div>
+      )}
+      {notice && (
+        <div role={notice.isError ? "alert" : "status"} className={`flex items-center gap-2 rounded-xl border px-4 py-3 text-xs font-semibold ${notice.isError ? "border-rose-200 bg-rose-50 text-rose-800" : "border-emerald-200 bg-emerald-50 text-emerald-800"}`}>
+          <CircleAlert size={16} /> {notice.text}
+          <button className="ml-auto opacity-60 hover:opacity-100" onClick={() => setNotice(null)} aria-label="Fermer">×</button>
         </div>
       )}
 
@@ -186,7 +223,12 @@ export default function VentesHistoriquePage() {
                         {cancelled ? "Annulée" : "Validée"}
                       </span>
                     </td>
-                    <td className="px-5 py-3 text-right">
+                    <td className="space-x-2 px-5 py-3 text-right">
+                      {canCancel && !cancelled && !sale.aCredit && day === today && (
+                        <button disabled={cancellingId === sale.id} onClick={() => void cancelCashSale(sale)} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-rose-200 px-3 text-[10px] font-bold text-rose-700 hover:bg-rose-50 disabled:opacity-50" title="Annuler cette vente : le client rapporte les articles et est remboursé">
+                          {cancellingId === sale.id ? <LoaderCircle size={13} className="animate-spin" /> : <Ban size={13} />} Annuler
+                        </button>
+                      )}
                       <button onClick={() => setReceipt(sale)} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-[10px] font-bold text-slate-600 hover:border-emerald-300 hover:text-emerald-700" title="Réimprimer le reçu">
                         <Printer size={13} /> Reçu
                       </button>

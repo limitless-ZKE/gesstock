@@ -88,6 +88,12 @@ Seuls ces quatre rôles existent. Les anciens rôles `VENDEUR` et `USER` sont fu
   `approbation: { username, motDePasse }`. Le serveur vérifie le mot de passe sans ouvrir de session (mêmes limites d'essais
   que la connexion), garde le nom du responsable sur la ligne de vente ou de proforma et écrit une ligne au journal. Les
   promotions ne comptent pas dans le plafond.
+- **Annulation d'une vente** (ADMIN et MANAGER seulement, `POST /api/ventes/{id}/annulation`) : à crédit, la dette est
+  annulée et les versements éventuels remboursés. Au comptant, seulement le jour même et tant que la journée de caisse de la
+  vente est ouverte, avec les articles rapportés en l'état (`articlesRetournesEnEtat`) : le stock rentre au coût de la vente et
+  le client est remboursé (en espèces, à condition que la caisse en contienne assez ; sinon par le même moyen de paiement). Le
+  remboursement en espèces n'est pas une sortie de caisse séparée : la vente annulée quitte les encaissements, ce qui fait
+  baisser le solde théorique du même montant. Après la clôture, une journée ne se rouvre pas.
 - **Coût du stock** : le coût d'un article est son coût moyen pondéré (CMP), recalculé à chaque réception ; chaque ligne de
   vente mémorise le coût du moment, donc la marge d'une vente passée ne bouge plus. `historique_prix_achat` garde l'évolution.
 - **TVA** : le taux est imposé par le serveur (`APP_TVA_TAUX`, 0 par défaut : aucune TVA), jamais saisi à la caisse

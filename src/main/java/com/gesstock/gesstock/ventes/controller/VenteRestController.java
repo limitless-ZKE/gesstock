@@ -80,7 +80,7 @@ public class VenteRestController {
         @Valid @RequestBody AnnulationVenteRequest request,
         @AuthenticationPrincipal UserDetails principal
     ) {
-        return gestionVentesService.annulerVenteACredit(
+        return gestionVentesService.annulerVente(
             id, request.motif(), request.articlesRapportes(), principal.getUsername());
     }
 }
