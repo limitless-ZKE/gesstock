@@ -6,6 +6,7 @@ import com.gesstock.gesstock.ventes.dto.*;
 import com.gesstock.gesstock.common.exception.ConflitRessourceException;
 import com.gesstock.gesstock.common.exception.RequeteInvalideException;
 import com.gesstock.gesstock.common.exception.RessourceIntrouvableException;
+import com.gesstock.gesstock.stock.CoutMoyenPondere;
 import com.gesstock.gesstock.ventes.fiscal.CalculTva;
 import com.gesstock.gesstock.ventes.mapper.VentesMapper;
 import com.gesstock.gesstock.promotions.service.PromotionService;
@@ -268,40 +269,7 @@ public class GestionVentesService {
                 remboursementEspeces), username);
         }
 
-        Map<Long, Integer> quantitesBase = new LinkedHashMap<>();
-        for (LigneVente ligne : vente.getLignesVente()) {
-            quantitesBase.merge(ligne.getArticle().getId(), quantiteEnUniteDeStock(ligne), Math::addExact);
-        }
-        Map<Long, Article> articles = new HashMap<>();
-        quantitesBase.keySet().stream().sorted().forEach(articleId -> articles.put(articleId,
-            articleRepository.findByIdForUpdate(articleId)
-                .orElseThrow(() -> new RessourceIntrouvableException("Article introuvable: " + articleId))));
-
-        Map<Long, Integer> stockCourant = new HashMap<>();
-        articles.forEach((articleId, article) -> stockCourant.put(articleId, article.getQuantiteStock()));
-        for (LigneVente ligne : vente.getLignesVente()) {
-            Article article = articles.get(ligne.getArticle().getId());
-            int quantite = quantiteEnUniteDeStock(ligne);
-            int avant = stockCourant.get(article.getId());
-            int apres = avant + quantite;
-            stockCourant.put(article.getId(), apres);
-            article.setQuantiteStock(apres);
-
-            MouvementStock mouvement = new MouvementStock();
-            mouvement.setType(TypeMouvementStock.RETOUR_CLIENT);
-            mouvement.setQuantite(quantite);
-            mouvement.setStockAvant(avant);
-            mouvement.setStockApres(apres);
-            mouvement.setDateMouvement(LocalDateTime.now());
-            mouvement.setReferenceDocument(vente.getCode());
-            mouvement.setCommentaire("Annulation de la vente : " + motif.trim());
-            mouvement.setArticle(article);
-            mouvement.setEffectuePar(utilisateur);
-            mouvement.setSessionCaisse(vente.getSessionCaisse());
-            mouvement.setVente(vente);
-            mouvementStockRepository.save(mouvement);
-        }
-        articleRepository.saveAll(articles.values());
+        remettreEnRayon(vente, motif, utilisateur);
 
         dette.setStatut(StatutDette.ANNULEE);
         detteClientRepository.save(dette);
@@ -319,6 +287,50 @@ public class GestionVentesService {
             username);
         return new AnnulationVenteResponse(
             VentesMapper.toResponse(saved), montantRembourse, remboursementEspeces, remboursementAutres);
+    }
+
+    /**
+     * Remet en rayon les articles d'une vente annulée (mouvement RETOUR_CLIENT). Le stock rentre au coût MÉMORISÉ à la
+     * vente, pas au coût du jour : le coût moyen pondéré est recalculé comme pour une entrée.
+     */
+    private void remettreEnRayon(Vente vente, String motif, Utilisateur utilisateur) {
+        Map<Long, Integer> quantitesBase = new LinkedHashMap<>();
+        for (LigneVente ligne : vente.getLignesVente()) {
+            quantitesBase.merge(ligne.getArticle().getId(), quantiteEnUniteDeStock(ligne), Math::addExact);
+        }
+        Map<Long, Article> articles = new HashMap<>();
+        quantitesBase.keySet().stream().sorted().forEach(articleId -> articles.put(articleId,
+            articleRepository.findByIdForUpdate(articleId)
+                .orElseThrow(() -> new RessourceIntrouvableException("Article introuvable: " + articleId))));
+
+        Map<Long, Integer> stockCourant = new HashMap<>();
+        articles.forEach((articleId, article) -> stockCourant.put(articleId, article.getQuantiteStock()));
+        for (LigneVente ligne : vente.getLignesVente()) {
+            Article article = articles.get(ligne.getArticle().getId());
+            int quantite = quantiteEnUniteDeStock(ligne);
+            int avant = stockCourant.get(article.getId());
+            int apres = avant + quantite;
+            stockCourant.put(article.getId(), apres);
+            BigDecimal cout = coutParUniteDeStock(ligne, article);
+            article.setCmp(CoutMoyenPondere.apresEntree(avant, article.getCmp(), quantite, cout));
+            article.setQuantiteStock(apres);
+
+            MouvementStock mouvement = new MouvementStock();
+            mouvement.setType(TypeMouvementStock.RETOUR_CLIENT);
+            mouvement.setQuantite(quantite);
+            mouvement.setStockAvant(avant);
+            mouvement.setStockApres(apres);
+            mouvement.setCoutUnitaire(cout);
+            mouvement.setDateMouvement(LocalDateTime.now());
+            mouvement.setReferenceDocument(vente.getCode());
+            mouvement.setCommentaire("Annulation de la vente : " + motif.trim());
+            mouvement.setArticle(article);
+            mouvement.setEffectuePar(utilisateur);
+            mouvement.setSessionCaisse(vente.getSessionCaisse());
+            mouvement.setVente(vente);
+            mouvementStockRepository.save(mouvement);
+        }
+        articleRepository.saveAll(articles.values());
     }
 
     public VenteResponse convertirProformaEnVente(
@@ -434,6 +446,10 @@ public class GestionVentesService {
             int apres = avant - quantite;
             stockCourant.put(article.getId(), apres);
             article.setQuantiteStock(apres);
+            // Une sortie ne change pas le CMP : elle sort à son niveau du moment, mémorisé sur la ligne (la marge de cette
+            // vente ne bougera plus, quoi qu'il arrive aux prix d'achat ensuite).
+            ligne.setCoutUnitaire(article.getCmp().multiply(facteurDe(ligne)).setScale(4, RoundingMode.HALF_UP));
+            ligne.setCoutEstime(false);
             creerMouvementStock(vente, ligne, article, quantite, avant, apres, vendeur, session);
         }
         articleRepository.saveAll(articles.values());
@@ -460,10 +476,20 @@ public class GestionVentesService {
         detteClientRepository.save(dette);
     }
 
+    private BigDecimal facteurDe(LigneVente ligne) {
+        return ligne.getUniteVente() == null ? BigDecimal.ONE : ligne.getUniteVente().getFacteurConversion();
+    }
+
+    /** Coût d'UNE unité de stock à la vente, déduit du coût mémorisé sur la ligne (par unité vendue) ; CMP actuel à défaut. */
+    private BigDecimal coutParUniteDeStock(LigneVente ligne, Article article) {
+        if (ligne.getCoutUnitaire() == null) {
+            return article.getCmp();
+        }
+        return ligne.getCoutUnitaire().divide(facteurDe(ligne), 4, RoundingMode.HALF_UP);
+    }
+
     private int quantiteEnUniteDeStock(LigneVente ligne) {
-        BigDecimal facteur = ligne.getUniteVente() == null
-            ? BigDecimal.ONE
-            : ligne.getUniteVente().getFacteurConversion();
+        BigDecimal facteur = facteurDe(ligne);
         try {
             return facteur.multiply(BigDecimal.valueOf(ligne.getQuantite()))
                 .setScale(0, RoundingMode.UNNECESSARY)
@@ -488,6 +514,7 @@ public class GestionVentesService {
         mouvement.setQuantite(quantite);
         mouvement.setStockAvant(avant);
         mouvement.setStockApres(apres);
+        mouvement.setCoutUnitaire(article.getCmp());
         mouvement.setDateMouvement(LocalDateTime.now());
         mouvement.setReferenceDocument(vente.getCode());
         mouvement.setCommentaire(ligne.getUniteVente() == null ? null : "Unité: " + ligne.getUniteVente().getCode());

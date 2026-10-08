@@ -92,9 +92,10 @@ public interface VenteRepository extends JpaRepository<Vente, Long> {
                                          @Param("fin") LocalDateTime fin,
                                          org.springframework.data.domain.Pageable pageable);
 
+    // Le coût vient de la ligne de vente (mémorisé à la vente) : une réception postérieure ne réécrit pas les marges passées.
     @Query("select a.id, a.reference, a.nom, sum(l.quantite), " +
         "sum((l.prixUnitaire - coalesce(l.remiseUnitaire, 0)) * l.quantite), " +
-        "sum(a.prixAchat * l.quantite * coalesce(u.facteurConversion, 1)) " +
+        "sum(coalesce(l.coutUnitaire, a.cmp * coalesce(u.facteurConversion, 1)) * l.quantite) " +
         "from LigneVente l join l.vente v join l.article a left join l.uniteVente u " +
         "where v.statut = :statut and v.dateVente >= :debut and v.dateVente < :fin " +
         "group by a.id, a.reference, a.nom order by sum((l.prixUnitaire - coalesce(l.remiseUnitaire, 0)) * l.quantite) desc")
@@ -104,7 +105,7 @@ public interface VenteRepository extends JpaRepository<Vente, Long> {
 
     @Query("select c.id, c.nom, " +
         "sum((l.prixUnitaire - coalesce(l.remiseUnitaire, 0)) * l.quantite), " +
-    "sum(a.prixAchat * l.quantite * coalesce(u.facteurConversion, 1)) " +
+    "sum(coalesce(l.coutUnitaire, a.cmp * coalesce(u.facteurConversion, 1)) * l.quantite) " +
     "from LigneVente l join l.vente v join l.article a left join l.uniteVente u left join a.categorie c " +
         "where v.statut = :statut and v.dateVente >= :debut and v.dateVente < :fin " +
         "group by c.id, c.nom")

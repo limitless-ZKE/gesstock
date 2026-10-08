@@ -7,6 +7,7 @@ public record ArticleResponse(
     String reference,
     String designation,
     BigDecimal prixAchat,
+    BigDecimal coutMoyen,
     BigDecimal prixVente,
     Integer quantiteStock,
     Integer seuilAlerteStock,

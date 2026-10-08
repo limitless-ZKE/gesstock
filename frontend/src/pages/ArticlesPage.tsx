@@ -29,6 +29,7 @@ type Article = {
   reference: string;
   designation: string;
   prixAchat: number;
+  coutMoyen: number;
   prixVente: number;
   quantiteStock: number;
   seuilAlerteStock: number;
@@ -414,7 +415,7 @@ export default function ArticlesPage() {
               <tr>
                 <SortHeader label="Article" active={sortKey === "designation"} direction={sortDirection} onClick={() => changeSort("designation")} />
                 <SortHeader label="Catégorie" active={sortKey === "categorie"} direction={sortDirection} onClick={() => changeSort("categorie")} />
-                <SortHeader label="Prix d'achat" active={sortKey === "prixAchat"} direction={sortDirection} onClick={() => changeSort("prixAchat")} />
+                <SortHeader label="Dernier achat" active={sortKey === "prixAchat"} direction={sortDirection} onClick={() => changeSort("prixAchat")} />
                 <SortHeader label="Prix de vente" active={sortKey === "prixVente"} direction={sortDirection} onClick={() => changeSort("prixVente")} />
                 <SortHeader label="Stock" active={sortKey === "quantiteStock"} direction={sortDirection} onClick={() => changeSort("quantiteStock")} />
                 <th className="px-4 py-3">État</th>
@@ -435,7 +436,7 @@ export default function ArticlesPage() {
                           </div>
                         </td>
                         <td className="px-4 py-3.5 text-xs text-slate-600">{article.categorie ?? "—"}</td>
-                        <td className="px-4 py-3.5 text-xs text-slate-600">{money.format(article.prixAchat)}</td>
+                        <td className="px-4 py-3.5 text-xs text-slate-600"><p>{money.format(article.prixAchat)}</p><p title="Coût moyen pondéré : valeur du stock divisée par sa quantité, base des marges" className="mt-1 text-[10px] text-slate-400">CMP {money.format(article.coutMoyen)}</p></td>
                         <td className="px-4 py-3.5 text-xs font-bold text-slate-800">{money.format(article.prixVente)}</td>
                         <td className="px-4 py-3.5"><p className="text-xs font-bold text-slate-800">{article.quantiteStock} <span className="font-normal text-slate-400">{article.uniteMesure ?? ""}</span></p><p className="mt-1 text-[10px] text-slate-400">Seuil : {article.seuilAlerteStock}</p></td>
                         <td className="px-4 py-3.5"><span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold ${status.className}`}><span className={`size-1.5 rounded-full ${status.dot}`} />{status.label}</span></td>
@@ -469,7 +470,7 @@ export default function ArticlesPage() {
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Désignation"><input required maxLength={150} className="input-field" value={articleForm.designation} onChange={(event) => setArticleForm({ ...articleForm, designation: event.target.value })} /></Field>
               <Field label="Référence"><input required maxLength={60} className="input-field" value={articleForm.reference} onChange={(event) => setArticleForm({ ...articleForm, reference: event.target.value })} /></Field>
-              <Field label="Prix d’achat (XOF)"><input required min="0" step="any" type="number" className="input-field" value={articleForm.prixAchat} onChange={(event) => setArticleForm({ ...articleForm, prixAchat: event.target.value })} /></Field>
+              <Field label={articleModal === "new" ? "Prix d’achat (XOF)" : "Dernier prix d’achat (XOF)"}><input required min="0" step="any" type="number" className="input-field" value={articleForm.prixAchat} onChange={(event) => setArticleForm({ ...articleForm, prixAchat: event.target.value })} /></Field>
               <Field label="Prix de vente (XOF)"><input required min="0" step="any" type="number" className="input-field" value={articleForm.prixVente} onChange={(event) => setArticleForm({ ...articleForm, prixVente: event.target.value })} /></Field>
               <Field label="Seuil d’alerte"><input required min="0" step="1" type="number" className="input-field" value={articleForm.seuilAlerteStock} onChange={(event) => setArticleForm({ ...articleForm, seuilAlerteStock: event.target.value })} /></Field>
               <Field label={articleModal === "new" ? "Stock initial" : "Stock actuel (non modifiable ici)"}><input required min="0" step="1" type="number" readOnly={articleModal !== "new"} className="input-field read-only:bg-slate-50 read-only:text-slate-500" value={articleForm.quantiteStock} onChange={(event) => setArticleForm({ ...articleForm, quantiteStock: event.target.value })} /><span className="mt-1 block text-[10px] text-slate-400">{articleModal === "new" ? "Les variations de stock sont ensuite enregistrées par réception ou vente." : "Pour corriger le stock, utilisez « Ajuster le stock » dans la liste (motif obligatoire)."}</span></Field>

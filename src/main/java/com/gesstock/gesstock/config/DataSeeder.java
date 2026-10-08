@@ -184,6 +184,7 @@ public class DataSeeder implements CommandLineRunner {
         article.setReference(reference);
         article.setNom(nom);
         article.setPrixAchat(new BigDecimal(prixAchat));
+        article.setCmp(new BigDecimal(prixAchat));
         article.setPrix(new BigDecimal(prixVente));
         article.setSeuilAlerte(seuilAlerte);
         article.setQuantite(quantite);

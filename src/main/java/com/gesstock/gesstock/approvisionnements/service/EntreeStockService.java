@@ -8,6 +8,7 @@ import com.gesstock.gesstock.common.exception.RessourceIntrouvableException;
 import com.gesstock.gesstock.approvisionnements.mapper.ApprovisionnementMapper;
 import com.gesstock.gesstock.entities.*;
 import com.gesstock.gesstock.repositories.*;
+import com.gesstock.gesstock.stock.CoutMoyenPondere;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.gesstock.gesstock.journal.service.JournalActiviteService;
@@ -26,14 +27,20 @@ public class EntreeStockService {
     private final ArticleRepository articleRepository;
     private final MouvementStockRepository mouvementStockRepository;
     private final JournalActiviteService journalActiviteService;
+    private final HistoriquePrixAchatRepository historiquePrixAchatRepository;
+    private final UtilisateurRepository utilisateurRepository;
 
     public EntreeStockService(
         ApprovisionnementRepository approvisionnementRepository,
         FournisseurRepository fournisseurRepository,
         ArticleRepository articleRepository,
         MouvementStockRepository mouvementStockRepository,
-        JournalActiviteService journalActiviteService
+        JournalActiviteService journalActiviteService,
+        HistoriquePrixAchatRepository historiquePrixAchatRepository,
+        UtilisateurRepository utilisateurRepository
     ) {
+        this.historiquePrixAchatRepository = historiquePrixAchatRepository;
+        this.utilisateurRepository = utilisateurRepository;
         this.approvisionnementRepository = approvisionnementRepository;
         this.fournisseurRepository = fournisseurRepository;
         this.articleRepository = articleRepository;
@@ -97,6 +104,7 @@ public class EntreeStockService {
                     .orElseThrow(() -> new RessourceIntrouvableException("Article introuvable: " + articleId));
                 articlesVerrouilles.put(articleId, article);
             });
+        Utilisateur utilisateur = utilisateurRepository.findByUsername(username).orElse(null);
 
         for (LigneApprovisionnement ligne : approvisionnement.getLignes()) {
             Article article = articlesVerrouilles.get(ligne.getArticle().getId());
@@ -108,8 +116,14 @@ public class EntreeStockService {
                 throw new ConflitRessourceException(
                     "La quantité dépasserait la capacité de stock pour l'article " + article.getReference());
             }
+            // Le coût de l'article est le coût moyen pondéré, recalculé à chaque entrée ; le prix saisi n'est que le dernier prix.
+            BigDecimal ancienPrix = article.getPrixAchat();
+            BigDecimal ancienCmp = article.getCmp();
+            BigDecimal nouveauCmp = CoutMoyenPondere.apresEntree(stockAvant, ancienCmp, ligne.getQuantite(), ligne.getPrixUnitaire());
             article.setQuantiteStock(stockApres);
             article.setPrixAchat(ligne.getPrixUnitaire());
+            article.setCmp(nouveauCmp);
+            enregistrerHistoriquePrix(article, approvisionnement, utilisateur, ancienPrix, ancienCmp, nouveauCmp, stockAvant, ligne);
             creerMouvement(approvisionnement, ligne, article, stockAvant, stockApres);
         }
 
@@ -119,6 +133,30 @@ public class EntreeStockService {
         journalActiviteService.enregistrer("VALIDATION", "APPROVISIONNEMENT", approvisionnement.getId(),
             "Réception du bon " + approvisionnement.getNumero(), username);
         return ApprovisionnementMapper.toResponse(approvisionnement);
+    }
+
+    private void enregistrerHistoriquePrix(
+        Article article,
+        Approvisionnement approvisionnement,
+        Utilisateur utilisateur,
+        BigDecimal ancienPrix,
+        BigDecimal ancienCmp,
+        BigDecimal nouveauCmp,
+        int stockAvant,
+        LigneApprovisionnement ligne
+    ) {
+        HistoriquePrixAchat historique = new HistoriquePrixAchat();
+        historique.setArticle(article);
+        historique.setDateEffet(java.time.LocalDateTime.now());
+        historique.setAncienPrix(ancienPrix);
+        historique.setNouveauPrix(ligne.getPrixUnitaire());
+        historique.setAncienCmp(ancienCmp);
+        historique.setNouveauCmp(nouveauCmp);
+        historique.setStockAvant(stockAvant);
+        historique.setQuantiteRecue(ligne.getQuantite());
+        historique.setApprovisionnement(approvisionnement);
+        historique.setUtilisateur(utilisateur);
+        historiquePrixAchatRepository.save(historique);
     }
 
     private void creerMouvement(
@@ -134,6 +172,7 @@ public class EntreeStockService {
         mouvement.setStockAvant(stockAvant);
         mouvement.setStockApres(stockApres);
         mouvement.setDateMouvement(java.time.LocalDateTime.now());
+        mouvement.setCoutUnitaire(ligne.getPrixUnitaire());
         mouvement.setReferenceDocument(approvisionnement.getNumero());
         mouvement.setArticle(article);
         mouvement.setEffectuePar(approvisionnement.getCreePar());

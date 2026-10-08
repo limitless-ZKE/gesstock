@@ -86,6 +86,9 @@ public class ArticleCatalogueService {
         if (creation && request.quantiteStock() != null) {
             article.setQuantiteStock(request.quantiteStock()); // stock de départ, à la création uniquement
         }
+        if (creation) {
+            article.setCmp(request.prixAchat()); // premier coût connu ; ensuite seules les entrées en stock le font évoluer
+        }
         article.setCategorie(request.categorieId() == null ? null : trouverCategorie(request.categorieId()));
         article.setUniteMesure(request.uniteMesureId() == null ? null : trouverUnite(request.uniteMesureId()));
     }

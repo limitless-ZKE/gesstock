@@ -27,7 +27,8 @@ public interface ArticleRepository extends JpaRepository<Article, Long> {
     @Query("select a from Article a where a.id = :id")
     Optional<Article> findByIdForUpdate(@Param("id") Long id);
 
-    @Query("select coalesce(sum(a.prixAchat * a.quantite), 0) from Article a")
+    /** Valeur du stock : quantité × coût moyen pondéré (et non le dernier prix d'achat, qui la fausserait à chaque lot). */
+    @Query("select coalesce(sum(a.cmp * a.quantite), 0) from Article a")
     java.math.BigDecimal valeurTotaleStock();
 
     @Query("select count(a) from Article a where a.quantite <= a.seuilAlerte")

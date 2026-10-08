@@ -34,6 +34,15 @@ public class Article {
     @Column(nullable = false, precision = 19, scale = 4)
     private BigDecimal prixAchat = BigDecimal.ZERO;
 
+    /**
+     * Coût moyen pondéré (CMP) : la valeur du stock divisée par sa quantité. Il sert aux marges et à la valeur du stock ;
+     * {@code prixAchat} reste le DERNIER prix d'achat saisi, à titre informatif. Il ne change que par une entrée en stock.
+     */
+    @NotNull
+    @DecimalMin("0.0")
+    @Column(nullable = false, precision = 19, scale = 4)
+    private BigDecimal cmp = BigDecimal.ZERO;
+
     @NotNull
     @DecimalMin("0.0")
     @Column(nullable = false, precision = 19, scale = 4)
@@ -84,6 +93,9 @@ public class Article {
 
     public BigDecimal getPrixAchat() { return prixAchat; }
     public void setPrixAchat(BigDecimal prixAchat) { this.prixAchat = prixAchat; }
+
+    public BigDecimal getCmp() { return cmp; }
+    public void setCmp(BigDecimal cmp) { this.cmp = cmp; }
 
     public int getSeuilAlerte() { return seuilAlerte; }
     public void setSeuilAlerte(int seuilAlerte) { this.seuilAlerte = seuilAlerte; }

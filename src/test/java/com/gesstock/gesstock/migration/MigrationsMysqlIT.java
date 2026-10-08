@@ -65,7 +65,7 @@ class MigrationsMysqlIT {
 
         try (ConfigurableApplicationContext contexte = demarrer(base, "--spring.flyway.baseline-on-migrate=false")) {
             JdbcTemplate jdbc = contexte.getBean(JdbcTemplate.class);
-            assertThat(versionsAppliquees(jdbc)).containsExactly("1", "2", "3", "4", "5", "6", "7");
+            assertThat(versionsAppliquees(jdbc)).containsExactly("1", "2", "3", "4", "5", "6", "7", "8");
             assertThat(migrationsEnEchec(jdbc)).isZero();
             assertThat(derives(contexte, base)).as("enum Java absents de la base").isEmpty();
         }
@@ -106,6 +106,14 @@ class MigrationsMysqlIT {
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM lignes_vente l JOIN vente v ON v.id = l.vente_id "
             + "WHERE v.code = 'VTE-ANCIENNE' AND l.quantite = 3 AND l.prix_unitaire = 1000 AND l.article_id = ?", Integer.class, articleId))
             .as("l'ancienne vente à un article devient une ligne de vente").isEqualTo(1);
+        // V8 : le coût moyen démarre au dernier prix d'achat, et les lignes déjà vendues portent un coût ESTIMÉ (jamais présenté
+        // comme exact : le vrai coût historique n'a jamais été enregistré)
+        assertThat(jdbc.queryForObject("SELECT cmp FROM article WHERE id = ?", java.math.BigDecimal.class, articleId))
+            .isEqualByComparingTo("600");
+        assertThat(jdbc.queryForObject("SELECT cout_unitaire FROM lignes_vente WHERE article_id = ?", java.math.BigDecimal.class, articleId))
+            .isEqualByComparingTo("600");
+        assertThat(jdbc.queryForObject("SELECT cout_estime FROM lignes_vente WHERE article_id = ?", Boolean.class, articleId)).isTrue();
+        assertThat(tableExiste(jdbc, base, "historique_prix_achat")).isTrue();
         assertThat(colonnesDe(jdbc, base, "vente")).doesNotContain("article_id", "promotion_id", "quantite", "prix_unit", "prix_total");
         assertThat(tableExiste(jdbc, base, "statistiques_journalieres")).isFalse();
         assertThat(indexDe(jdbc, base, "vente")).contains("idx_vente_statut_date", "idx_vente_session_statut");
@@ -135,7 +143,7 @@ class MigrationsMysqlIT {
         try (ConfigurableApplicationContext contexte = demarrer(base,
             "--spring.flyway.baseline-on-migrate=true", "--spring.flyway.baseline-version=3")) {
             JdbcTemplate jdbc = contexte.getBean(JdbcTemplate.class);
-            assertThat(versionsAppliquees(jdbc)).containsExactly("3", "4", "5", "6", "7");
+            assertThat(versionsAppliquees(jdbc)).containsExactly("3", "4", "5", "6", "7", "8");
             assertThat(migrationsEnEchec(jdbc)).isZero();
         }
     }

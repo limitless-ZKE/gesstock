@@ -1,6 +1,7 @@
 package com.gesstock.gesstock.entities;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -53,6 +54,11 @@ public class MouvementStock {
 
     @Size(max = 500)
     private String commentaire;
+
+    /** Coût unitaire (par unité de stock) auquel ce mouvement valorise le stock : prix d'achat à l'entrée, CMP à la sortie. */
+    @DecimalMin("0.0")
+    @Column(precision = 19, scale = 4)
+    private java.math.BigDecimal coutUnitaire;
 
     @NotNull
     @ManyToOne(optional = false)
