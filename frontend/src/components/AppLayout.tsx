@@ -82,7 +82,9 @@ export default function AppLayout() {
       return normalizedRoles.some((role) => ["ADMIN", "MANAGER", "GESTIONNAIRE"].includes(role));
     }
     if (to === "/statistiques") return normalizedRoles.some((role) => ["ADMIN", "MANAGER", "GESTIONNAIRE"].includes(role));
-    if (to === "/caisse/mouvements") return normalizedRoles.some((role) => ["ADMIN", "MANAGER", "GESTIONNAIRE", "CAISSIER", "VENDEUR"].includes(role));
+    if (to === "/caisse/mouvements") return normalizedRoles.some((role) => ["ADMIN", "MANAGER", "GESTIONNAIRE", "CAISSIER"].includes(role));
+    // Le tableau de bord lit des statistiques, et le catalogue se modifie : ni l'un ni l'autre ne concerne le caissier.
+    if (["/dashboard", "/articles"].includes(to)) return normalizedRoles.some((role) => ["ADMIN", "MANAGER", "GESTIONNAIRE"].includes(role));
     return true;
   });
 

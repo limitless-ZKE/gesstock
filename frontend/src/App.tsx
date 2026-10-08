@@ -10,6 +10,7 @@ import CaisseMouvementsPage from "./pages/CaisseMouvementsPage";
 import ClientsDettesPage from "./pages/ClientsDettesPage";
 import DashboardPage from "./pages/DashboardPage";
 import FournisseursPage from "./pages/FournisseursPage";
+import HomeRedirect from "./components/HomeRedirect";
 import LoginPage from "./pages/LoginPage";
 import StatistiquesPage from "./pages/StatistiquesPage";
 import VentesHistoriquePage from "./pages/VentesHistoriquePage";
@@ -38,7 +39,7 @@ export default function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route element={<ProtectedRoute />}>
           <Route element={<AppLayout />}>
-            <Route index element={<Navigate to="/dashboard" replace />} />
+            <Route index element={<HomeRedirect />} />
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/caisse" element={<CaissePage />} />
             <Route path="/historique-ventes" element={<VentesHistoriquePage />} />
@@ -51,7 +52,7 @@ export default function App() {
             <Route path="/statistiques" element={<StatistiquesPage />} />
           </Route>
         </Route>
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>
   );
