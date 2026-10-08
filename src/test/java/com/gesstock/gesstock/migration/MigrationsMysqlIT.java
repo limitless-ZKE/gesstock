@@ -65,7 +65,7 @@ class MigrationsMysqlIT {
 
         try (ConfigurableApplicationContext contexte = demarrer(base, "--spring.flyway.baseline-on-migrate=false")) {
             JdbcTemplate jdbc = contexte.getBean(JdbcTemplate.class);
-            assertThat(versionsAppliquees(jdbc)).containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12");
+            assertThat(versionsAppliquees(jdbc)).containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13");
             assertThat(migrationsEnEchec(jdbc)).isZero();
             assertThat(derives(contexte, base)).as("enum Java absents de la base").isEmpty();
 
@@ -160,7 +160,7 @@ class MigrationsMysqlIT {
         try (ConfigurableApplicationContext contexte = demarrer(base,
             "--spring.flyway.baseline-on-migrate=true", "--spring.flyway.baseline-version=3")) {
             JdbcTemplate jdbc = contexte.getBean(JdbcTemplate.class);
-            assertThat(versionsAppliquees(jdbc)).containsExactly("3", "4", "5", "6", "7", "8", "9", "10", "11", "12");
+            assertThat(versionsAppliquees(jdbc)).containsExactly("3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13");
             assertThat(migrationsEnEchec(jdbc)).isZero();
         }
     }
@@ -243,6 +243,32 @@ class MigrationsMysqlIT {
         jdbc.update(avoir, fournisseurId, 100, 40, utilisateurId);
 
         retoursGarantisParLaBase(jdbc, fournisseurId, bon1, utilisateurId);
+        entrepriseGarantieParLaBase(jdbc);
+    }
+
+    /** V13 : une seule entreprise, un nom non vide et un logo cohérent sont tenus par la BASE. */
+    private void entrepriseGarantieParLaBase(JdbcTemplate jdbc) {
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM parametres_entreprise", Integer.class))
+            .as("la migration crée l'entreprise de départ").isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT nom FROM parametres_entreprise WHERE id = 1", String.class)).isNotBlank();
+
+        String insertion = "INSERT INTO parametres_entreprise (id, nom, mis_a_jour_le, version) VALUES (?, ?, NOW(6), 0)";
+        assertThatThrownBy(() -> jdbc.update(insertion, 2, "Seconde entreprise"))
+            .as("une seule entreprise").isInstanceOf(org.springframework.dao.DataAccessException.class);
+        assertThatThrownBy(() -> jdbc.update("UPDATE parametres_entreprise SET nom = '   ' WHERE id = 1"))
+            .as("nom vide").isInstanceOf(org.springframework.dao.DataAccessException.class);
+        assertThatThrownBy(() -> jdbc.update("UPDATE parametres_entreprise SET logo_empreinte = 'abc' WHERE id = 1"))
+            .as("empreinte sans dimensions").isInstanceOf(org.springframework.dao.DataAccessException.class);
+        jdbc.update("UPDATE parametres_entreprise SET logo_empreinte = 'abc', logo_largeur = 100, logo_hauteur = 40 WHERE id = 1");
+        jdbc.update("UPDATE parametres_entreprise SET logo_empreinte = NULL, logo_largeur = NULL, logo_hauteur = NULL WHERE id = 1");
+
+        String logo = "INSERT INTO logo_entreprise (id, contenu, type_mime, largeur, hauteur, empreinte, mis_a_jour_le) "
+            + "VALUES (?, ?, 'image/png', ?, 40, 'abc', NOW(6))";
+        assertThatThrownBy(() -> jdbc.update(logo, 2, new byte[] {1, 2, 3}, 100))
+            .as("un seul logo").isInstanceOf(org.springframework.dao.DataAccessException.class);
+        assertThatThrownBy(() -> jdbc.update(logo, 1, new byte[] {1, 2, 3}, 0))
+            .as("dimensions positives").isInstanceOf(org.springframework.dao.DataAccessException.class);
+        jdbc.update(logo, 1, new byte[] {1, 2, 3}, 100);
     }
 
     /** V12 : « jamais plus rendu que reçu » et « un retour validé a son validateur » sont tenus par la BASE. */

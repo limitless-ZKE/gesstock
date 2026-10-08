@@ -29,6 +29,11 @@ spring:
     baseline-on-migrate: false         # à n'activer qu'une fois, pour reprendre une base existante (voir le guide)
     validate-on-migrate: true
     clean-disabled: true
+  servlet:
+    multipart:
+      # Seul l'envoi du logo utilise du multipart. Au-delà de ces limites : 413 « FICHIER_TROP_VOLUMINEUX », avant tout traitement.
+      max-file-size: 2MB
+      max-request-size: 3MB
   web:
     locale: fr
     locale-resolver: fixed             # messages de validation en français quel que soit le navigateur ou le serveur
@@ -75,6 +80,9 @@ springdoc:
 app:
   # Fuseau du commerce : il décide quand la journée de caisse change (jamais le fuseau de la machine ou du conteneur).
   zone-horaire: ${APP_ZONE_HORAIRE:Africa/Dakar}
+  entreprise:
+    # Poids maximal du logo envoyé ET du logo converti (octets). Le fichier est ré-encodé en PNG par le serveur.
+    logo-octets-max: ${APP_LOGO_OCTETS_MAX:2097152}
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS}
   security:

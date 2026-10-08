@@ -1,5 +1,10 @@
 package com.gesstock.gesstock.statistiques.service;
 
+import com.gesstock.gesstock.entreprise.dto.EntrepriseResponse;
+import com.gesstock.gesstock.entreprise.service.EnteteExcel;
+import com.gesstock.gesstock.entreprise.service.EntetePdf;
+import com.gesstock.gesstock.entreprise.service.EntrepriseService;
+import com.gesstock.gesstock.entreprise.service.TailleLogo;
 import com.gesstock.gesstock.statistiques.dto.MargeArticleResponse;
 import com.gesstock.gesstock.statistiques.dto.MargeCategorieResponse;
 import com.gesstock.gesstock.statistiques.dto.RapportStatistiquesResponse;
@@ -32,6 +37,12 @@ public class StatistiquesExportService {
 
     private static final DateTimeFormatter DATE_TIME = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 
+    private final EntrepriseService entrepriseService;
+
+    public StatistiquesExportService(EntrepriseService entrepriseService) {
+        this.entrepriseService = entrepriseService;
+    }
+
     public byte[] exporterExcel(RapportStatistiquesResponse rapport) throws IOException {
         try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             CellStyle header = workbook.createCellStyle();
@@ -42,7 +53,10 @@ public class StatistiquesExportService {
             header.setFont(headerFont);
 
             Sheet synthese = workbook.createSheet("Synthèse");
-            addSummary(synthese, rapport, header);
+            EntrepriseResponse entreprise = entrepriseService.obtenir();
+            byte[] logo = entrepriseService.logo(TailleLogo.MINIATURE).map(EntrepriseService.LogoServi::contenu).orElse(null);
+            int debut = EnteteExcel.ecrire(workbook, synthese, entreprise, logo);
+            addSummary(synthese, rapport, header, debut);
 
             Sheet categories = workbook.createSheet("Marges par catégorie");
             addHeader(categories, header, "Catégorie", "Chiffre d'affaires", "Coût d'achat", "Marge brute");
@@ -116,7 +130,9 @@ public class StatistiquesExportService {
                 document.open();
                 Font title = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 16);
                 Font section = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12);
-                document.add(new Paragraph("GesStock 3.0 - Rapport financier", title));
+                EntetePdf.ajouter(document, entrepriseService.obtenir(),
+                    entrepriseService.logo(TailleLogo.ENTETE).map(EntrepriseService.LogoServi::contenu).orElse(null));
+                document.add(new Paragraph("Rapport financier", title));
                 document.add(new Paragraph("Période : " + rapport.debut() + " au " + rapport.fin()));
                 document.add(new Paragraph(" "));
                 document.add(new Paragraph("Synthèse", section));
@@ -138,8 +154,8 @@ public class StatistiquesExportService {
         }
     }
 
-    private void addSummary(Sheet sheet, RapportStatistiquesResponse rapport, CellStyle header) {
-        addHeader(sheet, header, "Indicateur", "Valeur");
+    private void addSummary(Sheet sheet, RapportStatistiquesResponse rapport, CellStyle header, int debut) {
+        addHeader(sheet, debut, header, "Indicateur", "Valeur");
         String[][] values = {
             {"Période du", rapport.debut().toString()},
             {"Période au", rapport.fin().toString()},
@@ -148,7 +164,7 @@ public class StatistiquesExportService {
             {"Marge brute", rapport.margeBrute().toPlainString()}
         };
         for (int i = 0; i < values.length; i++) {
-            Row row = sheet.createRow(i + 1);
+            Row row = sheet.createRow(debut + i + 1);
             row.createCell(0).setCellValue(values[i][0]);
             row.createCell(1).setCellValue(values[i][1]);
         }
@@ -222,7 +238,11 @@ public class StatistiquesExportService {
     }
 
     private void addHeader(Sheet sheet, CellStyle style, String... labels) {
-        Row row = sheet.createRow(0);
+        addHeader(sheet, 0, style, labels);
+    }
+
+    private void addHeader(Sheet sheet, int rowIndex, CellStyle style, String... labels) {
+        Row row = sheet.createRow(rowIndex);
         for (int i = 0; i < labels.length; i++) {
             row.createCell(i).setCellValue(labels[i]);
             row.getCell(i).setCellStyle(style);

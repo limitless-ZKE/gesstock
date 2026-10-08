@@ -1,0 +1,194 @@
+package com.gesstock.gesstock.entreprise;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.transaction.annotation.Transactional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+/** L'API de l'entreprise vue de l'extérieur : rôles, JSON réel, envoi de fichier, cache de l'image. */
+@SpringBootTest
+@AutoConfigureMockMvc
+@Transactional
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
+class EntrepriseHttpTests {
+
+    private static final String JSON = "{\"nom\":\"Baobab SARL\",\"adresse\":\"12 rue du Marché, Dakar\",\"telephone\":\"+221 33 800 00 00\","
+        + "\"email\":\"contact@baobab.example\",\"identifiantLegal\":\"RCCM SN-DKR-2020-B-1234\",\"siteWeb\":null,"
+        + "\"piedDePage\":\"Merci !\",\"logoSurTickets\":true}";
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    private static MockMultipartFile fichier(byte[] octets) {
+        return new MockMultipartFile("fichier", "logo.png", "image/png", octets);
+    }
+
+    private org.springframework.test.web.servlet.ResultActions envoyerLogo(String role, byte[] octets) throws Exception {
+        return mockMvc.perform(multipart("/api/entreprise/logo").file(fichier(octets)).with(user("u").roles(role)).with(csrf()));
+    }
+
+    // --- droits ---
+
+    @Test
+    void tousLesRolesConnectesLisentLEntrepriseCarUnCaissierImprimeDesTickets() throws Exception {
+        for (String role : new String[] {"ADMIN", "MANAGER", "GESTIONNAIRE", "CAISSIER"}) {
+            mockMvc.perform(get("/api/entreprise").with(user("u").roles(role)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.nom").isNotEmpty());
+        }
+    }
+
+    @Test
+    void seulsLesResponsablesModifientLesInformationsEtLeLogo() throws Exception {
+        for (String role : new String[] {"GESTIONNAIRE", "CAISSIER"}) {
+            mockMvc.perform(put("/api/entreprise").contentType(MediaType.APPLICATION_JSON).content(JSON)
+                    .with(user("u").roles(role)).with(csrf()))
+                .andExpect(status().isForbidden());
+            envoyerLogo(role, ImagesDeTest.png(200, 80)).andExpect(status().isForbidden());
+            mockMvc.perform(delete("/api/entreprise/logo").with(user("u").roles(role)).with(csrf()))
+                .andExpect(status().isForbidden());
+        }
+    }
+
+    @Test
+    void sansConnexionRienNestAccessibleNiLeLogo() throws Exception {
+        mockMvc.perform(get("/api/entreprise")).andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/entreprise/logo")).andExpect(status().isUnauthorized());
+    }
+
+    // --- informations ---
+
+    @Test
+    void unResponsableModifieLesInformationsEtToutLeMondeLesRelit() throws Exception {
+        mockMvc.perform(put("/api/entreprise").contentType(MediaType.APPLICATION_JSON).content(JSON)
+                .with(user("manager").roles("MANAGER")).with(csrf()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.nom").value("Baobab SARL"));
+
+        mockMvc.perform(get("/api/entreprise").with(user("u").roles("CAISSIER")))
+            .andExpect(jsonPath("$.nom").value("Baobab SARL"))
+            .andExpect(jsonPath("$.identifiantLegal").value("RCCM SN-DKR-2020-B-1234"))
+            .andExpect(jsonPath("$.piedDePage").value("Merci !"))
+            .andExpect(jsonPath("$.logo").doesNotExist());
+    }
+
+    @Test
+    void unNomVideOuUnEmailInvalideSontRefusesEnFrancais() throws Exception {
+        mockMvc.perform(put("/api/entreprise").contentType(MediaType.APPLICATION_JSON)
+                .content(JSON.replace("\"Baobab SARL\"", "\"   \"")).with(user("a").roles("ADMIN")).with(csrf()))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("VALIDATION"))
+            .andExpect(jsonPath("$.erreurs.nom").exists());
+        mockMvc.perform(put("/api/entreprise").contentType(MediaType.APPLICATION_JSON)
+                .content(JSON.replace("contact@baobab.example", "pas-un-email")).with(user("a").roles("ADMIN")).with(csrf()))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.erreurs.email").exists());
+    }
+
+    // --- logo ---
+
+    @Test
+    void sansLogoLImageEstIntrouvableEnProblemJson() throws Exception {
+        mockMvc.perform(get("/api/entreprise/logo").with(user("u").roles("CAISSIER")))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value("RESSOURCE_INTROUVABLE"));
+    }
+
+    @Test
+    void unLogoEnvoyeEstServiAuFormatDemandeAvecUnEtagQuiPermetUn304() throws Exception {
+        envoyerLogo("MANAGER", ImagesDeTest.png(1000, 400))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.logo.largeur").value(1000))
+            .andExpect(jsonPath("$.logo.empreinte").isNotEmpty());
+
+        MvcResult ticket = mockMvc.perform(get("/api/entreprise/logo?taille=ticket").with(user("u").roles("CAISSIER")))
+            .andExpect(status().isOk())
+            .andExpect(content().contentType(MediaType.IMAGE_PNG))
+            .andExpect(header().string(HttpHeaders.CACHE_CONTROL, org.hamcrest.Matchers.containsString("no-cache")))
+            .andReturn();
+        assertThat(ImagesDeTest.dimensions(ticket.getResponse().getContentAsByteArray())).containsExactly(320, 128);
+        String etag = ticket.getResponse().getHeader(HttpHeaders.ETAG);
+        assertThat(etag).isNotBlank();
+
+        mockMvc.perform(get("/api/entreprise/logo?taille=ticket").header(HttpHeaders.IF_NONE_MATCH, etag).with(user("u").roles("CAISSIER")))
+            .andExpect(status().isNotModified());
+        MvcResult enTete = mockMvc.perform(get("/api/entreprise/logo").with(user("u").roles("CAISSIER"))).andExpect(status().isOk()).andReturn();
+        assertThat(ImagesDeTest.dimensions(enTete.getResponse().getContentAsByteArray())).as("format par défaut : l'en-tête").containsExactly(720, 288);
+        assertThat(enTete.getResponse().getHeader(HttpHeaders.ETAG)).as("un ETag par format").isNotEqualTo(etag);
+    }
+
+    @Test
+    void remplacerLeLogoChangeLEtagEtL1AncienNEstPlusReconnu() throws Exception {
+        envoyerLogo("ADMIN", ImagesDeTest.png(600, 200)).andExpect(status().isOk());
+        String ancien = mockMvc.perform(get("/api/entreprise/logo?taille=ticket").with(user("u").roles("CAISSIER")))
+            .andReturn().getResponse().getHeader(HttpHeaders.ETAG);
+
+        envoyerLogo("ADMIN", ImagesDeTest.png(400, 400)).andExpect(status().isOk());
+
+        MvcResult apres = mockMvc.perform(get("/api/entreprise/logo?taille=ticket").header(HttpHeaders.IF_NONE_MATCH, ancien).with(user("u").roles("CAISSIER")))
+            .andExpect(status().isOk())   // et non 304 : le navigateur récupère le nouveau logo
+            .andReturn();
+        assertThat(apres.getResponse().getHeader(HttpHeaders.ETAG)).isNotEqualTo(ancien);
+        assertThat(ImagesDeTest.dimensions(apres.getResponse().getContentAsByteArray())).containsExactly(160, 160);
+    }
+
+    @Test
+    void unTailleInconnueEstRefusee() throws Exception {
+        envoyerLogo("ADMIN", ImagesDeTest.png(300, 100)).andExpect(status().isOk());
+        mockMvc.perform(get("/api/entreprise/logo?taille=immense").with(user("u").roles("CAISSIER")))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("REQUETE_INVALIDE"));
+    }
+
+    @Test
+    void unFichierQuiNEstPasUneImageValideEstRefuseEnClair() throws Exception {
+        envoyerLogo("ADMIN", "<svg xmlns='http://www.w3.org/2000/svg' onload='alert(1)'/>".getBytes())
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("REQUETE_INVALIDE"))
+            .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("PNG ou JPEG")));
+        envoyerLogo("ADMIN", new byte[0]).andExpect(status().isBadRequest());
+        mockMvc.perform(get("/api/entreprise").with(user("u").roles("CAISSIER"))).andExpect(jsonPath("$.logo").doesNotExist());
+    }
+
+    @Test
+    void uneRequeteSansFichierEstRefuseeParUnMessageClair() throws Exception {
+        mockMvc.perform(multipart("/api/entreprise/logo").with(user("u").roles("ADMIN")).with(csrf()))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("FICHIER_ABSENT"));
+    }
+
+    @Test
+    void retirerLeLogoRendLEntrepriseSansLogo() throws Exception {
+        envoyerLogo("MANAGER", ImagesDeTest.png(300, 100)).andExpect(status().isOk());
+
+        mockMvc.perform(delete("/api/entreprise/logo").with(user("m").roles("MANAGER")).with(csrf()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.logo").doesNotExist());
+        mockMvc.perform(get("/api/entreprise/logo").with(user("u").roles("CAISSIER"))).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void sansJetonCsrfLEnvoiDuLogoEstRefuse() throws Exception {
+        mockMvc.perform(multipart("/api/entreprise/logo").file(fichier(ImagesDeTest.png(100, 50))).with(user("a").roles("ADMIN")))
+            .andExpect(status().isForbidden());
+    }
+}

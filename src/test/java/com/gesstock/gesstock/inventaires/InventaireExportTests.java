@@ -37,12 +37,19 @@ class InventaireExportTests {
         try (Workbook classeur = new XSSFWorkbook(new ByteArrayInputStream(fichier))) {
             Sheet feuille = classeur.getSheet("Inventaire");
             DataFormatter format = new DataFormatter();
-            assertThat(format.formatCellValue(feuille.getRow(0).getCell(0))).contains(inventaire.code()).contains("tout le catalogue");
-            assertThat(format.formatCellValue(feuille.getRow(2).getCell(5))).isEqualTo("Stock compté");
-            assertThat(feuille.getLastRowNum() - 2).as("une ligne par article").isEqualTo(6);
+            // l'en-tête de l'entreprise occupe le haut de la feuille : on retrouve la ligne des titres de colonnes
+            int enTete = -1;
+            for (int index = 0; index <= feuille.getLastRowNum(); index++) {
+                if (feuille.getRow(index) != null && "Stock compté".equals(format.formatCellValue(feuille.getRow(index).getCell(5)))) {
+                    enTete = index;
+                }
+            }
+            assertThat(enTete).as("ligne des titres de colonnes").isPositive();
+            assertThat(format.formatCellValue(feuille.getRow(enTete - 2).getCell(0))).contains(inventaire.code()).contains("tout le catalogue");
+            assertThat(feuille.getLastRowNum() - enTete).as("une ligne par article").isEqualTo(6);
             // chaque article y figure avec son stock théorique ; la colonne « Stock compté » est vide
             boolean telephoneTrouve = false;
-            for (int index = 3; index <= feuille.getLastRowNum(); index++) {
+            for (int index = enTete + 1; index <= feuille.getLastRowNum(); index++) {
                 if (format.formatCellValue(feuille.getRow(index).getCell(0)).equals("ELEC-001")) {
                     telephoneTrouve = true;
                     assertThat(format.formatCellValue(feuille.getRow(index).getCell(4))).isEqualTo("12");
