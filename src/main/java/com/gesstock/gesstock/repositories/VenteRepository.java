@@ -2,6 +2,7 @@ package com.gesstock.gesstock.repositories;
 
 import com.gesstock.gesstock.entities.Vente;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -16,8 +17,14 @@ import com.gesstock.gesstock.entities.ModeReglement;
 
 @Repository
 public interface VenteRepository extends JpaRepository<Vente, Long> {
+    /** Tout ce que VentesMapper lit est chargé en UNE requête (sinon : 2 requêtes supplémentaires par vente). */
+
+    @EntityGraph(attributePaths = {"lignesVente", "lignesVente.article", "lignesVente.uniteVente", "lignesVente.promotion",
+        "client", "vendeur", "proforma", "sessionCaisse", "detteClient"})
     List<Vente> findAllByOrderByIdDesc();
 
+    @EntityGraph(attributePaths = {"lignesVente", "lignesVente.article", "lignesVente.uniteVente", "lignesVente.promotion",
+        "client", "vendeur", "proforma", "sessionCaisse", "detteClient"})
     List<Vente> findByStatutInAndDateVenteGreaterThanEqualAndDateVenteLessThanOrderByDateVenteDesc(
         java.util.Collection<StatutVente> statuts, java.time.LocalDateTime debut, java.time.LocalDateTime fin);
     List<Vente> findByDateVenteBetween(LocalDateTime startDate, LocalDateTime endDate);
