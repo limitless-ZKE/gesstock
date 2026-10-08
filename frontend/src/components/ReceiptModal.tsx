@@ -126,9 +126,9 @@ export default function ReceiptModal({ sale, onClose, duplicata = false }: Recei
             {remises.negociee > 0 && <ReceiptRow label="Remise négociée" value={`−${money.format(remises.negociee)}`} />}
             {remises.promotions > 0 && <ReceiptRow label="Remise promotions" value={`−${money.format(remises.promotions)}`} />}
             {remises.total > 0 && <ReceiptRow label="Total des remises" value={`−${money.format(remises.total)}`} />}
-            <ReceiptRow label="Sous-total HT" value={money.format(sale.montantHT)} />
-            <ReceiptRow label={`TVA (${sale.tauxTva}%)`} value={money.format(sale.montantTva)} />
-            <ReceiptRow label="TOTAL TTC" value={money.format(sale.montantTotal)} strong />
+            {sale.tauxTva > 0 && <ReceiptRow label="Sous-total HT" value={money.format(sale.montantHT)} />}
+            {sale.tauxTva > 0 && <ReceiptRow label={`TVA (${sale.tauxTva}%)`} value={money.format(sale.montantTva)} />}
+            <ReceiptRow label={sale.tauxTva > 0 ? "TOTAL TTC" : "TOTAL"} value={money.format(sale.montantTotal)} strong />
             {sale.aCredit ? (
               <ReceiptRow label="Vente à crédit" value="à régler" />
             ) : (

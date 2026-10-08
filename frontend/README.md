@@ -20,10 +20,9 @@ Authentication uses the Spring Security session cookie. The API client sends
 credentials with requests. Set `VITE_API_BASE_URL` to override the default
 `http://localhost:8080/api` endpoint.
 
-Copy `.env.example` to `.env.local` to configure the API URL and the business
-TVA rate (`VITE_TVA_RATE`, percentage; defaults to `0`). The selected rate is
-sent with direct sales and persisted by the backend. VAT rules/rates should be
-configured for the business before production use.
+Copy `.env.example` to `.env.local` to configure the API URL. The TVA rate is not
+configured in the frontend: the backend imposes it (`APP_TVA_TAUX`, `0` by default)
+and the till reads it from `GET /api/caisse/parametres`.
 
 ## Production build
 

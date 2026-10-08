@@ -81,6 +81,12 @@ Seuls ces quatre rôles existent. Les anciens rôles `VENDEUR` et `USER` sont fu
 - Une vente au comptant, y compris issue d'un proforma, exige un mode de règlement et un montant reçu : c'est ce qui
   alimente le solde théorique de la caisse. Le « montant encaissé » est le total de la vente, pas la somme remise.
 
+- **TVA** : le taux est imposé par le serveur (`APP_TVA_TAUX`, 0 par défaut : aucune TVA), jamais saisi à la caisse
+  (un autre taux envoyé est refusé). Pour l'activer sans migration : `APP_TVA_TAUX=18`, et `APP_TVA_PRIX_TTC=true` si les
+  prix du catalogue sont TTC (la taxe en est extraite : le client paie le prix affiché) ou `false` s'ils sont HT (la taxe
+  s'ajoute). La caisse lit le régime sur `GET /api/caisse/parametres`. Les proformas n'appliquent pas de TVA : à traiter
+  le jour où la TVA est activée.
+
 ## Production (profil `prod`)
 
 ```sh
@@ -98,6 +104,7 @@ docker compose up -d --build
 | `COOKIES_SECURE` | `true` par défaut : cookies réservés au HTTPS. `false` seulement pour un déploiement volontairement en HTTP, sinon la connexion échoue |
 | `MANAGEMENT_PORT` | Port de supervision (8081 par défaut), lié à `127.0.0.1` |
 | `APP_ZONE_HORAIRE` | Fuseau du commerce (`Africa/Dakar` par défaut) : il décide quand la journée de caisse change |
+| `APP_TVA_TAUX`, `APP_TVA_PRIX_TTC` | Taux de TVA en % (0 = aucune TVA) et prix catalogue TTC ou HT |
 
 Le schéma est géré par Flyway ; Hibernate se contente de le valider. Swagger est désactivé.
 Le contrôle de santé de Docker interroge `http://127.0.0.1:8081/actuator/health/readiness` dans le conteneur.

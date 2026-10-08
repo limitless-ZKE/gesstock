@@ -6,6 +6,7 @@ import com.gesstock.gesstock.ventes.dto.*;
 import com.gesstock.gesstock.common.exception.ConflitRessourceException;
 import com.gesstock.gesstock.common.exception.RequeteInvalideException;
 import com.gesstock.gesstock.common.exception.RessourceIntrouvableException;
+import com.gesstock.gesstock.ventes.fiscal.CalculTva;
 import com.gesstock.gesstock.ventes.mapper.VentesMapper;
 import com.gesstock.gesstock.promotions.service.PromotionService;
 import com.gesstock.gesstock.caisse.dto.MouvementCaisseRequest;
@@ -43,6 +44,7 @@ public class GestionVentesService {
     private final PromotionService promotionService;
     private final JournalActiviteService journalActiviteService;
     private final MouvementCaisseService mouvementCaisseService;
+    private final CalculTva calculTva;
 
     public GestionVentesService(
         ProformaRepository proformaRepository,
@@ -56,8 +58,10 @@ public class GestionVentesService {
         DetteClientRepository detteClientRepository,
         PromotionService promotionService,
         JournalActiviteService journalActiviteService,
-        MouvementCaisseService mouvementCaisseService
+        MouvementCaisseService mouvementCaisseService,
+        CalculTva calculTva
     ) {
+        this.calculTva = calculTva;
         this.mouvementCaisseService = mouvementCaisseService;
         this.proformaRepository = proformaRepository;
         this.venteRepository = venteRepository;
@@ -185,7 +189,12 @@ public class GestionVentesService {
         Vente vente = new Vente();
         vente.setStatut(StatutVente.BROUILLON);
         vente.setVenteACredit(request.aCredit());
-        vente.setTauxTva(request.tauxTva() == null ? BigDecimal.ZERO : request.tauxTva());
+        // Le taux de TVA est imposé par le serveur : une caisse qui enverrait un autre taux est refusée plutôt qu'obéie.
+        if (request.tauxTva() != null && request.tauxTva().compareTo(calculTva.taux()) != 0) {
+            throw new RequeteInvalideException("Le taux de TVA est fixé par le serveur ("
+                + calculTva.taux().stripTrailingZeros().toPlainString() + " %) et ne se saisit pas à la caisse");
+        }
+        vente.setTauxTva(calculTva.taux());
         vente.setModeReglement(request.modeReglement());
         vente.setMontantRecu(request.montantRecu());
         vente.setVendeur(trouverUtilisateurActif(username));
@@ -194,12 +203,10 @@ public class GestionVentesService {
         for (LigneDocumentRequest requestLigne : request.lignes()) {
             vente.getLignesVente().add(creerLigneVente(vente, requestLigne));
         }
-        BigDecimal montantHT = calculerTotalVente(vente.getLignesVente());
-        BigDecimal montantTva = montantHT.multiply(vente.getTauxTva())
-            .divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP);
-        vente.setMontantHT(montantHT);
-        vente.setMontantTva(montantTva);
-        vente.setMontantTotal(montantHT.add(montantTva));
+        CalculTva.Montants montants = calculTva.decomposer(calculerTotalVente(vente.getLignesVente()));
+        vente.setMontantHT(montants.montantHT());
+        vente.setMontantTva(montants.montantTva());
+        vente.setMontantTotal(montants.montantTotal());
         validerMontantRecu(vente);
         return VentesMapper.toResponse(venteRepository.save(vente));
     }

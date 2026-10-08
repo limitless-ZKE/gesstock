@@ -124,10 +124,8 @@ export default function CaissePage() {
   const [categoryId, setCategoryId] = useState("all");
   const [cart, setCart] = useState<CartLine[]>([]);
   const [clientId, setClientId] = useState("");
-  const [tvaRate, setTvaRate] = useState(() => {
-    const configured = Number(import.meta.env.VITE_TVA_RATE ?? "0");
-    return Number.isFinite(configured) && configured >= 0 && configured <= 100 ? configured : 0;
-  });
+  // Régime de TVA imposé par le serveur : la caisse l'affiche, elle ne le décide pas (0 % tant que la TVA n'est pas activée).
+  const [fiscal, setFiscal] = useState({ tauxTva: 0, prixTtc: false });
   const [openingAmount, setOpeningAmount] = useState("");
   const [closingAmount, setClosingAmount] = useState("");
   const [sessionBusy, setSessionBusy] = useState(false);
@@ -161,9 +159,22 @@ export default function CaissePage() {
       const unitDiscount = round4(basePrice(line) * rate / 100);
       return total + (basePrice(line) - unitDiscount) * line.quantite;
     }, 0);
-    const tax = round4(subtotal * tvaRate / 100);
-    return { subtotal: round4(subtotal), tax, total: round4(subtotal + tax) };
-  }, [cart, promotions, tvaRate]);
+    // Mêmes formules que le serveur (CalculTva) : le total affiché est exactement le total facturé.
+    const net = round4(subtotal);
+    if (fiscal.tauxTva === 0) return { subtotal: net, tax: 0, total: net };
+    if (fiscal.prixTtc) {
+      const hors = round4(net / (1 + fiscal.tauxTva / 100));
+      return { subtotal: hors, tax: round4(net - hors), total: net };
+    }
+    const tax = round4(net * fiscal.tauxTva / 100);
+    return { subtotal: net, tax, total: round4(net + tax) };
+  }, [cart, promotions, fiscal]);
+
+  useEffect(() => {
+    api.get<{ tauxTva: number; prixTtc: boolean }>("/caisse/parametres")
+      .then(({ data }) => setFiscal(data))
+      .catch(() => undefined); // à défaut, 0 % : le serveur refusera un taux différent avec un message explicite
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -298,11 +309,11 @@ export default function CaissePage() {
     }
     const received = Number(amountReceived);
     if (!Number.isFinite(received) || received < cartTotals.total) {
-      showNotice("Le montant reçu doit être supérieur ou égal au total TTC.", true);
+      showNotice("Le montant reçu doit être supérieur ou égal au total à payer.", true);
       return;
     }
     if (paymentMode !== "ESPECES" && received !== cartTotals.total) {
-      showNotice("Pour un règlement sans espèces, saisissez exactement le total TTC.", true);
+      showNotice("Pour un règlement sans espèces, saisissez exactement le total à payer.", true);
       return;
     }
     setCheckoutBusy(true);
@@ -311,7 +322,7 @@ export default function CaissePage() {
       const request = {
         clientId: clientId ? Number(clientId) : null,
         aCredit: false,
-        tauxTva: tvaRate,
+        tauxTva: fiscal.tauxTva,
         modeReglement: paymentMode,
         montantRecu: received,
         lignes: cart.map((line) => ({
@@ -585,25 +596,14 @@ export default function CaissePage() {
               <div className="flex items-center justify-between text-xs text-slate-500">
                 <span>Sous-total après promotions</span><span className="font-semibold text-slate-700">{currency.format(cartTotals.subtotal)}</span>
               </div>
-              <label className="mt-3 flex items-center justify-between gap-3 text-xs text-slate-500">
-                <span className="flex items-center gap-1.5">TVA (%) <span title="Le taux dépend de votre paramétrage fiscal." className="cursor-help text-slate-400">ⓘ</span></span>
-                <input
-                  aria-label="Taux de TVA en pourcentage"
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.01"
-                  value={tvaRate}
-                  onChange={(event) => setTvaRate(Math.min(100, Math.max(0, Number(event.target.value) || 0)))}
-                  className="w-20 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-right text-xs font-semibold text-slate-700 outline-none focus:border-emerald-500"
-                />
-              </label>
-              <div className="mt-2 flex items-center justify-between text-xs text-slate-500">
-                <span>Montant TVA</span><span className="font-semibold text-slate-700">{currency.format(cartTotals.tax)}</span>
-              </div>
+              {fiscal.tauxTva > 0 && (
+                <div className="mt-2 flex items-center justify-between text-xs text-slate-500">
+                  <span>TVA ({fiscal.tauxTva} %{fiscal.prixTtc ? ", incluse" : ""})</span><span className="font-semibold text-slate-700">{currency.format(cartTotals.tax)}</span>
+                </div>
+              )}
               <div className="my-3 border-t border-dashed border-slate-200" />
               <div className="flex items-center justify-between">
-                <span className="text-sm font-bold text-slate-800">Total TTC</span>
+                <span className="text-sm font-bold text-slate-800">{fiscal.tauxTva > 0 ? "Total TTC" : "Total à payer"}</span>
                 <span className="text-xl font-extrabold tracking-tight text-slate-900">{currency.format(cartTotals.total)}</span>
               </div>
             </div>

@@ -62,12 +62,12 @@ class GestionVentesServiceTests {
     }
 
     @Test
-    void venteDirecteCalculeHtTvaEtTotalSansErreurDArrondi() {
-        VenteResponse brouillon = ventesService.creerVenteDirecte(vente(2, "18"), ADMIN);
+    void parDefautAucuneTvaNEstFactureeEtLeTotalEstLeNetDesLignes() {
+        VenteResponse brouillon = ventesService.creerVenteDirecte(vente(2, "0"), ADMIN);
 
         assertThat(brouillon.montantHT()).isEqualByComparingTo("490000");
-        assertThat(brouillon.montantTva()).isEqualByComparingTo("88200");
-        assertThat(brouillon.montantTotal()).isEqualByComparingTo("578200");
+        assertThat(brouillon.montantTva()).isEqualByComparingTo("0");
+        assertThat(brouillon.montantTotal()).isEqualByComparingTo("490000");
         assertThat(brouillon.statut()).isEqualTo(StatutVente.BROUILLON);
     }
 
@@ -76,16 +76,16 @@ class GestionVentesServiceTests {
         SessionCaisseResponse session = ouvrirSession();
         int stockAvant = telephone().getQuantiteStock();
 
-        VenteResponse brouillon = ventesService.creerVenteDirecte(vente(2, "18"), ADMIN);
+        VenteResponse brouillon = ventesService.creerVenteDirecte(vente(2, "0"), ADMIN);
         VenteResponse validee = ventesService.validerVente(brouillon.id(), ADMIN);
 
         assertThat(validee.statut()).isEqualTo(StatutVente.VALIDEE);
         assertThat(telephone().getQuantiteStock()).isEqualTo(stockAvant - 2);
         assertThat(venteRepository.chiffreAffairesSession(session.id(), StatutVente.VALIDEE))
-            .isEqualByComparingTo("578200");
+            .isEqualByComparingTo("490000");
         assertThat(venteRepository.chiffreAffairesEntre(StatutVente.VALIDEE,
             LocalDateTime.now().minusMinutes(5), LocalDateTime.now().plusMinutes(5)))
-            .isGreaterThanOrEqualTo(new BigDecimal("578200"));
+            .isGreaterThanOrEqualTo(new BigDecimal("490000"));
     }
 
     @Test
