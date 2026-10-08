@@ -35,7 +35,12 @@ updates:
       actions:
         patterns: ["*"]
 
+  # Images Docker : seulement les correctifs. Un saut de majeure changerait la version de Java qui fait tourner l'application
+  # (17 aujourd'hui) : c'est une décision à part, pas une mise à jour automatique.
   - package-ecosystem: docker
     directory: /
     schedule:
       interval: monthly
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
