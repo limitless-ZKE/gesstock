@@ -11,6 +11,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
+import java.util.Arrays;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -90,6 +91,27 @@ class AuthFlowTests {
 
         mockMvc.perform(get("/api/auth/me").session(session))
             .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void laReponseDeConnexionPorteDejaLeNouveauJetonCsrfEtUneEcritureImmediatePasse() throws Exception {
+        String ancien = jetonCsrf();
+
+        MvcResult connexion = mockMvc.perform(avecJeton(post("/api/auth/login"), ancien)
+                .param("username", "admin").param("password", "admin123"))
+            .andExpect(status().isNoContent())
+            .andReturn();
+
+        // la réponse contient d'abord la suppression de l'ancien cookie, puis le nouveau : c'est le dernier qui compte
+        List<Cookie> jetons = Arrays.stream(connexion.getResponse().getCookies())
+            .filter(cookie -> cookie.getName().equals("XSRF-TOKEN")).toList();
+        assertThat(jetons).as("cookies XSRF-TOKEN dans la réponse de connexion").isNotEmpty();
+        Cookie nouveau = jetons.get(jetons.size() - 1);
+        assertThat(nouveau.getValue()).isNotBlank().isNotEqualTo(ancien);
+        // première écriture juste après la connexion, sans aucun GET intermédiaire : elle doit passer
+        mockMvc.perform(avecJeton(post("/api/auth/logout"), nouveau.getValue())
+                .session((MockHttpSession) connexion.getRequest().getSession(false)))
+            .andExpect(status().isNoContent());
     }
 
     @Test

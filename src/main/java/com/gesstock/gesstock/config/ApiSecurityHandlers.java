@@ -9,6 +9,7 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.csrf.CsrfException;
+import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.stereotype.Component;
 import com.gesstock.gesstock.security.LimiteurConnexions;
 
@@ -48,6 +49,13 @@ public class ApiSecurityHandlers implements AuthenticationEntryPoint, AccessDeni
     public void loginReussi(HttpServletRequest request, HttpServletResponse response,
                             Authentication authentication) {
         limiteur.reinitialiser(LimiteurConnexions.cle(request.getParameter("username"), request.getRemoteAddr()));
+        // Spring Security renouvelle le jeton CSRF à la connexion mais ne l'écrit qu'à la réponse SUIVANTE : on le charge
+        // ici pour que cette réponse porte déjà le nouveau cookie XSRF-TOKEN. Sans cela, la première écriture après la
+        // connexion part avec un jeton supprimé et reçoit un 403 (le front y échappait en relisant /api/auth/me).
+        CsrfToken jeton = (CsrfToken) request.getAttribute(CsrfToken.class.getName());
+        if (jeton != null) {
+            jeton.getToken();
+        }
         response.setStatus(HttpStatus.NO_CONTENT.value());
     }
 

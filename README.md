@@ -51,6 +51,8 @@ d'écriture.
 | `GET /api/auth/me` | `200` `{ username, roles }` ou `401` |
 | `POST /api/auth/logout` | `204` |
 
+- À la connexion, le jeton CSRF est renouvelé et la réponse `204` porte déjà le nouveau cookie `XSRF-TOKEN` : un client
+  autre que le front peut écrire immédiatement après, sans appel intermédiaire.
 - Les erreurs de sécurité sont en `application/problem+json` avec un champ `code` stable
   (`NON_AUTHENTIFIE`, `ACCES_REFUSE`, `CSRF_INVALIDE`…).
 - Après 5 mauvais mots de passe en 15 minutes, le couple identifiant + adresse IP est bloqué 15 minutes
