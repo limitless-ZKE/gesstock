@@ -10,7 +10,7 @@ COPY frontend/ ./
 RUN npm run build
 
 # 2. Le programme, avec l'interface dans static/ (profil Maven « interface »).
-FROM maven:3.9.11-eclipse-temurin-17-alpine AS build
+FROM maven:3.9-eclipse-temurin-26-alpine AS build
 
 WORKDIR /workspace
 
