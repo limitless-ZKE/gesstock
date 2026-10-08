@@ -53,16 +53,10 @@ public class RoleService {
 
     public RoleResponse modifier(Long id, RoleRequest request) {
         Role role = trouver(id);
-        String ancienNom = role.getName();
         String nouveauNom = normaliser(request.name());
         verifierRoleConnu(nouveauNom);
         verifierNomDisponible(nouveauNom, id);
         role.setName(nouveauNom);
-        role.getUtilisateurs().forEach(utilisateur -> {
-            if (utilisateur.getRole() != null && normaliser(utilisateur.getRole()).equals(normaliser(ancienNom))) {
-                utilisateur.setRole(nomLegacy(nouveauNom));
-            }
-        });
         return RoleMapper.toResponse(roleRepository.save(role));
     }
 
@@ -97,9 +91,5 @@ public class RoleService {
     private String normaliser(String name) {
         String normalized = name.trim().toUpperCase(Locale.ROOT);
         return normalized.startsWith("ROLE_") ? normalized.substring(5) : normalized;
-    }
-
-    private String nomLegacy(String name) {
-        return normaliser(name);
     }
 }

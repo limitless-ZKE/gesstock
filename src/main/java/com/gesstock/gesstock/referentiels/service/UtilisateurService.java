@@ -109,7 +109,6 @@ public class UtilisateurService {
         }
         roles.sort(Comparator.comparing(Role::getName));
         utilisateur.setRoles(new HashSet<>(roles));
-        utilisateur.setRole(nomLegacy(roles.get(0).getName()));
     }
 
     private void verifierNomDisponible(String username, Long idIgnore) {
@@ -123,10 +122,5 @@ public class UtilisateurService {
     private Utilisateur trouver(Long id) {
         return utilisateurRepository.findById(id)
             .orElseThrow(() -> new RessourceIntrouvableException("Utilisateur introuvable: " + id));
-    }
-
-    private String nomLegacy(String roleName) {
-        String normalized = roleName.trim().toUpperCase(Locale.ROOT);
-        return normalized.startsWith("ROLE_") ? normalized.substring(5) : normalized;
     }
 }

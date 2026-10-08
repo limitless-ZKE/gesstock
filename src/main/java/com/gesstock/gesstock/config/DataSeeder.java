@@ -150,7 +150,6 @@ public class DataSeeder implements CommandLineRunner {
         Utilisateur utilisateur = new Utilisateur();
         utilisateur.setUsername(username);
         utilisateur.setPassword(passwordEncoder.encode(rawPassword));
-        utilisateur.setRole(role.getName());
         utilisateur.setActif(true);
         utilisateur.setRoles(Set.of(role));
         utilisateurRepository.save(utilisateur);

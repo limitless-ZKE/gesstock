@@ -2,6 +2,7 @@ package com.gesstock.gesstock.ventes.controller;
 
 import com.gesstock.gesstock.ventes.dto.AnnulationVenteRequest;
 import com.gesstock.gesstock.ventes.dto.AnnulationVenteResponse;
+import com.gesstock.gesstock.ventes.dto.PageVentesResponse;
 import com.gesstock.gesstock.ventes.dto.VenteDirecteRequest;
 import com.gesstock.gesstock.ventes.dto.VenteResponse;
 import com.gesstock.gesstock.ventes.service.GestionVentesService;
@@ -21,17 +22,32 @@ import java.util.List;
 @RequestMapping("/api/ventes")
 public class VenteRestController {
 
+    public static final String EN_TETE_TOTAL = "X-Total-Count";
+
     private final GestionVentesService gestionVentesService;
 
     public VenteRestController(GestionVentesService gestionVentesService) {
         this.gestionVentesService = gestionVentesService;
     }
 
+    /**
+     * Avec {@code date} : les ventes de cette journée. Sinon : l'historique paginé, les plus récentes d'abord
+     * ({@code page} à partir de 0, {@code size} 50 par défaut et 200 au plus), limité à {@code clientId} s'il est donné.
+     * Le nombre total de ventes est dans l'en-tête {@code X-Total-Count}.
+     */
     @GetMapping
-    public List<VenteResponse> lister(
-        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date
+    public ResponseEntity<List<VenteResponse>> lister(
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+        @RequestParam(required = false) Long clientId,
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "50") int size
     ) {
-        return gestionVentesService.listerVentes(date);
+        if (date != null) {
+            List<VenteResponse> duJour = gestionVentesService.listerVentes(date);
+            return ResponseEntity.ok().header(EN_TETE_TOTAL, String.valueOf(duJour.size())).body(duJour);
+        }
+        PageVentesResponse resultat = gestionVentesService.listerVentesPaginees(clientId, page, size);
+        return ResponseEntity.ok().header(EN_TETE_TOTAL, String.valueOf(resultat.total())).body(resultat.ventes());
     }
 
     @GetMapping("/{id}")

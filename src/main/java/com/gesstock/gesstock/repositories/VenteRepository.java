@@ -1,6 +1,7 @@
 package com.gesstock.gesstock.repositories;
 
 import com.gesstock.gesstock.entities.Vente;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -19,24 +20,35 @@ import com.gesstock.gesstock.entities.ModeReglement;
 public interface VenteRepository extends JpaRepository<Vente, Long> {
     /** Tout ce que VentesMapper lit est chargé en UNE requête (sinon : 2 requêtes supplémentaires par vente). */
 
+    /**
+     * Pagination en deux temps : un {@code @EntityGraph} sur une collection (les lignes) combiné à une page ferait charger
+     * TOUTES les ventes en mémoire puis découper (Hibernate l'avertit : HHH90003004). On pagine donc les seuls
+     * identifiants, puis on charge ces ventes avec leurs détails en une requête.
+     */
+    @Query(value = "select v.id from Vente v order by v.id desc", countQuery = "select count(v) from Vente v")
+    Page<Long> identifiantsRecents(Pageable pageable);
+
+    @Query(value = "select v.id from Vente v where v.client.id = :clientId order by v.id desc",
+        countQuery = "select count(v) from Vente v where v.client.id = :clientId")
+    Page<Long> identifiantsDuClient(@Param("clientId") Long clientId, Pageable pageable);
+
     @EntityGraph(attributePaths = {"lignesVente", "lignesVente.article", "lignesVente.uniteVente", "lignesVente.promotion",
         "client", "vendeur", "proforma", "sessionCaisse", "detteClient"})
-    List<Vente> findAllByOrderByIdDesc();
+    @Query("select v from Vente v where v.id in :ids order by v.id desc")
+    List<Vente> chargerAvecDetails(@Param("ids") java.util.Collection<Long> ids);
+
+    @Query("select v.client.id, count(v) from Vente v where v.client is not null and v.statut = :statut group by v.client.id")
+    List<Object[]> compterVentesParClient(@Param("statut") StatutVente statut);
+
+    @Query("select count(v) from Vente v where v.client.id = :clientId and v.statut = :statut")
+    long compterVentesClient(@Param("clientId") Long clientId, @Param("statut") StatutVente statut);
 
     @EntityGraph(attributePaths = {"lignesVente", "lignesVente.article", "lignesVente.uniteVente", "lignesVente.promotion",
         "client", "vendeur", "proforma", "sessionCaisse", "detteClient"})
     List<Vente> findByStatutInAndDateVenteGreaterThanEqualAndDateVenteLessThanOrderByDateVenteDesc(
         java.util.Collection<StatutVente> statuts, java.time.LocalDateTime debut, java.time.LocalDateTime fin);
-    List<Vente> findByDateVenteBetween(LocalDateTime startDate, LocalDateTime endDate);
     List<Vente> findByStatutAndDateVenteGreaterThanEqualAndDateVenteLessThan(
         StatutVente statut, LocalDateTime debut, LocalDateTime fin);
-
-    @Query("SELECT v.article, SUM(v.quantite) FROM Vente v GROUP BY v.article ORDER BY SUM(v.quantite) DESC")
-    List<Object[]> findTopVendus(Pageable pageable);
-
-    // NOUVEAU : Récupère l'historique avec les lignes de vente et les articles pour éviter les listes vides
-    @Query("SELECT DISTINCT v FROM Vente v LEFT JOIN FETCH v.lignesVente lv LEFT JOIN FETCH lv.article ORDER BY v.id DESC")
-    List<Vente> findAllWithLignesVente();
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select v from Vente v where v.id = :id")

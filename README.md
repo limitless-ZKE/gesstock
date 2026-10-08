@@ -35,7 +35,7 @@ Depuis VS Code (Spring Boot Dashboard, « Run »), ajouter `SPRING_PROFILES_ACTI
     ./mvnw test -Dtest=MigrationsMysqlIT
   ```
 
-  Il vérifie l'installation neuve (V1 à V5 puis validation Hibernate, y compris les valeurs d'enum MySQL que Hibernate
+  Il vérifie l'installation neuve (V1 à V7 puis validation Hibernate, y compris les valeurs d'enum MySQL que Hibernate
   ne contrôle pas), la mise à jour depuis V3 avec des données, et la reprise d'une base existante. La CI le lance
   sur MySQL 8.4.
 
@@ -109,6 +109,10 @@ Le contrôle de santé de Docker interroge `http://127.0.0.1:8081/actuator/healt
 - `V3__prix_catalogue_lignes.sql` : prix catalogue mémorisé sur les lignes de vente et de proforma.
 - `V4__fusion_roles_vendeur_user.sql` : fusion des rôles `VENDEUR` et `USER` dans `CAISSIER`.
 - `V5__index_performance.sql` : index des rapports et de l'historique (ventes par statut et date, journal, mouvements).
+- `V6__nettoyage_ancien_modele_vente.sql` : une ancienne vente « un article » devient une ligne de vente, puis les
+  colonnes héritées de `vente` (article, promotion, quantité, prix) et la table `statistiques_journalieres` disparaissent.
+- `V7__roles_source_unique.sql` : les droits ne viennent plus que de `utilisateur_roles` ; la colonne `utilisateurs.role`
+  disparaît après avoir été reportée dans `utilisateur_roles` (rôle créé au besoin s'il fait partie des quatre connus).
 - Une migration déjà appliquée ne se modifie jamais : toute évolution du schéma est un nouveau fichier
   `V<n>__description.sql`.
 - Une base créée à la main par `ddl-auto=update` n'est **pas** reprise automatiquement (`V3` échouerait : colonne

@@ -72,7 +72,6 @@ public class AdminBootstrap implements CommandLineRunner {
         Utilisateur admin = new Utilisateur();
         admin.setUsername(username.trim());
         admin.setPassword(passwordEncoder.encode(password));
-        admin.setRole(adminRole.getName());
         admin.setActif(true);
         admin.setRoles(Set.of(adminRole));
         utilisateurRepository.save(admin);

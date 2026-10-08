@@ -21,20 +21,9 @@ public class Vente {
     @Column(length = 50, unique = true)
     private String code;
 
-    // Champs conservés pour la compatibilité avec votre structure existante si besoin
-    @PositiveOrZero
-    private int quantite;
-
-    @PositiveOrZero
-    @Column(name = "prix_unit", precision = 19, scale = 4)
-    private BigDecimal prixUnit = BigDecimal.ZERO;
-
     @Column(name = "montant_total", precision = 19, scale = 4)
     @PositiveOrZero
     private BigDecimal montantTotal = BigDecimal.ZERO;
-
-    @Column(name = "prix_total", precision = 19, scale = 4)
-    private BigDecimal prixTotalField = BigDecimal.ZERO;
 
     @Column(name = "montant_ht", precision = 19, scale = 4)
     private BigDecimal montantHT = BigDecimal.ZERO;
@@ -54,19 +43,15 @@ public class Vente {
 
     private LocalDateTime dateVente;
 
+    /** Une vente naît brouillon : seule la validation (stock, caisse, journal) la rend effective. */
     @Enumerated(EnumType.STRING)
     @Column(length = 20)
-    private StatutVente statut = StatutVente.VALIDEE;
-
-    @ManyToOne
-    @JoinColumn(name = "article_id")
-    private Article article; // Utilisé pour l'ancienne version, conservé pour éviter d'autres erreurs
+    private StatutVente statut = StatutVente.BROUILLON;
 
     @ManyToOne
     @JoinColumn(name = "client_id")
     private Client client;
 
-    // Nouvelle relation OneToMany vers les lignes de vente (Panier)
     @OneToMany(mappedBy = "vente", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<@Valid LigneVente> lignesVente = new ArrayList<>();
 
@@ -77,10 +62,6 @@ public class Vente {
     @ManyToOne
     @JoinColumn(name = "utilisateur_id")
     private Utilisateur vendeur;
-
-    @ManyToOne
-    @JoinColumn(name = "promotion_id")
-    private Promotion promotion;
 
     @OneToOne
     @JoinColumn(name = "proforma_id", unique = true)
@@ -105,34 +86,14 @@ public class Vente {
         }
     }
 
-    public BigDecimal getPrixTotal() {
-        return this.montantTotal;
-    }
-
-    public void setPrixTotal(BigDecimal montantTotal) {
-        this.montantTotal = montantTotal;
-        this.prixTotalField = montantTotal;
-    }
-
-    // --- GETTERS ET SETTERS ---
-
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
     public String getCode() { return code; }
     public void setCode(String code) { this.code = code; }
 
-    public int getQuantite() { return quantite; }
-    public void setQuantite(int quantite) { this.quantite = quantite; }
-
-    public BigDecimal getPrixUnit() { return prixUnit; }
-    public void setPrixUnit(BigDecimal prixUnit) { this.prixUnit = prixUnit; }
-
     public BigDecimal getMontantTotal() { return montantTotal; }
-    public void setMontantTotal(BigDecimal montantTotal) { 
-        this.montantTotal = montantTotal; 
-        this.prixTotalField = montantTotal; 
-    }
+    public void setMontantTotal(BigDecimal montantTotal) { this.montantTotal = montantTotal; }
 
     public BigDecimal getMontantHT() { return montantHT; }
     public void setMontantHT(BigDecimal montantHT) { this.montantHT = montantHT; }
@@ -155,29 +116,17 @@ public class Vente {
     public StatutVente getStatut() { return statut; }
     public void setStatut(StatutVente statut) { this.statut = statut; }
 
-    public Article getArticle() { return article; }
-    public void setArticle(Article article) { this.article = article; }
-
     public Client getClient() { return client; }
     public void setClient(Client client) { this.client = client; }
 
-    // Getters et Setters pour la liste des lignes de vente (Panier)
-    public List<LigneVente> getLignesVente() { 
-        return lignesVente; 
-    }
-    
-    public void setLignesVente(List<LigneVente> lignesVente) { 
-        this.lignesVente = lignesVente; 
-    }
+    public List<LigneVente> getLignesVente() { return lignesVente; }
+    public void setLignesVente(List<LigneVente> lignesVente) { this.lignesVente = lignesVente; }
 
     public SessionCaisse getSessionCaisse() { return sessionCaisse; }
     public void setSessionCaisse(SessionCaisse sessionCaisse) { this.sessionCaisse = sessionCaisse; }
 
     public Utilisateur getVendeur() { return vendeur; }
     public void setVendeur(Utilisateur vendeur) { this.vendeur = vendeur; }
-
-    public Promotion getPromotion() { return promotion; }
-    public void setPromotion(Promotion promotion) { this.promotion = promotion; }
 
     public Proforma getProforma() { return proforma; }
     public void setProforma(Proforma proforma) { this.proforma = proforma; }

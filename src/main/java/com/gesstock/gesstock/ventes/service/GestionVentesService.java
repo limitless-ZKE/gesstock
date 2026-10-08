@@ -11,6 +11,9 @@ import com.gesstock.gesstock.promotions.service.PromotionService;
 import com.gesstock.gesstock.caisse.dto.MouvementCaisseRequest;
 import com.gesstock.gesstock.caisse.service.MouvementCaisseService;
 import com.gesstock.gesstock.journal.service.JournalActiviteService;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -146,13 +149,28 @@ public class GestionVentesService {
 
     @Transactional(readOnly = true)
     /** Ventes validées ou annulées (celles qui ont un reçu, pas les brouillons) le jour donné, les plus récentes d'abord ; toutes si {@code jour} est nul. */
+    /** Ventes validées ou annulées d'une journée : le volume est borné par l'activité d'un jour. */
     public List<VenteResponse> listerVentes(LocalDate jour) {
-        List<Vente> ventes = jour == null
-            ? venteRepository.findAllByOrderByIdDesc()
-            : venteRepository.findByStatutInAndDateVenteGreaterThanEqualAndDateVenteLessThanOrderByDateVenteDesc(
-                List.of(StatutVente.VALIDEE, StatutVente.ANNULEE),
-                jour.atStartOfDay(), jour.plusDays(1).atStartOfDay());
-        return ventes.stream().map(VentesMapper::toResponse).toList();
+        return venteRepository.findByStatutInAndDateVenteGreaterThanEqualAndDateVenteLessThanOrderByDateVenteDesc(
+                List.of(StatutVente.VALIDEE, StatutVente.ANNULEE), jour.atStartOfDay(), jour.plusDays(1).atStartOfDay())
+            .stream().map(VentesMapper::toResponse).toList();
+    }
+
+    public static final int TAILLE_MAX_PAGE = 200;
+
+    /**
+     * Historique paginé, les ventes les plus récentes d'abord, éventuellement limité à un client. La taille est bornée :
+     * une liste de toutes les ventes grossit sans limite (des dizaines de milliers par an) et gèlerait l'écran.
+     */
+    @Transactional(readOnly = true)
+    public PageVentesResponse listerVentesPaginees(Long clientId, int page, int taille) {
+        Pageable pageable = PageRequest.of(Math.max(page, 0), Math.min(Math.max(taille, 1), TAILLE_MAX_PAGE));
+        Page<Long> identifiants = clientId == null
+            ? venteRepository.identifiantsRecents(pageable)
+            : venteRepository.identifiantsDuClient(clientId, pageable);
+        List<VenteResponse> ventes = identifiants.isEmpty() ? List.of()
+            : venteRepository.chargerAvecDetails(identifiants.getContent()).stream().map(VentesMapper::toResponse).toList();
+        return new PageVentesResponse(ventes, identifiants.getTotalElements());
     }
 
     @Transactional(readOnly = true)

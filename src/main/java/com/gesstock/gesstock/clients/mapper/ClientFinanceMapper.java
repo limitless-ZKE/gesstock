@@ -12,13 +12,14 @@ public final class ClientFinanceMapper {
 
     private ClientFinanceMapper() {}
 
-    public static ClientResponse toResponse(Client client) {
+    public static ClientResponse toResponse(Client client, long nombreAchats) {
         return new ClientResponse(
             client.getId(),
             client.getNom(),
             client.getEmail(),
             client.getTelephone(),
-            client.getAdresse()
+            client.getAdresse(),
+            nombreAchats
         );
     }
 

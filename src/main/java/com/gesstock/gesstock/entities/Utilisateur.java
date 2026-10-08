@@ -31,11 +31,6 @@ public class Utilisateur {
     @Column(nullable = false)
     private String password;
 
-    @NotBlank
-    @Size(max = 30)
-    @Column(nullable = false)
-    private String role;
-
     // Ajout d'une valeur par défaut à true pour éviter l'erreur "Field 'actif' doesn't have a default value"
     @Column(nullable = false)
     private boolean actif = true;

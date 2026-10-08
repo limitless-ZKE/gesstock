@@ -65,34 +65,49 @@ class MigrationsMysqlIT {
 
         try (ConfigurableApplicationContext contexte = demarrer(base, "--spring.flyway.baseline-on-migrate=false")) {
             JdbcTemplate jdbc = contexte.getBean(JdbcTemplate.class);
-            assertThat(versionsAppliquees(jdbc)).containsExactly("1", "2", "3", "4", "5");
+            assertThat(versionsAppliquees(jdbc)).containsExactly("1", "2", "3", "4", "5", "6", "7");
             assertThat(migrationsEnEchec(jdbc)).isZero();
             assertThat(derives(contexte, base)).as("enum Java absents de la base").isEmpty();
         }
     }
 
     @Test
-    void miseAJourDepuisLaVersion3_fusionneLesAnciensRolesEtAjouteLesIndex() {
+    void miseAJourDepuisLaVersion3_fusionneLesRolesConserveLesVentesEtNettoieLAncienModele() {
         String base = nouvelleBase();
         migrerJusqua(base, "3");
         JdbcTemplate jdbc = jdbc(base);
-        // état réel d'avant : des comptes aux anciens rôles VENDEUR / USER, dont un cumul et un sans attribution
+        // état réel d'avant : des comptes aux anciens rôles VENDEUR / USER (dont un cumul), des comptes qui n'ont que
+        // l'ancien champ « role » (un rôle connu absent de la table, un rôle inconnu) et une vente de l'ancien modèle
         jdbc.update("INSERT INTO roles (name) VALUES ('ADMIN'), ('VENDEUR'), ('USER')");
         jdbc.update("INSERT INTO utilisateurs (actif, role, username, password) VALUES "
-            + "(1, 'ADMIN', 'chef', 'x'), (1, 'VENDEUR', 'vendeur', 'x'), (1, 'USER', 'double', 'x'), (1, 'ROLE_USER', 'ancien', 'x')");
+            + "(1, 'ADMIN', 'chef', 'x'), (1, 'VENDEUR', 'vendeur', 'x'), (1, 'USER', 'double', 'x'), (1, 'ROLE_USER', 'ancien', 'x'), "
+            + "(1, 'MANAGER', 'oubli', 'x'), (1, 'STAGIAIRE', 'inconnu', 'x')");
         jdbc.update("INSERT INTO utilisateur_roles (role_id, utilisateur_id) SELECT r.id, u.id FROM roles r JOIN utilisateurs u ON "
             + "(r.name = 'ADMIN' AND u.username = 'chef') OR (r.name = 'VENDEUR' AND u.username IN ('vendeur', 'double')) "
             + "OR (r.name = 'USER' AND u.username = 'double')");
+        jdbc.update("INSERT INTO article (prix, prix_achat, quantite, seuil_alerte, reference, nom) VALUES (1000, 600, 10, 2, 'A-1', 'Article')");
+        Long articleId = jdbc.queryForObject("SELECT id FROM article WHERE reference = 'A-1'", Long.class);
+        jdbc.update("INSERT INTO vente (code, quantite, prix_unit, prix_total, montant_total, venteacredit, version, statut, article_id, date_vente) "
+            + "VALUES ('VTE-ANCIENNE', 3, 1000, 3000, 3000, 0, 0, 'VALIDEE', ?, NOW())", articleId);
 
         migrerJusqua(base, null);
 
         assertThat(jdbc.queryForList("SELECT name FROM roles ORDER BY name", String.class))
-            .as("VENDEUR et USER disparaissent, CAISSIER est créé").containsExactly("ADMIN", "CAISSIER");
+            .as("VENDEUR et USER disparaissent, CAISSIER est créé, MANAGER est créé pour le compte qui l'avait en ancien champ")
+            .containsExactly("ADMIN", "CAISSIER", "MANAGER");
         assertThat(rolesDe(jdbc, "chef")).isEqualTo("ADMIN");
         assertThat(rolesDe(jdbc, "vendeur")).isEqualTo("CAISSIER");
         assertThat(rolesDe(jdbc, "double")).as("un seul CAISSIER malgré les deux anciens rôles").isEqualTo("CAISSIER");
-        assertThat(jdbc.queryForObject("SELECT role FROM utilisateurs WHERE username = 'ancien'", String.class))
-            .as("l'ancien champ suit pour un compte sans attribution").isEqualTo("CAISSIER");
+        assertThat(rolesDe(jdbc, "ancien")).as("compte sans attribution : son ancien champ ROLE_USER devient CAISSIER").isEqualTo("CAISSIER");
+        assertThat(rolesDe(jdbc, "oubli")).isEqualTo("MANAGER");
+        assertThat(rolesDe(jdbc, "inconnu")).as("rôle inconnu : aucun droit, jamais un rôle inventé").isNull();
+        assertThat(colonnesDe(jdbc, base, "utilisateurs")).doesNotContain("role");
+
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM lignes_vente l JOIN vente v ON v.id = l.vente_id "
+            + "WHERE v.code = 'VTE-ANCIENNE' AND l.quantite = 3 AND l.prix_unitaire = 1000 AND l.article_id = ?", Integer.class, articleId))
+            .as("l'ancienne vente à un article devient une ligne de vente").isEqualTo(1);
+        assertThat(colonnesDe(jdbc, base, "vente")).doesNotContain("article_id", "promotion_id", "quantite", "prix_unit", "prix_total");
+        assertThat(tableExiste(jdbc, base, "statistiques_journalieres")).isFalse();
         assertThat(indexDe(jdbc, base, "vente")).contains("idx_vente_statut_date", "idx_vente_session_statut");
 
         try (ConfigurableApplicationContext contexte = demarrer(base, "--spring.flyway.baseline-on-migrate=false")) {
@@ -120,7 +135,7 @@ class MigrationsMysqlIT {
         try (ConfigurableApplicationContext contexte = demarrer(base,
             "--spring.flyway.baseline-on-migrate=true", "--spring.flyway.baseline-version=3")) {
             JdbcTemplate jdbc = contexte.getBean(JdbcTemplate.class);
-            assertThat(versionsAppliquees(jdbc)).containsExactly("3", "4", "5");
+            assertThat(versionsAppliquees(jdbc)).containsExactly("3", "4", "5", "6", "7");
             assertThat(migrationsEnEchec(jdbc)).isZero();
         }
     }
@@ -173,6 +188,16 @@ class MigrationsMysqlIT {
 
     private int migrationsEnEchec(JdbcTemplate jdbc) {
         return jdbc.queryForObject("SELECT COUNT(*) FROM flyway_schema_history WHERE success = 0", Integer.class);
+    }
+
+    private List<String> colonnesDe(JdbcTemplate jdbc, String base, String table) {
+        return jdbc.queryForList("SELECT column_name FROM information_schema.columns WHERE table_schema = ? AND table_name = ?",
+            String.class, base, table).stream().map(String::toLowerCase).toList();
+    }
+
+    private boolean tableExiste(JdbcTemplate jdbc, String base, String table) {
+        return jdbc.queryForObject("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = ? AND table_name = ?",
+            Integer.class, base, table) > 0;
     }
 
     private String rolesDe(JdbcTemplate jdbc, String compte) {

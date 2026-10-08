@@ -14,11 +14,7 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/**
- * Charge un compte depuis la base : ses droits viennent de ses rôles ({@code utilisateur_roles}).
- * L'ancien champ unique {@code utilisateurs.role} n'est relu que pour un compte qui n'a aucun rôle dans
- * {@code utilisateur_roles} (comptes créés avant les rôles multiples) ; il disparaît avec la migration de nettoyage.
- */
+/** Charge un compte depuis la base : ses droits viennent uniquement de ses rôles ({@code utilisateur_roles}). */
 @Service
 public class UtilisateurDetailsService implements UserDetailsService {
 
@@ -37,10 +33,6 @@ public class UtilisateurDetailsService implements UserDetailsService {
         Set<SimpleGrantedAuthority> authorities = utilisateur.getRoles().stream()
             .map(role -> new SimpleGrantedAuthority(toAuthority(role.getName())))
             .collect(Collectors.toSet());
-        String ancienRole = utilisateur.getRole();
-        if (authorities.isEmpty() && ancienRole != null && !ancienRole.isBlank()) {
-            authorities = Set.of(new SimpleGrantedAuthority(toAuthority(ancienRole)));
-        }
 
         return User.withUsername(utilisateur.getUsername())
             .password(utilisateur.getPassword())

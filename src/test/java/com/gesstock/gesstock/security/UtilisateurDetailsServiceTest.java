@@ -10,6 +10,7 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -27,11 +28,10 @@ class UtilisateurDetailsServiceTest {
         return role;
     }
 
-    private UserDetails charger(String ancienRole, boolean actif, String... roles) {
+    private UserDetails charger(boolean actif, String... roles) {
         Utilisateur utilisateur = new Utilisateur();
         utilisateur.setUsername("u");
         utilisateur.setPassword("hash");
-        utilisateur.setRole(ancienRole);
         utilisateur.setActif(actif);
         for (String nom : roles) {
             utilisateur.getRoles().add(role(nom));
@@ -41,28 +41,21 @@ class UtilisateurDetailsServiceTest {
     }
 
     private static Set<String> droits(UserDetails details) {
-        return details.getAuthorities().stream().map(GrantedAuthority::getAuthority)
-            .collect(java.util.stream.Collectors.toSet());
+        return details.getAuthorities().stream().map(GrantedAuthority::getAuthority).collect(Collectors.toSet());
     }
 
     @Test
-    void lesDroitsViennentDesRolesAttribues() {
-        UserDetails details = charger("CAISSIER", true, "manager", "ROLE_GESTIONNAIRE");
+    void lesDroitsViennentDesRolesAttribuesEtSontNormalises() {
+        UserDetails details = charger(true, "manager", "ROLE_GESTIONNAIRE");
 
         assertThat(droits(details)).containsExactlyInAnyOrder("ROLE_MANAGER", "ROLE_GESTIONNAIRE");
         assertThat(details.isEnabled()).isTrue();
     }
 
     @Test
-    void lAncienChampRoleNEstRluQueSiAucunRoleNEstAttribue() {
-        assertThat(droits(charger("caissier", true))).containsExactly("ROLE_CAISSIER");
-        assertThat(droits(charger("ADMIN", true, "CAISSIER"))).containsExactly("ROLE_CAISSIER");
-    }
-
-    @Test
-    void unCompteSansAucunDroitOuDesactiveNePeutPasSeConnecter() {
-        assertThat(charger(" ", true).isEnabled()).as("aucun rôle, ancien champ vide").isFalse();
-        assertThat(charger("CAISSIER", false, "CAISSIER").isEnabled()).as("compte désactivé").isFalse();
+    void unCompteSansAucunRoleOuDesactiveNePeutPasSeConnecter() {
+        assertThat(charger(true).isEnabled()).as("aucun rôle attribué").isFalse();
+        assertThat(charger(false, "CAISSIER").isEnabled()).as("compte désactivé").isFalse();
     }
 
     @Test
