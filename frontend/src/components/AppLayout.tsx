@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import {
   Boxes,
   Building2,
@@ -231,7 +231,10 @@ export default function AppLayout() {
           </div>
         </header>
         <main className="mx-auto w-full max-w-[1440px] p-4 md:p-8">
-          <Outlet />
+          {/* Le menu reste affiché pendant le chargement d'un écran. */}
+          <Suspense fallback={<p role="status" className="py-24 text-center text-sm font-medium text-slate-400">Chargement…</p>}>
+            <Outlet />
+          </Suspense>
         </main>
       </div>
     </div>

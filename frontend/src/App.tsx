@@ -1,21 +1,23 @@
-import { useEffect, useState } from "react";
+import { lazy, useEffect, useState } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import AppLayout from "./components/AppLayout";
 import ProtectedRoute from "./components/ProtectedRoute";
-import ApprovisionnementsPage from "./pages/ApprovisionnementsPage";
-import AdminUsersPage from "./pages/AdminUsersPage";
-import ArticlesPage from "./pages/ArticlesPage";
-import CaissePage from "./pages/CaissePage";
-import CaisseMouvementsPage from "./pages/CaisseMouvementsPage";
-import ClientsDettesPage from "./pages/ClientsDettesPage";
-import DashboardPage from "./pages/DashboardPage";
-import FournisseursPage from "./pages/FournisseursPage";
 import HomeRedirect from "./components/HomeRedirect";
-import InventairesPage from "./pages/InventairesPage";
 import LoginPage from "./pages/LoginPage";
-import RetoursFournisseursPage from "./pages/RetoursFournisseursPage";
-import StatistiquesPage from "./pages/StatistiquesPage";
-import VentesHistoriquePage from "./pages/VentesHistoriquePage";
+
+// Chaque écran est un morceau à part, chargé à la première visite : la connexion n'embarque pas la caisse, l'inventaire, etc.
+const ApprovisionnementsPage = lazy(() => import("./pages/ApprovisionnementsPage"));
+const AdminUsersPage = lazy(() => import("./pages/AdminUsersPage"));
+const ArticlesPage = lazy(() => import("./pages/ArticlesPage"));
+const CaissePage = lazy(() => import("./pages/CaissePage"));
+const CaisseMouvementsPage = lazy(() => import("./pages/CaisseMouvementsPage"));
+const ClientsDettesPage = lazy(() => import("./pages/ClientsDettesPage"));
+const DashboardPage = lazy(() => import("./pages/DashboardPage"));
+const FournisseursPage = lazy(() => import("./pages/FournisseursPage"));
+const InventairesPage = lazy(() => import("./pages/InventairesPage"));
+const RetoursFournisseursPage = lazy(() => import("./pages/RetoursFournisseursPage"));
+const StatistiquesPage = lazy(() => import("./pages/StatistiquesPage"));
+const VentesHistoriquePage = lazy(() => import("./pages/VentesHistoriquePage"));
 
 export default function App() {
   const [notification, setNotification] = useState("");
