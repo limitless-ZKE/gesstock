@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import axios from "axios";
 import {
   Ban,
   Banknote,
@@ -16,6 +15,7 @@ import {
 } from "lucide-react";
 import ReceiptModal, { remisesDeLaVente, type Sale } from "../components/ReceiptModal";
 import { api } from "../services/api";
+import { apiErrorMessage as errorMessage } from "../services/apiError";
 
 const money = new Intl.NumberFormat("fr-FR", {
   style: "currency",
@@ -52,13 +52,6 @@ function formatTime(value: string) {
 function formatLongDay(value: string) {
   const [year, month, day] = value.split("-").map(Number);
   return new Intl.DateTimeFormat("fr-FR", { dateStyle: "full" }).format(new Date(year, month - 1, day));
-}
-
-function errorMessage(error: unknown, fallback: string) {
-  if (axios.isAxiosError<{ detail?: string; message?: string }>(error)) {
-    return error.response?.data?.detail ?? error.response?.data?.message ?? fallback;
-  }
-  return fallback;
 }
 
 type StatusFilter = "all" | "VALIDEE" | "ANNULEE";

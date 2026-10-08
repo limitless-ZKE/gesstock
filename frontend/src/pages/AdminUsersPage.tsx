@@ -1,9 +1,9 @@
 import { useEffect, useState, type FormEvent } from "react";
-import axios from "axios";
 import { Check, LoaderCircle, Pencil, Plus, Search, ShieldCheck, UserRound, UserRoundX, X } from "lucide-react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { api } from "../services/api";
+import { apiErrorMessage as errorMessage } from "../services/apiError";
 
 type Role = { id: number; name: string };
 type User = { id: number; username: string; actif: boolean; roles: Role[] };
@@ -20,11 +20,6 @@ const accessMatrix: { module: string; roles: string[] }[] = [
   { module: "Clients, proformas et dettes", roles: ["ADMIN", "MANAGER", "GESTIONNAIRE", "CAISSIER"] },
   { module: "Administration des comptes", roles: ["ADMIN"] },
 ];
-
-function errorMessage(error: unknown, fallback: string) {
-  if (axios.isAxiosError<{ detail?: string; message?: string }>(error)) return error.response?.data?.detail ?? error.response?.data?.message ?? fallback;
-  return fallback;
-}
 
 function normalizeRole(name: string) {
   return name.toUpperCase().replace(/^ROLE_/, "");

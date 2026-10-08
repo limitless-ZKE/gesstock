@@ -14,9 +14,12 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -131,5 +134,13 @@ class AuthFlowTests {
         // même un administrateur connecté n'y accède pas : springdoc est désactivé hors profil « dev »
         mockMvc.perform(get("/v3/api-docs").with(SecurityMockMvcRequestPostProcessors.user("a").roles("ADMIN")))
             .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void unIdentifiantDeRequeteEstToujoursRenvoyeEtJamaisRecopieSiMalveillant() throws Exception {
+        mockMvc.perform(get("/api/auth/me").header("X-Request-Id", "test-correlation-42"))
+            .andExpect(header().string("X-Request-Id", "test-correlation-42"));
+        mockMvc.perform(get("/api/auth/me").header("X-Request-Id", "x".repeat(200)))
+            .andExpect(header().string("X-Request-Id", not(containsString("xxxxxxxxxxxx"))));
     }
 }

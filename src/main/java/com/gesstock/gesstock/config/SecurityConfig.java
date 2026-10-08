@@ -147,7 +147,8 @@ public class SecurityConfig {
         configuration.setAllowedMethods(List.of(
             HttpMethod.GET.name(), HttpMethod.POST.name(), HttpMethod.PUT.name(),
             HttpMethod.PATCH.name(), HttpMethod.DELETE.name(), HttpMethod.OPTIONS.name()));
-        configuration.setAllowedHeaders(List.of("Content-Type", "Accept", "X-XSRF-TOKEN"));
+        configuration.setAllowedHeaders(List.of("Content-Type", "Accept", "X-XSRF-TOKEN", "X-Request-Id"));
+        configuration.setExposedHeaders(List.of("X-Request-Id", "Content-Disposition"));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
 

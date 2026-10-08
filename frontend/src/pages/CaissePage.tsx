@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import ReceiptModal, { type Sale } from "../components/ReceiptModal";
 import { api } from "../services/api";
+import { apiErrorMessage as messageFor } from "../services/apiError";
 
 type Category = { id: number; nom: string };
 type Article = {
@@ -102,13 +103,6 @@ const paymentModes: { value: PaymentMode; label: string; icon: typeof Banknote }
   { value: "CARTE", label: "Carte", icon: CreditCard },
   { value: "VIREMENT", label: "Virement", icon: WalletCards },
 ];
-
-function messageFor(error: unknown, fallback: string) {
-  if (axios.isAxiosError<{ message?: string }>(error)) {
-    return error.response?.data?.message ?? fallback;
-  }
-  return fallback;
-}
 
 /** Date d'une journée de caisse (AAAA-MM-JJ) au format local, sans décalage de fuseau. */
 function formatDay(value: string) {

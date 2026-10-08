@@ -1,16 +1,11 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import axios from "axios";
 import { Building2, LoaderCircle, Mail, MapPin, Pencil, Phone, Plus, Search, Trash2, Truck, X } from "lucide-react";
 import { api } from "../services/api";
+import { apiErrorMessage as messageFor } from "../services/apiError";
 
 type Supplier = { id: number; nom: string; telephone: string | null; email: string | null; adresse: string | null };
 type SupplierForm = { nom: string; telephone: string; email: string; adresse: string };
 const blank: SupplierForm = { nom: "", telephone: "", email: "", adresse: "" };
-
-function messageFor(error: unknown, fallback: string) {
-  if (axios.isAxiosError<{ detail?: string; message?: string }>(error)) return error.response?.data?.detail ?? error.response?.data?.message ?? fallback;
-  return fallback;
-}
 
 export default function FournisseursPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);

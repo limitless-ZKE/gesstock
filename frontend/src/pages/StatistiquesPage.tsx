@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import axios from "axios";
 import {
   ArrowDownToLine,
   Banknote,
@@ -12,6 +11,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { api } from "../services/api";
+import { apiErrorMessage as messageFor } from "../services/apiError";
 
 type CategoryMargin = {
   categorieId: number | null;
@@ -70,11 +70,6 @@ type PeriodPreset = "today" | "month" | "custom";
 const money = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "XOF", maximumFractionDigits: 0 });
 const isoToday = () => new Date().toISOString().slice(0, 10);
 const monthStart = () => `${isoToday().slice(0, 7)}-01`;
-
-function messageFor(error: unknown, fallback: string) {
-  if (axios.isAxiosError<{ message?: string }>(error)) return error.response?.data?.message ?? fallback;
-  return fallback;
-}
 
 function dateLabel(value: string) {
   return new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium" }).format(new Date(`${value.slice(0, 10)}T00:00:00`));

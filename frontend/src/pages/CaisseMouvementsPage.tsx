@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "re
 import axios from "axios";
 import { ArrowDownRight, Banknote, CircleAlert, LoaderCircle, Plus, ReceiptText, Wallet, X } from "lucide-react";
 import { api } from "../services/api";
+import { apiErrorMessage as messageFor } from "../services/apiError";
 
 type Session = {
   id: number;
@@ -25,11 +26,6 @@ type CashMovement = {
 };
 
 const money = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "XOF", maximumFractionDigits: 0 });
-
-function messageFor(error: unknown, fallback: string) {
-  if (axios.isAxiosError<{ detail?: string; message?: string }>(error)) return error.response?.data?.detail ?? error.response?.data?.message ?? fallback;
-  return fallback;
-}
 
 export default function CaisseMouvementsPage() {
   const [session, setSession] = useState<Session | null>(null);
