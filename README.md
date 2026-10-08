@@ -138,6 +138,39 @@ Seuls ces quatre rôles existent. Les anciens rôles `VENDEUR` et `USER` sont fu
   s'ajoute). La caisse lit le régime sur `GET /api/caisse/parametres`. Les proformas n'appliquent pas de TVA : à traiter
   le jour où la TVA est activée.
 
+## Plusieurs postes sur un réseau local (une seule adresse)
+
+Un PC fait office de **serveur** (celui où tourne MySQL) ; les caisses et le bureau ouvrent simplement `http://ADRESSE-DU-SERVEUR:8080` dans
+leur navigateur. Le programme embarque son interface (profil Maven `interface`) : pas de second programme à lancer, pas de réglage
+à faire sur les autres postes. Chaque poste imprime ses tickets sur sa propre imprimante.
+
+1. **Construire** (sur le serveur, à refaire après chaque mise à jour du code) : `scriptsconstruire-pour-le-reseau.cmd`. Il construit
+   l'interface puis le programme `targetgesstock-0.0.1-SNAPSHOT.jar`. Avec Docker, `docker compose up -d --build` fait la même chose.
+2. **Créer un utilisateur MySQL dédié** (ne pas faire tourner un serveur de réseau avec `root`) :
+   ```sql
+   CREATE USER 'gesstock'@'localhost' IDENTIFIED BY 'un mot de passe solide';
+   GRANT ALL PRIVILEGES ON gesstock_db.* TO 'gesstock'@'localhost';
+   ```
+3. **Lancer** : modifier les 3 premières lignes de `scriptslancer-gesstock-reseau.cmd` (adresse IP du serveur, utilisateur et mot de passe
+   MySQL), puis le lancer et laisser sa fenêtre ouverte. Il active le profil `prod` et `COOKIES_SECURE=false` (voir ci-dessous).
+4. **Autoriser le port 8080** dans le pare-feu Windows du serveur (PowerShell en administrateur ; réseau « privé » seulement) :
+   `New-NetFirewallRule -DisplayName "GesStock 8080" -Direction Inbound -Protocol TCP -LocalPort 8080 -Action Allow -Profile Private`
+5. **Fixer l'adresse du serveur** (réservation DHCP dans la box ou adresse IP fixe Windows) : si elle change, les postes ne trouvent plus GesStock.
+6. **Ouvrir** `http://ADRESSE:8080` depuis un autre poste ; connexion avec les comptes habituels.
+
+À savoir :
+- L'interface construite appelle l'API en `/api`, sur le serveur qui la sert (aucun CORS, aucune adresse à régler). Seul `npm run dev`
+  utilise l'adresse `http://localhost:8080/api` ; `VITE_API_BASE_URL` impose une autre adresse dans les deux cas.
+- **HTTP sans chiffrement** : sur un réseau local, les cookies de connexion ne peuvent pas exiger le HTTPS (`COOKIES_SECURE=false`), donc
+  les mots de passe circulent en clair sur le réseau. Acceptable sur un réseau filaire privé ; sur un Wi-Fi partagé ou non fiable, placer
+  un serveur web avec certificat (Caddy, nginx) devant GesStock. **Ne jamais exposer le port à Internet** sans HTTPS.
+- **Changer les mots de passe de démonstration** (`admin123`…) depuis l'écran Administration avant d'ouvrir l'accès au réseau.
+- Le serveur doit rester allumé et GesStock lancé pendant les heures d'ouverture ; rien ne le démarre automatiquement au démarrage de
+  Windows, et la sauvegarde de la base reste à planifier (`mysqldump`).
+- Seul le serveur parle à MySQL ; la supervision (`/actuator/health`) reste sur le port local 8081, jamais sur le réseau.
+- Testé : profil `prod` sur une copie de la base, ouvert par l'adresse réseau du PC dans un vrai navigateur (connexion, tous les écrans,
+  rechargement d'une page profonde, logo, tickets). Pas encore essayé avec un second PC physique ni avec le pare-feu activé.
+
 ## Production (profil `prod`)
 
 ```sh
