@@ -42,3 +42,14 @@ frontend/tsconfig.tsbuildinfo
 
 ### Réglages locaux de Claude Code ###
 .claude/settings.local.json
+
+### Reglages locaux et secrets : ne jamais commiter (seul .env.example est suivi) ###
+.env
+.env.*
+!.env.example
+*.local
+
+### Journaux de plantage de la JVM et fichiers temporaires d'editeur ###
+hs_err_pid*.log
+replay_pid*.log
+*.tmp.*
