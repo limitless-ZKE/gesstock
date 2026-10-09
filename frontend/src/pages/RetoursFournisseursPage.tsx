@@ -160,8 +160,7 @@ export default function RetoursFournisseursPage() {
     <div className="space-y-6">
       <header className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
         <div>
-          <p className="mb-1 text-xs font-bold uppercase tracking-[0.16em] text-emerald-600">Approvisionnements</p>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900">Retours fournisseurs</h1>
+          <h1 className="text-2xl font-bold text-slate-900">Retours fournisseurs</h1>
           <p className="mt-1.5 text-sm text-slate-500">Rendez de la marchandise reçue : à la validation, le stock baisse et le fournisseur vous crédite un avoir.</p>
         </div>
         <button className="button-primary" onClick={() => void startCreation()}><Plus size={16} /> Nouveau retour</button>
@@ -177,7 +176,7 @@ export default function RetoursFournisseursPage() {
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[860px] text-left">
-            <thead className="bg-slate-50/80 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            <thead className="bg-slate-50/80 text-xs font-semibold text-slate-600">
               <tr><th className="px-5 py-3">Retour</th><th className="px-4 py-3">Fournisseur</th><th className="px-4 py-3">Bon</th><th className="px-4 py-3">Préparé</th><th className="px-4 py-3">Statut</th><th className="px-4 py-3 text-right">Avoir</th><th className="px-5 py-3 text-right"><span className="sr-only">Actions</span></th></tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -196,7 +195,7 @@ export default function RetoursFournisseursPage() {
                     <td className="px-4 py-3.5 text-xs text-slate-700">{item.fournisseur}</td>
                     <td className="px-4 py-3.5 text-xs text-slate-600">{item.numeroBon}</td>
                     <td className="px-4 py-3.5 text-xs text-slate-600">{dayTime(item.dateCreation)} · {item.creePar}</td>
-                    <td className="px-4 py-3.5"><span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${statusLabel[item.statut].className}`}>{statusLabel[item.statut].label}</span></td>
+                    <td className="px-4 py-3.5"><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${statusLabel[item.statut].className}`}>{statusLabel[item.statut].label}</span></td>
                     <td className="px-4 py-3.5 text-right text-xs font-bold text-slate-900">{money.format(item.montantTotal)}</td>
                     <td className="px-5 py-3.5">
                       {item.statut === "BROUILLON" && (
@@ -210,10 +209,10 @@ export default function RetoursFournisseursPage() {
                   {expanded.has(item.id) && (
                     <tr className="bg-slate-50/60">
                       <td colSpan={7} className="px-5 py-3">
-                        <p className="mb-2 text-[11px] text-slate-600"><span className="font-bold text-slate-800">Motif :</span> {item.motif}{item.validePar && ` · validé ${dayTime(item.dateValidation)} par ${item.validePar}`}</p>
+                        <p className="mb-2 text-xs text-slate-600"><span className="font-bold text-slate-800">Motif :</span> {item.motif}{item.validePar && ` · validé ${dayTime(item.dateValidation)} par ${item.validePar}`}</p>
                         <ul className="space-y-1">
                           {item.lignes.map((line) => (
-                            <li key={line.ligneApprovisionnementId} className="flex flex-wrap gap-x-4 text-[11px] text-slate-600">
+                            <li key={line.ligneApprovisionnementId} className="flex flex-wrap gap-x-4 text-xs text-slate-600">
                               <span className="w-64 font-semibold text-slate-800">{line.designation} <span className="font-normal text-slate-400">({line.reference})</span></span>
                               <span>{line.quantite} × {money.format(line.coutUnitaire)}</span>
                               <span className="font-semibold text-slate-800">{money.format(line.montant)}</span>
@@ -238,7 +237,7 @@ export default function RetoursFournisseursPage() {
               <button onClick={() => setCreating(false)} className="icon-button" aria-label="Fermer"><X size={16} /></button>
             </div>
             <form onSubmit={(event) => void submitCreation(event)} className="space-y-4">
-              <label className="block"><span className="mb-1.5 block text-[10px] font-bold text-slate-600">Bon reçu à l’origine du retour</span>
+              <label className="block"><span className="mb-1.5 block text-xs font-bold text-slate-600">Bon reçu à l’origine du retour</span>
                 <select required className="input-field" value={receiptId} onChange={(event) => void chooseReceipt(event.target.value)}>
                   <option value="">Choisir un bon reçu</option>
                   {receipts.map((receipt) => <option key={receipt.id} value={receipt.id}>{receipt.numero} · {receipt.fournisseur} · {receipt.dateApprovisionnement}</option>)}
@@ -248,7 +247,7 @@ export default function RetoursFournisseursPage() {
               {lines.length > 0 && (
                 <div className="overflow-x-auto rounded-xl border border-slate-200">
                   <table className="w-full min-w-[620px] text-left">
-                    <thead className="bg-slate-50 text-[9px] font-bold uppercase tracking-wider text-slate-400">
+                    <thead className="bg-slate-50 text-xs font-semibold text-slate-600">
                       <tr><th className="px-4 py-2.5">Article</th><th className="px-3 py-2.5 text-right">Reçu</th><th className="px-3 py-2.5 text-right">Déjà rendu</th><th className="px-3 py-2.5 text-right">En rayon</th><th className="px-3 py-2.5 text-right">Coût</th><th className="px-4 py-2.5">À rendre</th></tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -257,7 +256,7 @@ export default function RetoursFournisseursPage() {
                         return (
                           <Fragment key={line.ligneApprovisionnementId}>
                             <tr>
-                              <td className="px-4 py-2.5"><p className="text-xs font-bold text-slate-800">{line.designation}</p><p className="text-[10px] text-slate-400">{line.reference}</p></td>
+                              <td className="px-4 py-2.5"><p className="text-xs font-bold text-slate-800">{line.designation}</p><p className="text-xs text-slate-400">{line.reference}</p></td>
                               <td className="px-3 py-2.5 text-right text-xs text-slate-600">{line.quantiteRecue}</td>
                               <td className="px-3 py-2.5 text-right text-xs text-slate-600">{line.quantiteDejaRetournee}</td>
                               <td className="px-3 py-2.5 text-right text-xs text-slate-600">{line.stockActuel}</td>
@@ -278,7 +277,7 @@ export default function RetoursFournisseursPage() {
                 </div>
               )}
 
-              <label className="block"><span className="mb-1.5 block text-[10px] font-bold text-slate-600">Motif du retour</span>
+              <label className="block"><span className="mb-1.5 block text-xs font-bold text-slate-600">Motif du retour</span>
                 <input required maxLength={300} className="input-field" value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Ex. : écrans défectueux à la livraison" />
               </label>
 

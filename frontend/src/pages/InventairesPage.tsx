@@ -62,7 +62,7 @@ const reasons: { value: Reason; label: string }[] = [
   { value: "AUTRE", label: "Autre (préciser)" },
 ];
 const statusLabels: Record<Status, { label: string; className: string }> = {
-  EN_SAISIE: { label: "En saisie", className: "bg-sky-50 text-sky-700" },
+  EN_SAISIE: { label: "En saisie", className: "bg-slate-100 text-slate-700" },
   SOUMIS: { label: "À valider", className: "bg-amber-50 text-amber-700" },
   VALIDE: { label: "Validé", className: "bg-emerald-50 text-emerald-700" },
   ANNULE: { label: "Annulé", className: "bg-slate-100 text-slate-500" },
@@ -219,8 +219,7 @@ export default function InventairesPage() {
     <div className="space-y-6">
       <header className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
         <div>
-          <p className="mb-1 text-xs font-bold uppercase tracking-[0.16em] text-emerald-600">Stock</p>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900">Inventaires physiques</h1>
+          <h1 className="text-2xl font-bold text-slate-900">Inventaires physiques</h1>
           <p className="mt-1.5 text-sm text-slate-500">Comptez le stock réel, justifiez les écarts, puis faites valider par un responsable.</p>
         </div>
         {!selected && (
@@ -242,7 +241,7 @@ export default function InventairesPage() {
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[820px] text-left">
-              <thead className="bg-slate-50/80 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+              <thead className="bg-slate-50/80 text-xs font-semibold text-slate-600">
                 <tr><th className="px-5 py-3">Inventaire</th><th className="px-4 py-3">Périmètre</th><th className="px-4 py-3">Ouvert</th><th className="px-4 py-3">Statut</th><th className="px-4 py-3 text-right">Comptés</th><th className="px-4 py-3 text-right">Écarts</th><th className="px-5 py-3 text-right">Valeur de l’écart</th></tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -250,10 +249,10 @@ export default function InventairesPage() {
                   <tr><td colSpan={7} className="h-32 text-center text-sm text-slate-400"><LoaderCircle className="mr-2 inline animate-spin" size={16} />Chargement…</td></tr>
                 ) : inventories.length ? inventories.map((inventory) => (
                   <tr key={inventory.id} className="cursor-pointer hover:bg-slate-50/70" onClick={() => setSelectedId(inventory.id)}>
-                    <td className="px-5 py-3.5"><p className="text-xs font-bold text-slate-800">{inventory.code}</p>{inventory.commentaire && <p className="mt-0.5 text-[10px] text-slate-400">{inventory.commentaire}</p>}</td>
+                    <td className="px-5 py-3.5"><p className="text-xs font-bold text-slate-800">{inventory.code}</p>{inventory.commentaire && <p className="mt-0.5 text-xs text-slate-400">{inventory.commentaire}</p>}</td>
                     <td className="px-4 py-3.5 text-xs text-slate-600">{inventory.categorie ?? "Tout le catalogue"}</td>
                     <td className="px-4 py-3.5 text-xs text-slate-600">{dateTime(inventory.ouvertLe)} · {inventory.ouvertPar}</td>
-                    <td className="px-4 py-3.5"><span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${statusLabels[inventory.statut].className}`}>{statusLabels[inventory.statut].label}</span></td>
+                    <td className="px-4 py-3.5"><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${statusLabels[inventory.statut].className}`}>{statusLabels[inventory.statut].label}</span></td>
                     <td className="px-4 py-3.5 text-right text-xs text-slate-600">{inventory.nombreComptees} / {inventory.nombreLignes}</td>
                     <td className="px-4 py-3.5 text-right text-xs text-slate-600">{inventory.nombreEcarts}</td>
                     <td className={`px-5 py-3.5 text-right text-xs font-bold ${inventory.valeurEcartTotal < 0 ? "text-rose-700" : "text-slate-800"}`}>{money.format(inventory.valeurEcartTotal)}</td>
@@ -274,7 +273,7 @@ export default function InventairesPage() {
               <div>
                 <div className="flex items-center gap-3">
                   <h2 className="text-lg font-bold text-slate-900">{selected.code}</h2>
-                  <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${statusLabels[selected.statut].className}`}>{statusLabels[selected.statut].label}</span>
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${statusLabels[selected.statut].className}`}>{statusLabels[selected.statut].label}</span>
                 </div>
                 <p className="mt-1 text-xs text-slate-500">
                   {selected.categorie ?? "Tout le catalogue"} · ouvert {dateTime(selected.ouvertLe)} par {selected.ouvertPar}
@@ -320,11 +319,11 @@ export default function InventairesPage() {
               <label className="flex items-center gap-2 text-xs font-semibold text-slate-600">
                 <input type="checkbox" checked={onlyGaps} onChange={(event) => setOnlyGaps(event.target.checked)} /> Écarts seulement
               </label>
-              <span className="ml-auto text-[11px] text-slate-500">{visibleLines.length} ligne(s)</span>
+              <span className="ml-auto text-xs text-slate-500">{visibleLines.length} ligne(s)</span>
             </div>
             <div className="max-h-[65vh] overflow-auto">
               <table className="w-full min-w-[920px] text-left">
-                <thead className="sticky top-0 bg-slate-50 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                <thead className="sticky top-0 bg-slate-50 text-xs font-semibold text-slate-600">
                   <tr><th className="px-5 py-3">Article</th><th className="px-3 py-3 text-right">Théorique</th><th className="px-3 py-3">Compté</th><th className="px-3 py-3 text-right">Écart</th><th className="px-3 py-3 text-right">Valeur</th><th className="px-3 py-3">Motif</th><th className="px-4 py-3">Commentaire</th></tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -334,7 +333,7 @@ export default function InventairesPage() {
                     const gap = line.ecart !== null && line.ecart !== 0;
                     return (
                       <tr key={line.articleId} className={gap ? "bg-amber-50/40" : ""}>
-                        <td className="px-5 py-2.5"><p className="text-xs font-bold text-slate-800">{line.designation}</p><p className="text-[10px] text-slate-400">{line.reference}{line.unite ? ` · ${line.unite}` : ""}</p></td>
+                        <td className="px-5 py-2.5"><p className="text-xs font-bold text-slate-800">{line.designation}</p><p className="text-xs text-slate-400">{line.reference}{line.unite ? ` · ${line.unite}` : ""}</p></td>
                         <td className="px-3 py-2.5 text-right text-xs text-slate-600">{line.stockTheorique}</td>
                         <td className="px-3 py-2.5">
                           {editable ? (
@@ -375,23 +374,23 @@ export default function InventairesPage() {
         <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-slate-950/50 p-4 print:hidden" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) setOpenModal(false); }}>
           <section role="dialog" aria-modal="true" aria-label="Ouvrir un inventaire" className="my-auto w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
             <h2 className="mb-1 text-base font-bold text-slate-900">Ouvrir un inventaire</h2>
-            <p className="mb-5 text-[11px] text-slate-500">Le stock théorique est figé à l’ouverture. Un seul inventaire peut être en cours à la fois.</p>
+            <p className="mb-5 text-xs text-slate-500">Le stock théorique est figé à l’ouverture. Un seul inventaire peut être en cours à la fois.</p>
             <form onSubmit={openInventory} className="space-y-4">
-              <label className="block"><span className="mb-1.5 block text-[10px] font-bold text-slate-600">Périmètre</span>
+              <label className="block"><span className="mb-1.5 block text-xs font-bold text-slate-600">Périmètre</span>
                 <select className="input-field" value={scope} onChange={(event) => setScope(event.target.value as "TOUT" | "CATEGORIE")}>
                   <option value="TOUT">Tout le catalogue</option>
                   <option value="CATEGORIE">Une catégorie (rayon)</option>
                 </select>
               </label>
               {scope === "CATEGORIE" && (
-                <label className="block"><span className="mb-1.5 block text-[10px] font-bold text-slate-600">Catégorie</span>
+                <label className="block"><span className="mb-1.5 block text-xs font-bold text-slate-600">Catégorie</span>
                   <select required className="input-field" value={categoryId} onChange={(event) => setCategoryId(event.target.value)}>
                     <option value="">Choisir une catégorie</option>
                     {categories.map((category) => <option key={category.id} value={category.id}>{category.nom}</option>)}
                   </select>
                 </label>
               )}
-              <label className="block"><span className="mb-1.5 block text-[10px] font-bold text-slate-600">Commentaire (facultatif)</span>
+              <label className="block"><span className="mb-1.5 block text-xs font-bold text-slate-600">Commentaire (facultatif)</span>
                 <input className="input-field" maxLength={500} value={comment} onChange={(event) => setComment(event.target.value)} placeholder="Ex. : inventaire de fin de mois" />
               </label>
               <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">

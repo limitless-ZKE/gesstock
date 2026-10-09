@@ -2,12 +2,10 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import axios from "axios";
 import {
   Banknote,
-  Barcode,
   Check,
   CheckCircle2,
   ChevronDown,
   CircleAlert,
-  Clock3,
   CreditCard,
   Minus,
   Package,
@@ -389,18 +387,8 @@ export default function CaissePage() {
 
   return (
     <div className="space-y-5">
-      <header className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
-        <div>
-          <p className="mb-1 text-xs font-bold uppercase tracking-[0.16em] text-emerald-600">Point de vente</p>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900">Caisse & ventes</h1>
-          <p className="mt-1.5 text-sm text-slate-500">Gérez la journée de caisse et encaissez vos ventes.</p>
-        </div>
-        <div className={`flex w-fit items-center gap-2 rounded-full px-3.5 py-2 text-xs font-bold ${
-          session ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
-        }`}>
-          <span className={`size-2 rounded-full ${session ? "bg-emerald-500" : "bg-amber-500"}`} />
-          {session ? `Caisse ouverte · ${session.code}` : "Caisse fermée"}
-        </div>
+      <header>
+        <h1 className="text-2xl font-bold text-slate-900">Caisse & ventes</h1>
       </header>
 
       {notice && (
@@ -432,7 +420,7 @@ export default function CaissePage() {
                 <h2 className="font-bold text-slate-900">Catalogue</h2>
                 <p className="mt-1 text-xs text-slate-500">{articles.length} articles au catalogue</p>
               </div>
-              <span className="grid size-10 place-items-center rounded-xl bg-slate-50 text-slate-500"><Barcode size={19} /></span>
+              
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
               <label className="relative min-w-0 flex-1">
@@ -486,14 +474,14 @@ export default function CaissePage() {
                       onClick={() => addToCart(article)}
                       className="group relative flex min-h-[160px] flex-col rounded-xl border border-slate-200 p-4 text-left transition hover:border-emerald-300 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-55"
                     >
-                      {inCart > 0 && <span className="absolute right-3 top-3 grid size-6 place-items-center rounded-full bg-emerald-600 text-[10px] font-bold text-white">{inCart}</span>}
-                      <div className="grid size-10 place-items-center rounded-xl bg-emerald-50 text-emerald-700 transition group-hover:bg-emerald-100"><Package size={19} /></div>
-                      <p className="mt-3 line-clamp-2 pr-5 text-sm font-bold text-slate-800">{article.designation}</p>
-                      <p className="mt-1 text-[10px] font-medium uppercase tracking-wide text-slate-400">{article.reference}{article.categorie ? ` · ${article.categorie}` : ""}</p>
+                      {inCart > 0 && <span className="absolute right-3 top-3 grid size-6 place-items-center rounded-full bg-emerald-600 text-xs font-bold text-white">{inCart}</span>}
+                      
+                      <p className="line-clamp-2 pr-7 text-base font-semibold text-slate-900">{article.designation}</p>
+                      <p className="mt-1 text-xs font-medium text-slate-400">{article.reference}{article.categorie ? ` · ${article.categorie}` : ""}</p>
                       <div className="mt-auto flex items-end justify-between gap-2 pt-4">
                         <div>
                           <p className="text-sm font-extrabold text-slate-900">{currency.format(article.prixVente)}</p>
-                          <p className={`mt-1 text-[10px] font-semibold ${outOfStock || lowStock ? "text-amber-700" : "text-slate-400"}`}>
+                          <p className={`mt-1 text-xs font-semibold ${outOfStock || lowStock ? "text-amber-700" : "text-slate-400"}`}>
                             Stock : {article.quantiteStock} {article.uniteMesure ?? ""}
                             {outOfStock ? " · Rupture" : lowStock ? " · Alerte" : ""}
                           </p>
@@ -511,7 +499,7 @@ export default function CaissePage() {
         <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="flex items-center justify-between border-b border-slate-100 p-5 md:p-6">
             <div className="flex items-center gap-3">
-              <div className="grid size-10 place-items-center rounded-xl bg-emerald-50 text-emerald-700"><ShoppingBag size={19} /></div>
+              
               <div><h2 className="font-bold text-slate-900">Panier de vente</h2><p className="mt-1 text-xs text-slate-500">{cart.reduce((count, line) => count + line.quantite, 0)} article(s)</p></div>
             </div>
             {cart.length > 0 && <button onClick={() => setCart([])} className="text-xs font-semibold text-slate-400 hover:text-rose-600">Vider</button>}
@@ -532,7 +520,7 @@ export default function CaissePage() {
             <div className="max-h-[335px] min-h-[150px] space-y-3 overflow-y-auto pr-1">
               {cart.length === 0 ? (
                 <div className="grid min-h-[150px] place-items-center rounded-xl border border-dashed border-slate-200 text-center">
-                  <div><ShoppingBag className="mx-auto text-slate-300" size={24} /><p className="mt-2 text-xs font-semibold text-slate-500">Votre panier est vide</p><p className="mt-1 text-[10px] text-slate-400">Ajoutez des articles depuis le catalogue.</p></div>
+                  <div><ShoppingBag className="mx-auto text-slate-300" size={24} /><p className="mt-2 text-xs font-semibold text-slate-500">Votre panier est vide</p><p className="mt-1 text-xs text-slate-400">Ajoutez des articles depuis le catalogue.</p></div>
                 </div>
               ) : cart.map((line) => {
                 const availablePromotions = promotionsForArticle(line.article.id, promotions);
@@ -547,7 +535,7 @@ export default function CaissePage() {
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="truncate text-xs font-bold text-slate-800">{line.article.designation}</p>
-                        <p className="mt-1 text-[10px] text-slate-400">{money2.format(unitPrice)} / {line.article.uniteMesure || "unité"}</p>
+                        <p className="mt-1 text-xs text-slate-400">{money2.format(unitPrice)} / {line.article.uniteMesure || "unité"}</p>
                       </div>
                       <button onClick={() => changeQuantity(line.article.id, 0)} className="rounded-md p-1 text-slate-300 hover:bg-rose-50 hover:text-rose-600" aria-label={`Retirer ${line.article.designation}`}><Trash2 size={15} /></button>
                     </div>
@@ -559,7 +547,7 @@ export default function CaissePage() {
                       </div>
                       <p className="text-xs font-extrabold text-slate-900">{money2.format(unitPrice * line.quantite)}</p>
                     </div>
-                    <label className="mt-3 flex items-center gap-2 text-[10px] font-semibold text-slate-600">
+                    <label className="mt-3 flex items-center gap-2 text-xs font-semibold text-slate-600">
                       <span className="shrink-0">Prix négocié</span>
                       <input
                         type="number"
@@ -577,22 +565,22 @@ export default function CaissePage() {
                       />
                     </label>
                     {negotiationError
-                      ? <p role="alert" className="mt-1 text-[10px] font-semibold text-rose-600">{negotiationError}</p>
+                      ? <p role="alert" className="mt-1 text-xs font-semibold text-rose-600">{negotiationError}</p>
                       : negotiatedDiscount > 0 && (
-                        <p className="mt-1 text-[10px] font-semibold text-emerald-700">
+                        <p className="mt-1 text-xs font-semibold text-emerald-700">
                           Remise négociée : −{money2.format(negotiatedDiscount)} / unité
                           {" "}(−{round2(negotiatedDiscount / line.article.prixVente * 100)} %)
                         </p>
                       )}
                     {availablePromotions.length > 0 && (
-                      <label className="mt-3 flex items-center gap-2 text-[10px] font-semibold text-emerald-700">
+                      <label className="mt-3 flex items-center gap-2 text-xs font-semibold text-emerald-700">
                         <span className="shrink-0">Remise</span>
                         <select
                           value={line.promotionId ?? ""}
                           onChange={(event) => setCart((current) => current.map((entry) => entry.article.id === line.article.id
                             ? { ...entry, promotionId: event.target.value ? Number(event.target.value) : null }
                             : entry))}
-                          className="min-w-0 flex-1 rounded-lg border border-emerald-100 bg-emerald-50 px-2 py-1.5 text-[10px] font-semibold outline-none"
+                          className="min-w-0 flex-1 rounded-lg border border-emerald-100 bg-emerald-50 px-2 py-1.5 text-xs font-semibold outline-none"
                         >
                           <option value="">Automatique · meilleure promo</option>
                           {availablePromotions.map((promotion) => (
@@ -624,11 +612,11 @@ export default function CaissePage() {
             <button
               onClick={beginCheckout}
               disabled={!cart.length || !session}
-              className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 text-sm font-bold text-white shadow-sm shadow-emerald-200 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none"
+              className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none"
             >
               <Banknote size={17} /> Encaisser {currency.format(cartTotals.total)}
             </button>
-            {!session && <p className="-mt-2 text-center text-[10px] font-medium text-amber-700">Ouvrez la caisse pour pouvoir valider une vente.</p>}
+            {!session && <p className="-mt-2 text-center text-xs font-medium text-amber-700">Ouvrez la caisse pour pouvoir valider une vente.</p>}
           </div>
         </section>
       </div>
@@ -690,37 +678,37 @@ function CashSessionPanel({
     <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:px-5">
       <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
         <div className="flex items-center gap-3">
-          <div className={`grid size-10 place-items-center rounded-xl ${session ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}><Clock3 size={18} /></div>
+          
           <div>
-            <p className="text-sm font-bold text-slate-800">{session ? "Session de caisse active" : "Aucune session ouverte"}</p>
-            <p className="mt-1 text-[11px] text-slate-500">
+            <p className="text-base font-semibold text-slate-900">{session ? "Session de caisse active" : "Aucune session ouverte"}</p>
+            <p className="mt-1 text-xs text-slate-500">
               {session ? `Journée du ${formatDay(session.journee)} · ${session.code} · Fond initial ${currency.format(session.fondDeCaisse)} · Ouverte à ${formatDateTime(session.ouverteLe)}` : "Ouvrez la journée de caisse : sa date est celle du serveur, elle ne se saisit pas."}
             </p>
           </div>
         </div>
         {session ? (
           <form onSubmit={onClose} className="flex flex-col gap-2 sm:flex-row sm:items-end">
-            <div className="rounded-lg bg-emerald-50 px-3 py-2.5 text-[10px] text-emerald-800">
-              <p className="font-bold">Solde théorique : {currency.format(session.soldeTheorique)}</p>
-              <p className="mt-0.5">Espèces ventes + règlements − sorties</p>
+            <div className="border-l-4 border-emerald-600 pl-3 text-sm">
+              <p className="font-semibold text-slate-900">Solde théorique : {currency.format(session.soldeTheorique)}</p>
+              <p className="text-slate-500">Espèces des ventes + règlements − sorties</p>
             </div>
             <label className="block">
-              <span className="mb-1.5 block text-[10px] font-bold text-slate-500">Espèces comptées (XOF)</span>
-              <input className="input-field h-10 sm:w-48" min="0" step="1" type="number" required value={closingAmount} onChange={(event) => onClosingAmount(event.target.value)} placeholder="Montant compté" />
+              <span className="mb-1.5 block text-sm font-semibold text-slate-700">Espèces comptées (XOF)</span>
+              <input className="input-field sm:w-48" min="0" step="1" type="number" required value={closingAmount} onChange={(event) => onClosingAmount(event.target.value)} placeholder="Montant compté" />
             </label>
-            <button disabled={busy} className="h-10 rounded-lg border border-rose-200 px-4 text-xs font-bold text-rose-700 hover:bg-rose-50 disabled:opacity-50">{busy ? "Clôture…" : "Clôturer la caisse"}</button>
+            <button disabled={busy} className="button-secondary border-rose-300 text-rose-800 hover:bg-rose-50">{busy ? "Clôture…" : "Clôturer la caisse"}</button>
           </form>
         ) : (
           <form onSubmit={onOpen} className="flex flex-col gap-2 sm:flex-row sm:items-end">
             <label className="block">
-              <span className="mb-1.5 block text-[10px] font-bold text-slate-500">Fond initial (XOF)</span>
-              <input className="input-field h-10 sm:w-48" min="0" step="1" type="number" required value={openingAmount} onChange={(event) => onOpeningAmount(event.target.value)} placeholder="Ex. 50 000" />
+              <span className="mb-1.5 block text-sm font-semibold text-slate-700">Fond initial (XOF)</span>
+              <input className="input-field sm:w-48" min="0" step="1" type="number" required value={openingAmount} onChange={(event) => onOpeningAmount(event.target.value)} placeholder="Ex. 50 000" />
             </label>
-            <button disabled={busy} className="h-10 rounded-lg bg-emerald-600 px-4 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50">{busy ? "Ouverture…" : "Ouvrir la caisse"}</button>
+            <button disabled={busy} className="button-primary">{busy ? "Ouverture…" : "Ouvrir la caisse"}</button>
           </form>
         )}
       {session?.journeeDepassee && (
-        <p role="alert" className="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-800">
+        <p role="alert" className="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
           <CircleAlert size={14} className="mt-0.5 shrink-0" />
           La journée du {formatDay(session.journee)} n’a pas été clôturée. Comptez les espèces et clôturez-la : les ventes et l’ouverture de la journée d’aujourd’hui sont bloquées tant qu’elle reste ouverte.
         </p>
@@ -759,7 +747,7 @@ function PaymentModal({
     <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-slate-950/50 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose(); }}>
       <form onSubmit={onSubmit} className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
         <div className="flex items-start justify-between">
-          <div><p className="text-xs font-bold uppercase tracking-wider text-emerald-600">Finaliser la vente</p><h2 className="mt-1 text-xl font-bold text-slate-900">Règlement</h2></div>
+          <div><h2 className="mt-1 text-xl font-bold text-slate-900">Règlement</h2></div>
           <button type="button" onClick={onClose} disabled={busy} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100" aria-label="Fermer"><X size={18} /></button>
         </div>
         <div className="mt-5 rounded-xl bg-slate-50 p-4">
@@ -785,7 +773,7 @@ function PaymentModal({
             ))}
           </div>
         </fieldset>
-        {draftCreated && <p className="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-[11px] font-medium text-amber-800">Le brouillon est déjà enregistré. Les informations de règlement sont verrouillées pendant la nouvelle tentative de validation.</p>}
+        {draftCreated && <p className="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">Le brouillon est déjà enregistré. Les informations de règlement sont verrouillées pendant la nouvelle tentative de validation.</p>}
         <label className="mt-5 block">
           <span className="mb-2 block text-xs font-bold text-slate-700">{paymentMode === "ESPECES" ? "Montant reçu (XOF)" : "Montant encaissé (XOF)"}</span>
           <input autoFocus disabled={draftCreated} className="input-field h-12 text-base font-bold" min={amount} step="any" type="number" required value={amountReceived} onChange={(event) => onAmountReceived(event.target.value)} />
