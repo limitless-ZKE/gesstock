@@ -61,6 +61,15 @@ describe("menu de navigation selon les rôles", () => {
     expect(liensVisibles()).toEqual(TOUS_LES_LIENS);
   });
 
+  it("la liste des liens défile seule : sinon, sur un écran bas, les derniers écrans sont inaccessibles", async () => {
+    afficher(["ADMIN"]);
+    await screen.findByText("Caisse ouverte");
+    // jsdom ne calcule aucune mise en page : on garde les deux classes qui rendent le défilement possible
+    // (la vraie vérification se fait dans un navigateur, écran réduit).
+    const zone = screen.getByRole("navigation").parentElement;
+    expect(zone).toHaveClass("overflow-y-auto", "min-h-0", "flex-1");
+  });
+
   it("affiche l'écran demandé dans la zone de contenu", async () => {
     afficher(["CAISSIER"]);
     expect(await screen.findByText("Écran de caisse")).toBeInTheDocument();
