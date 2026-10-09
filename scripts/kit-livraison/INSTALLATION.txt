@@ -1,0 +1,162 @@
+﻿GESSTOCK - INSTALLATION CHEZ LE CLIENT, PAS À PAS
+==================================================
+
+Durée : environ 1 heure (dont 15 minutes d'attente). À faire sur le PC qui servira de SERVEUR.
+Les autres postes (caisses, bureau, téléphone…) n'ont rien à installer : un navigateur (Chrome ou Edge) leur suffit.
+
+
+CE QU'IL FAUT AVOIR SOUS LA MAIN
+--------------------------------
+  [ ] Un PC Windows 10 ou 11 qui restera ALLUMÉ pendant les heures d'ouverture (le serveur).
+  [ ] Les postes et le serveur sur le même réseau (même box / même routeur, en câble ou en Wi-Fi).
+  [ ] Une connexion Internet, juste pour télécharger Java et MySQL aujourd'hui (GesStock lui-même n'en a pas besoin).
+  [ ] Une clé USB ou un disque externe (pour la copie de secours des sauvegardes, étape 6).
+  [ ] Un papier et un stylo : vous allez noter 3 mots de passe.
+
+
+ÉTAPE 1 - Installer Java (5 min)
+--------------------------------
+  1. Sur le PC serveur, ouvrez  https://adoptium.net  et téléchargez "Temurin 17", version Windows x64, fichier .msi
+     (le JRE suffit, le JDK convient aussi).
+  2. Double-cliquez sur le fichier, choisissez "Suivant" partout. À l'écran des options, laissez cochées
+     "Add to PATH" et "Set JAVA_HOME".
+  3. Terminez l'installation.
+
+
+ÉTAPE 2 - Installer MySQL (15 min)
+----------------------------------
+  1. Ouvrez  https://dev.mysql.com/downloads/installer/  et téléchargez "MySQL Installer" (le plus gros fichier,
+     "Windows (x86, 32-bit), MSI Installer"). Pas besoin de compte : cliquez sur "No thanks, just start my download".
+  2. Lancez-le, choisissez "Server only" (serveur seulement), puis "Suivant"/"Execute".
+  3. À l'écran "Type and Networking" : laissez "Server Computer", port 3306. Ne touchez à rien d'autre.
+  4. À l'écran "Accounts and Roles" : choisissez un mot de passe pour "root" (l'administrateur de MySQL).
+     NOTEZ-LE SUR VOTRE PAPIER (mot de passe n° 1). Ne créez pas d'autre utilisateur ici.
+  5. À l'écran "Windows Service" : laissez cochés "Configure MySQL Server as a Windows Service" et
+     "Start the MySQL Server at System Startup" (c'est ce qui le fait démarrer tout seul avec le PC).
+  6. Terminez ("Execute", puis "Finish").
+
+
+ÉTAPE 3 - Créer la base de données de GesStock (5 min)
+------------------------------------------------------
+  1. Menu Démarrer > tapez "MySQL 8.4 Command Line Client" > ouvrez-le. Tapez le mot de passe root (n° 1), Entrée.
+  2. Collez les 3 lignes ci-dessous, une par une, en remplaçant UN-MOT-DE-PASSE-SOLIDE par un mot de passe de
+     votre choix (lettres et chiffres, 12 caractères ou plus ; pas d'espace, ni de & % ^ ! " \ ).
+     NOTEZ-LE SUR VOTRE PAPIER (mot de passe n° 2). Terminez chaque ligne par Entrée :
+
+       CREATE DATABASE gesstock_db CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+       CREATE USER 'gesstock'@'localhost' IDENTIFIED BY 'UN-MOT-DE-PASSE-SOLIDE';
+       GRANT ALL PRIVILEGES ON gesstock_db.* TO 'gesstock'@'localhost';
+
+     Chaque ligne doit répondre "Query OK". Tapez ensuite  exit  et fermez la fenêtre.
+
+
+ÉTAPE 4 - Copier GesStock sur le serveur (2 min)
+------------------------------------------------
+  1. Faites un clic droit sur GesStock-AAAA-MM-JJ.zip > "Extraire tout…" et choisissez comme destination  C:\
+     Vous obtenez le dossier  C:\GesStock  (gardez ce chemin simple : pas sur le Bureau, pas dans Téléchargements).
+  2. Il contient notamment : gesstock.jar (le programme), configuration.cmd (les réglages), installer.cmd.
+
+
+ÉTAPE 5 - Donner au serveur une adresse fixe (10 min)
+-----------------------------------------------------
+  Les postes retrouvent GesStock grâce à l'adresse du serveur. Si elle change, plus personne ne peut se connecter.
+  1. Sur le serveur : touche Windows + R, tapez  cmd , Entrée. Tapez  ipconfig , Entrée.
+     Repérez "Adresse IPv4" (par exemple 192.168.1.23). C'est l'adresse actuelle du serveur.
+  2. Pour la FIXER (une des deux méthodes) :
+     - Dans la box/le routeur, "réservation DHCP" (ou "bail statique") de cette adresse pour ce PC ; ou
+     - Sur le PC : Paramètres > Réseau et Internet > (votre connexion) > Propriétés > "Attribution d'adresse IP" >
+       Modifier > Manuel > IPv4 activé : adresse = celle notée, masque 255.255.255.0, passerelle = l'adresse de la box
+       (souvent 192.168.1.1), DNS = 8.8.8.8.
+  3. Notez l'adresse choisie : elle sert à l'étape suivante et à tous les postes.
+
+
+ÉTAPE 6 - Renseigner les réglages (10 min)
+------------------------------------------
+  Ouvrez  C:\GesStock\configuration.cmd  avec le Bloc-notes (clic droit > Ouvrir avec > Bloc-notes), puis modifiez :
+
+  - ADRESSE_SERVEUR      l'adresse fixe de l'étape 5 (ex. 192.168.1.23)
+  - MYSQL_MOT_DE_PASSE   le mot de passe n° 2 de l'étape 3
+  - FUSEAU_HORAIRE       celui du pays du client (la liste d'exemples est dans le fichier)
+  - TAUX_TVA / PRIX_TTC  0 et false si le client n'applique pas la TVA
+  - DOSSIER_COPIE_SAUVEGARDE
+                         INDISPENSABLE : la lettre de la clé USB / du disque externe + un dossier,
+                         par exemple  E:\Sauvegardes-GesStock  (laissez la clé branchée en permanence sur le serveur).
+                         Sans cela, une panne du disque du serveur détruirait aussi les sauvegardes.
+  - Le premier administrateur : retirez le mot "rem " au début des 2 lignes APP_ADMIN_USERNAME et APP_ADMIN_PASSWORD,
+    gardez ou changez le nom (ex. patron) et mettez un mot de passe de 12 caractères au moins
+    (mot de passe n° 3 : c'est celui avec lequel le patron se connectera la première fois).
+
+  Enregistrez (Ctrl+S) et fermez le Bloc-notes.
+
+
+ÉTAPE 7 - Installer GesStock (5 min d'action + attente)
+-------------------------------------------------------
+  1. Double-cliquez sur  installer.cmd . Windows demande l'autorisation : répondez "Oui".
+  2. Une fenêtre bleue affiche les actions : démarrage automatique, sauvegarde quotidienne, pare-feu.
+  3. Patientez : le premier démarrage prépare la base et prend 2 à 3 minutes (des points s'affichent).
+  4. Le message vert "GesStock fonctionne" apparaît avec l'adresse à utiliser. Appuyez sur une touche pour fermer.
+  Si un message rouge apparaît, lisez-le : il dit quoi corriger (voir "Si ça ne marche pas", plus bas).
+
+
+ÉTAPE 8 - Premier test depuis un AUTRE poste (5 min)
+----------------------------------------------------
+  1. Sur un autre PC du réseau, ouvrez Chrome ou Edge et tapez l'adresse affichée, par exemple
+     http://192.168.1.23:8080
+  2. Connectez-vous avec l'identifiant et le mot de passe n° 3 de l'étape 6.
+  3. Ouvrez la page "Entreprise" : saisissez le nom, l'adresse, le téléphone et le logo du client
+     (ils apparaîtront sur les tickets, factures et rapports).
+  4. Créez les comptes du personnel (gérant, gestionnaire, caissiers), un par personne.
+  5. De retour sur le serveur, ouvrez  configuration.cmd  et remettez "rem " devant les 2 lignes APP_ADMIN
+     (ou effacez-les). Elles ne servent plus : le compte existe maintenant dans la base.
+
+
+ÉTAPE 9 - Tester la sauvegarde (2 min)
+--------------------------------------
+  1. Sur le serveur, double-cliquez sur  sauvegarder-base.cmd .
+  2. Le message "Sauvegarde réussie" doit s'afficher. Vérifiez qu'un fichier  gesstock_db-DATE.zip  est apparu dans
+     C:\GesStock\sauvegardes  ET dans le dossier de la clé USB.
+  3. La sauvegarde automatique se fera ensuite chaque soir à l'heure choisie (22:00 par défaut).
+
+
+ÉTAPE 10 - Tester le redémarrage (5 min)
+----------------------------------------
+  1. Redémarrez le PC serveur (Démarrer > Redémarrer). Ne vous connectez même pas à Windows si vous voulez.
+  2. Attendez 3 minutes, puis rouvrez l'adresse de GesStock depuis un autre poste.
+  3. Elle doit s'ouvrir toute seule. Si oui, le serveur survivra aux coupures de courant et aux mises à jour Windows.
+
+  Réglez aussi : Paramètres > Système > Alimentation > Mise en veille : "Jamais" (un PC en veille n'est plus un serveur).
+
+
+REMISE AU CLIENT - LISTE DE CONTRÔLE
+------------------------------------
+  [ ] Les 3 mots de passe sont notés et remis au patron dans une enveloppe fermée (pas par message).
+  [ ] L'adresse de GesStock est écrite sur un papier collé près de chaque poste.
+  [ ] Une sauvegarde apparaît bien sur la clé USB, et la clé reste branchée sur le serveur.
+  [ ] Le serveur ne se met jamais en veille.
+  [ ] Le patron a le fichier EXPLOITATION.txt (vie quotidienne, restauration, mise à jour).
+  [ ] Un test d'encaissement complet a été fait avec le caissier devant le patron.
+
+
+SI ÇA NE MARCHE PAS
+-------------------
+  "ERREUR : Java 17 ou plus est introuvable"
+      > refaites l'étape 1, puis relancez installer.cmd.
+
+  "GesStock ne répond pas encore" après 6 minutes
+      > ouvrez C:\GesStock\journaux\gesstock.log et regardez les dernières lignes :
+        - "Access denied for user" ou "Communications link failure" : mot de passe MySQL (n° 2) ou nom de base
+          incorrects dans configuration.cmd, ou MySQL arrêté (Démarrer > Services > MySQL84 > Démarrer).
+        - "Port 8080 was already in use" : un autre programme utilise ce port ; changez PORT dans configuration.cmd
+          (ex. 8085), puis relancez installer.cmd.
+      Après avoir corrigé configuration.cmd, relancez simplement installer.cmd (il remplace l'installation précédente).
+
+  La page s'ouvre sur le serveur mais PAS depuis les autres postes
+      > vérifiez que l'adresse tapée est bien celle du serveur (étape 5), et que le pare-feu d'un antivirus
+        tiers (Kaspersky, ESET, Avast…) autorise le port 8080 ; ensuite essayez en Wi-Fi/câble sur le même réseau.
+
+  "Impossible de créer le premier administrateur"
+      > le mot de passe APP_ADMIN_PASSWORD doit faire 12 caractères au moins.
+
+  Tout recommencer proprement
+      > desinstaller.cmd retire le démarrage automatique (ni la base ni les sauvegardes ne sont touchées),
+        puis relancez installer.cmd.
