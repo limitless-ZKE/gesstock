@@ -50,6 +50,11 @@ public interface VenteRepository extends JpaRepository<Vente, Long> {
     List<Vente> findByStatutAndDateVenteGreaterThanEqualAndDateVenteLessThan(
         StatutVente statut, LocalDateTime debut, LocalDateTime fin);
 
+    /** Les ventes rattachées à une session de caisse, dans l'ordre du temps (journal de caisse). */
+    @EntityGraph(attributePaths = {"client", "vendeur"})
+    List<Vente> findBySessionCaisseIdAndStatutInOrderByDateVenteAscIdAsc(
+        Long sessionId, java.util.Collection<StatutVente> statuts);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select v from Vente v where v.id = :id")
     java.util.Optional<Vente> findByIdForUpdate(@Param("id") Long id);
