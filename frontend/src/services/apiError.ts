@@ -47,6 +47,21 @@ export function parseApiError(error: unknown, fallback = "Une erreur est survenu
   return { status: null, code: null, message: fallback, fieldErrors: {}, requestId: null };
 }
 
+/**
+ * Un téléchargement (responseType « blob ») qui échoue renvoie l'erreur du serveur DANS un blob : on le relit pour que le message
+ * du serveur (« période trop longue »…) arrive à l'écran au lieu d'un texte de repli. À appeler avant apiErrorMessage.
+ */
+export async function lireErreurDeFichier(error: unknown): Promise<unknown> {
+  if (axios.isAxiosError(error) && error.response?.data instanceof Blob) {
+    try {
+      error.response.data = JSON.parse(await error.response.data.text());
+    } catch {
+      // corps qui n'est pas du JSON : le texte de repli suffit
+    }
+  }
+  return error;
+}
+
 /** Le message à afficher : celui du serveur s'il en a donné un, sinon le texte de repli de l'écran. */
 export function apiErrorMessage(error: unknown, fallback = "Une erreur est survenue."): string {
   return parseApiError(error, fallback).message;
