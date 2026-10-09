@@ -172,13 +172,13 @@ export default function CompteFournisseurModal({ supplier, canCreateCredit, onCl
           <div className="space-y-6">
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="rounded-xl border border-slate-200 p-4">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Nous lui devons</p>
+                <p className="text-xs font-semibold text-slate-600">Nous lui devons</p>
                 <p className={`mt-1 text-2xl font-bold ${account.soldeDu > 0 ? "text-rose-700" : "text-slate-900"}`}>{money.format(account.soldeDu)}</p>
               </div>
               <div className="rounded-xl border border-slate-200 p-4">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Crédit chez lui (avoirs)</p>
+                <p className="text-xs font-semibold text-slate-600">Crédit chez lui (avoirs)</p>
                 <p className={`mt-1 text-2xl font-bold ${account.creditDisponible > 0 ? "text-emerald-700" : "text-slate-900"}`}>{money.format(account.creditDisponible)}</p>
-                {account.creditDisponible > 0 && <p className="mt-1 text-[10px] text-slate-500">Il sera déduit automatiquement de ses prochains bons.</p>}
+                {account.creditDisponible > 0 && <p className="mt-1 text-xs text-slate-500">Il sera déduit automatiquement de ses prochains bons.</p>}
               </div>
             </div>
 
@@ -186,7 +186,7 @@ export default function CompteFournisseurModal({ supplier, canCreateCredit, onCl
               <h3 className="mb-2 text-sm font-bold text-slate-900">Dettes (un bon reçu = une dette)</h3>
               <div className="overflow-x-auto rounded-xl border border-slate-200">
                 <table className="w-full min-w-[640px] text-left">
-                  <thead className="bg-slate-50 text-[9px] font-bold uppercase tracking-wider text-slate-400">
+                  <thead className="bg-slate-50 text-xs font-semibold text-slate-600">
                     <tr><th className="px-4 py-2.5">Bon</th><th className="px-3 py-2.5">Reçu le</th><th className="px-3 py-2.5 text-right">Montant</th><th className="px-3 py-2.5 text-right">Réglé</th><th className="px-3 py-2.5 text-right">Reste</th><th className="px-3 py-2.5">Statut</th><th className="px-4 py-2.5 text-right"><span className="sr-only">Actions</span></th></tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -205,7 +205,7 @@ export default function CompteFournisseurModal({ supplier, canCreateCredit, onCl
                           <td className="px-3 py-2.5 text-right text-xs text-slate-600">{money.format(debt.montantInitial)}</td>
                           <td className="px-3 py-2.5 text-right text-xs text-slate-600">{money.format(debt.montantRegle)}</td>
                           <td className="px-3 py-2.5 text-right text-xs font-bold text-slate-900">{money.format(debt.solde)}</td>
-                          <td className="px-3 py-2.5"><span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${statusLabel[debt.statut].className}`}>{statusLabel[debt.statut].label}</span></td>
+                          <td className="px-3 py-2.5"><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${statusLabel[debt.statut].className}`}>{statusLabel[debt.statut].label}</span></td>
                           <td className="px-4 py-2.5 text-right">
                             {(debt.statut === "EN_COURS" || debt.statut === "PARTIELLEMENT_REGLEE") && (
                               <button className="button-secondary h-8 px-3 text-xs" onClick={() => startPayment(debt)}><Banknote size={13} /> Payer</button>
@@ -216,11 +216,11 @@ export default function CompteFournisseurModal({ supplier, canCreateCredit, onCl
                           <tr className="bg-slate-50/60">
                             <td colSpan={7} className="px-4 py-3">
                               {debt.reglements.length === 0 ? (
-                                <p className="text-[11px] text-slate-400">Aucun règlement pour ce bon.</p>
+                                <p className="text-xs text-slate-400">Aucun règlement pour ce bon.</p>
                               ) : (
                                 <ul className="space-y-1">
                                   {debt.reglements.map((item) => (
-                                    <li key={item.id} className="flex flex-wrap items-center gap-x-3 text-[11px] text-slate-600">
+                                    <li key={item.id} className="flex flex-wrap items-center gap-x-3 text-xs text-slate-600">
                                       <span className="w-28 text-slate-400">{dayTime(item.dateReglement)}</span>
                                       <span className="w-24 text-right font-semibold text-slate-800">{money.format(item.montant)}</span>
                                       <span>{item.source === "AVOIR" ? "Avoir imputé" : modeLabel(item.modeReglement)}</span>
@@ -244,20 +244,20 @@ export default function CompteFournisseurModal({ supplier, canCreateCredit, onCl
               <form onSubmit={(event) => void submitPayment(event)} className="space-y-3 rounded-xl border border-emerald-200 bg-emerald-50/40 p-4">
                 <p className="text-xs font-bold text-slate-900">Payer le bon {paying.numeroBon} <span className="font-normal text-slate-500">· reste {money.format(paying.solde)}</span></p>
                 <div className="grid gap-3 sm:grid-cols-3">
-                  <label className="block"><span className="mb-1.5 block text-[10px] font-bold text-slate-600">Montant (XOF)</span>
+                  <label className="block"><span className="mb-1.5 block text-xs font-bold text-slate-600">Montant (XOF)</span>
                     <input required autoFocus type="number" min="0.0001" max={paying.solde} step="any" className="input-field" value={payment.montant} onChange={(event) => setPayment({ ...payment, montant: event.target.value })} />
                   </label>
-                  <label className="block"><span className="mb-1.5 block text-[10px] font-bold text-slate-600">Mode de règlement</span>
+                  <label className="block"><span className="mb-1.5 block text-xs font-bold text-slate-600">Mode de règlement</span>
                     <select className="input-field" value={payment.mode} onChange={(event) => setPayment({ ...payment, mode: event.target.value })}>
                       {modes.map((mode) => <option key={mode.value} value={mode.value}>{mode.label}</option>)}
                     </select>
                   </label>
-                  <label className="block"><span className="mb-1.5 block text-[10px] font-bold text-slate-600">Référence (facultatif)</span>
+                  <label className="block"><span className="mb-1.5 block text-xs font-bold text-slate-600">Référence (facultatif)</span>
                     <input maxLength={80} className="input-field" value={payment.reference} onChange={(event) => setPayment({ ...payment, reference: event.target.value })} placeholder="N° de chèque, de virement…" />
                   </label>
                 </div>
                 {payment.mode === "ESPECES" && (
-                  <p className="text-[11px] text-slate-600">L’argent sort de la caisse : une session de caisse ouverte avec assez d’espèces est nécessaire.</p>
+                  <p className="text-xs text-slate-600">L’argent sort de la caisse : une session de caisse ouverte avec assez d’espèces est nécessaire.</p>
                 )}
                 <div className="flex justify-end gap-2">
                   <button type="button" disabled={busy} className="button-secondary" onClick={() => setPaying(null)}>Annuler</button>
@@ -276,14 +276,14 @@ export default function CompteFournisseurModal({ supplier, canCreateCredit, onCl
               {creditOpen && (
                 <form onSubmit={(event) => void submitCredit(event)} className="mb-3 space-y-3 rounded-xl border border-slate-200 p-4">
                   <div className="grid gap-3 sm:grid-cols-3">
-                    <label className="block"><span className="mb-1.5 block text-[10px] font-bold text-slate-600">Montant (XOF)</span>
+                    <label className="block"><span className="mb-1.5 block text-xs font-bold text-slate-600">Montant (XOF)</span>
                       <input required autoFocus type="number" min="0.0001" step="any" className="input-field" value={credit.montant} onChange={(event) => setCredit({ ...credit, montant: event.target.value })} />
                     </label>
-                    <label className="block sm:col-span-2"><span className="mb-1.5 block text-[10px] font-bold text-slate-600">Motif</span>
+                    <label className="block sm:col-span-2"><span className="mb-1.5 block text-xs font-bold text-slate-600">Motif</span>
                       <input required maxLength={300} className="input-field" value={credit.motif} onChange={(event) => setCredit({ ...credit, motif: event.target.value })} placeholder="Ex. : ristourne de fin d’année" />
                     </label>
                   </div>
-                  <p className="text-[11px] text-slate-500">L’avoir efface aussitôt les dettes les plus anciennes ; ce qui dépasse reste en crédit pour les prochains bons.</p>
+                  <p className="text-xs text-slate-500">L’avoir efface aussitôt les dettes les plus anciennes ; ce qui dépasse reste en crédit pour les prochains bons.</p>
                   <div className="flex justify-end gap-2">
                     <button type="button" disabled={busy} className="button-secondary" onClick={() => setCreditOpen(false)}>Annuler</button>
                     <button disabled={busy} className="button-primary">{busy ? <LoaderCircle size={14} className="animate-spin" /> : <Plus size={14} />} Enregistrer l’avoir</button>
@@ -292,7 +292,7 @@ export default function CompteFournisseurModal({ supplier, canCreateCredit, onCl
               )}
               <div className="overflow-x-auto rounded-xl border border-slate-200">
                 <table className="w-full min-w-[560px] text-left">
-                  <thead className="bg-slate-50 text-[9px] font-bold uppercase tracking-wider text-slate-400">
+                  <thead className="bg-slate-50 text-xs font-semibold text-slate-600">
                     <tr><th className="px-4 py-2.5">Date</th><th className="px-3 py-2.5">Motif</th><th className="px-3 py-2.5 text-right">Montant</th><th className="px-3 py-2.5 text-right">Utilisé</th><th className="px-4 py-2.5 text-right">Disponible</th></tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -300,7 +300,7 @@ export default function CompteFournisseurModal({ supplier, canCreateCredit, onCl
                     {account.avoirs.map((item) => (
                       <tr key={item.id}>
                         <td className="px-4 py-2.5 text-xs text-slate-600">{dayTime(item.dateCreation)}</td>
-                        <td className="px-3 py-2.5 text-xs text-slate-700">{item.motif}<span className="ml-2 text-[10px] text-slate-400">par {item.creePar}</span></td>
+                        <td className="px-3 py-2.5 text-xs text-slate-700">{item.motif}<span className="ml-2 text-xs text-slate-400">par {item.creePar}</span></td>
                         <td className="px-3 py-2.5 text-right text-xs text-slate-600">{money.format(item.montant)}</td>
                         <td className="px-3 py-2.5 text-right text-xs text-slate-600">{money.format(item.montantUtilise)}</td>
                         <td className="px-4 py-2.5 text-right text-xs font-bold text-slate-900">{money.format(item.restant)}</td>

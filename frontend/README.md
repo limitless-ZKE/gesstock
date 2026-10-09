@@ -43,6 +43,19 @@ morceau « socle » stable, qui reste en cache d'une version à l'autre.
 `/statistiques`, `/entreprise` et `/admin/utilisateurs`. Le menu n'affiche que ce que le rôle de la personne connectée peut utiliser ; le serveur
 refuse de toute façon le reste.
 
+## Charte graphique
+
+Tout part de `src/index.css` : les échelles Tailwind `slate` (neutres) et `emerald` (le vert sapin de la marque) y sont **redéfinies**, de même
+que les angles (`--radius-*`) et les ombres (`--shadow-*`). Les écrans gardent leurs classes (`bg-emerald-600`, `text-slate-500`…) : changer une
+teinte se fait à un seul endroit. Principes : une seule couleur de marque (l'ambre et le rouge ne servent qu'à signaler), peu d'ombres, pas de
+pastille d'icône décorative, pas d'étiquette en majuscules au-dessus des titres, textes de 12 px au minimum, contrastes AA (calculés, voir le
+commentaire en tête de `index.css`), chiffres de largeur fixe pour aligner les colonnes. Les composants réutilisables sont `Indicateur` (un
+chiffre et son libellé) et `Marque` (le logo : trois barres de stock décroissantes). Le menu groupe les écrans (Vente, Stock, Gestion) et porte
+le nom de l'entreprise renseigné dans l'écran Entreprise. La police, **Atkinson Hyperlegible Next** (conçue pour ne pas confondre 1/7 ou 0/O ; son
+zéro est barré), est embarquée par `@fontsource-variable` : aucun appel à Internet. Les documents imprimés (tickets, reçus) gardent leur mise
+en page d'origine, réglée pour le papier. Le graphique du tableau de bord applique les règles de lisibilité des graphiques : colonnes fines, un seul ton, valeur sur le jour en
+cours et le meilleur jour seulement, info-bulle au survol et au clavier, tableau de secours.
+
 ## Documents imprimables : en-tête de l'entreprise
 
 Nom, coordonnées et logo viennent de l'écran **Entreprise** (ADMIN et MANAGER), jamais du code. `EntrepriseProvider` les charge après

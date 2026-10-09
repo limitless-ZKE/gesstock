@@ -19,7 +19,6 @@ import {
   Smartphone,
   Trash2,
   UserRound,
-  UsersRound,
   WalletCards,
   X,
 } from "lucide-react";
@@ -30,6 +29,7 @@ import ApprobationModal, { type Approbation } from "../components/ApprobationMod
 import EnTeteDocument from "../components/EnTeteDocument";
 import { imprimer } from "../lib/impression";
 import { money as currency } from "../lib/format";
+import Indicateur from "../components/Indicateur";
 
 type Client = { id: number; nom: string; email: string | null; telephone: string | null; adresse: string | null; nombreAchats: number };
 type Article = { id: number; reference: string; designation: string; prixVente: number; quantiteStock: number };
@@ -513,24 +513,24 @@ export default function ClientsDettesPage() {
   return <>
     <div className="space-y-6 print:hidden">
       <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-        <div><p className="mb-1 text-xs font-bold uppercase tracking-[0.16em] text-emerald-600">Espace clients</p><h1 className="text-3xl font-bold tracking-tight text-slate-900">Clients, proformas & dettes</h1><p className="mt-1.5 text-sm text-slate-500">Gérez les comptes clients, les offres commerciales et les règlements.</p></div>
+        <div><h1 className="text-2xl font-bold text-slate-900">Clients, proformas & dettes</h1><p className="mt-1.5 text-sm text-slate-500">Gérez les comptes clients, les offres commerciales et les règlements.</p></div>
         <button onClick={() => tab === "clients" ? openClientForm("new") : openProformaForm("new")} className="button-primary">{tab === "clients" ? <UserRound size={16} /> : <CirclePlus size={16} />}{tab === "clients" ? "Nouveau client" : "Nouvelle proforma"}</button>
       </header>
 
       {notice && <div role={noticeError ? "alert" : "status"} className={`flex items-start gap-2 rounded-xl border px-4 py-3 text-xs font-semibold ${noticeError ? "border-rose-200 bg-rose-50 text-rose-800" : "border-emerald-200 bg-emerald-50 text-emerald-800"}`}><CheckCircle2 size={15} className="mt-0.5 shrink-0" /><span>{notice}</span><button className="ml-auto" onClick={() => setNotice("")} aria-label="Fermer"><X size={15} /></button></div>}
 
       <section className="grid gap-3 sm:grid-cols-3">
-        <Metric title="Clients enregistrés" count={clients.length} icon={<UsersRound size={18} />} />
-        <Metric title="Proformas en cours" count={proformas.filter((item) => item.statut === "BROUILLON" || item.statut === "ENVOYEE" || item.statut === "ACCEPTEE").length} icon={<FileText size={18} />} />
-        <div className="flex items-center justify-between rounded-2xl border border-orange-200 bg-orange-50 p-4 shadow-sm"><div><p className="text-xs font-semibold text-orange-700">Total des créances</p><p className="mt-1 text-xl font-extrabold text-orange-900">{currency.format(totalDue)}</p><p className="mt-1 text-[10px] font-medium text-orange-700">{unpaidDebtCount} dette(s) non soldée(s)</p></div><span className="grid size-10 place-items-center rounded-xl bg-white text-orange-600"><CircleDollarSign size={18} /></span></div>
+        <Metric title="Clients enregistrés" count={clients.length} />
+        <Metric title="Proformas en cours" count={proformas.filter((item) => item.statut === "BROUILLON" || item.statut === "ENVOYEE" || item.statut === "ACCEPTEE").length} />
+        <Indicateur libelle="Total des créances" valeur={currency.format(totalDue)} note={`${unpaidDebtCount} dette(s) non soldée(s)`} accent={totalDue > 0} />
       </section>
 
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="flex flex-col gap-3 border-b border-slate-100 p-4 md:flex-row md:items-center md:justify-between md:px-5">
           <div className="flex w-fit gap-1 rounded-xl bg-slate-100 p-1">
-            <TabButton active={tab === "clients"} onClick={() => { setTab("clients"); setSearch(""); }} icon={<UsersRound size={14} />}>Clients</TabButton>
-            <TabButton active={tab === "proformas"} onClick={() => { setTab("proformas"); setSearch(""); }} icon={<FileText size={14} />}>Proformas</TabButton>
-            <TabButton active={tab === "debts"} onClick={() => { setTab("debts"); setSearch(""); }} icon={<CircleDollarSign size={14} />}>Dettes & règlements</TabButton>
+            <TabButton active={tab === "clients"} onClick={() => { setTab("clients"); setSearch(""); }}>Clients</TabButton>
+            <TabButton active={tab === "proformas"} onClick={() => { setTab("proformas"); setSearch(""); }}>Proformas</TabButton>
+            <TabButton active={tab === "debts"} onClick={() => { setTab("debts"); setSearch(""); }}>Dettes & règlements</TabButton>
           </div>
           <label className="relative block w-full md:max-w-xs"><Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input className="input-field pl-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={tab === "clients" ? "Rechercher un client…" : tab === "proformas" ? "Rechercher un proforma…" : "Client ou numéro de vente…"} /></label>
         </div>
@@ -540,7 +540,7 @@ export default function ClientsDettesPage() {
           {tab === "proformas" && <ProformasTable proformas={filteredProformas} loading={loading} busyId={busyProformaId} convertCreditId={convertCreditId} onConvertCredit={setConvertCreditId} onEdit={openProformaForm} onStatus={(proforma, status) => void updateProformaStatus(proforma, status)} onConvert={(proforma) => void convertProforma(proforma, convertCreditId === proforma.id)} onDelete={(proforma) => void deleteProforma(proforma)} />}
           {tab === "debts" && <DebtsTable debts={filteredDebts} loading={loading} onPay={(debt) => void openPaymentForm(debt)} />}
         </div>
-        <div className="border-t border-slate-100 px-5 py-3 text-[11px] text-slate-500">{tab === "clients" ? `${filteredClients.length} client(s) · L’historique d’achats est accessible depuis chaque fiche.` : tab === "proformas" ? `${filteredProformas.length} proforma(s)` : `${filteredDebts.length} dette(s) en cours`}</div>
+        <div className="border-t border-slate-100 px-5 py-3 text-xs text-slate-500">{tab === "clients" ? `${filteredClients.length} client(s) · L’historique d’achats est accessible depuis chaque fiche.` : tab === "proformas" ? `${filteredProformas.length} proforma(s)` : `${filteredDebts.length} dette(s) en cours`}</div>
       </section>
     </div>
 
@@ -562,14 +562,14 @@ export default function ClientsDettesPage() {
           <Field label="Date d’expiration"><input type="date" min={emissionDate} className="input-field" value={expirationDate} onChange={(event) => setExpirationDate(event.target.value)} /></Field>
         </div>
         <div className="overflow-hidden rounded-xl border border-slate-200">
-          <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-4 py-3"><div><p className="text-xs font-bold text-slate-700">Articles et prix négociés</p><p className="mt-0.5 text-[10px] text-slate-400">Saisissez une remise ou modifiez directement le prix unitaire.</p></div><button type="button" onClick={() => setDraftLines((current) => [...current, blankLine()])} className="button-secondary h-9"><Plus size={14} /> Ajouter</button></div>
+          <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-4 py-3"><div><p className="text-xs font-bold text-slate-700">Articles et prix négociés</p><p className="mt-0.5 text-xs text-slate-400">Saisissez une remise ou modifiez directement le prix unitaire.</p></div><button type="button" onClick={() => setDraftLines((current) => [...current, blankLine()])} className="button-secondary h-9"><Plus size={14} /> Ajouter</button></div>
           <div className="divide-y divide-slate-100">
             {draftLines.map((line, index) => <div key={index} className="grid gap-3 p-3 sm:grid-cols-[minmax(0,1fr)_85px_100px_130px_115px_36px] sm:items-end">
               <Field label="Article"><select required className="input-field h-10" value={line.articleId} onChange={(event) => updateLine(index, { articleId: event.target.value })}><option value="">Sélectionner</option>{articles.map((article) => <option key={article.id} value={article.id}>{article.reference} · {article.designation} ({currency.format(article.prixVente)})</option>)}</select></Field>
               <Field label="Qté"><input required type="number" min="1" step="1" className="input-field h-10" value={line.quantite} onChange={(event) => updateLine(index, { quantite: event.target.value })} /></Field>
               <Field label="Remise %"><input type="number" min="0" max="100" step="0.01" className="input-field h-10" value={line.remise} onChange={(event) => updateLine(index, { remise: event.target.value })} /></Field>
               <Field label="Prix négocié"><input required type="number" min="0" step="any" className="input-field h-10" value={line.prixUnitaire} onChange={(event) => updateLine(index, { prixUnitaire: event.target.value })} /></Field>
-              <div><span className="mb-1 block text-[10px] font-bold text-slate-500">Total ligne</span><p className="flex h-10 items-center text-xs font-bold text-slate-800">{currency.format((Number(line.quantite) || 0) * (Number(line.prixUnitaire) || 0))}</p></div>
+              <div><span className="mb-1 block text-xs font-bold text-slate-500">Total ligne</span><p className="flex h-10 items-center text-xs font-bold text-slate-800">{currency.format((Number(line.quantite) || 0) * (Number(line.prixUnitaire) || 0))}</p></div>
               <button type="button" title="Supprimer cette ligne" disabled={draftLines.length === 1} onClick={() => setDraftLines((current) => current.filter((_, lineIndex) => lineIndex !== index))} className="icon-button mb-0.5 disabled:opacity-30"><Trash2 size={15} /></button>
             </div>)}
           </div>
@@ -585,28 +585,28 @@ export default function ClientsDettesPage() {
         <div className="flex gap-2 text-xs text-slate-600"><Mail size={15} className="shrink-0 text-slate-400" />{clientDetail.email || clientDetail.telephone || "Aucun contact"}</div>
         <div className="flex gap-2 text-xs text-slate-600"><MapPin size={15} className="shrink-0 text-slate-400" />{clientDetail.adresse || "Adresse non renseignée"}</div>
       </div>
-      <div className="mb-5 flex items-center justify-between"><h3 className="text-sm font-bold text-slate-800">Historique d’achats</h3><span className="text-[11px] text-slate-500">{(clients.find((client) => client.id === clientDetail.id) ?? clientDetail).nombreAchats} vente(s) validée(s){clientSales.length < (clients.find((client) => client.id === clientDetail.id) ?? clientDetail).nombreAchats ? ` · ${clientSales.length} dernière(s) affichée(s)` : ""}</span></div>
-      {clientSales.length ? <div className="max-h-56 overflow-auto rounded-xl border border-slate-200"><table className="w-full text-left"><thead className="sticky top-0 bg-slate-50 text-[9px] font-bold uppercase text-slate-400"><tr><th className="px-3 py-2">Vente</th><th className="px-3 py-2">Date</th><th className="px-3 py-2">Articles</th><th className="px-3 py-2 text-right">Total</th>{canCancelSales && <th className="px-3 py-2 text-right">Action</th>}</tr></thead><tbody className="divide-y divide-slate-100">{clientSales.map((sale) => <tr key={sale.id}><td className="px-3 py-2.5 text-xs font-bold text-slate-700">{sale.code}</td><td className="px-3 py-2.5 text-xs text-slate-500">{dateTimeLabel(sale.dateVente)}</td><td className="px-3 py-2.5 text-xs text-slate-500">{sale.lignes.length}</td><td className="px-3 py-2.5 text-right text-xs font-bold text-slate-800">{currency.format(sale.montantTotal)}</td>{canCancelSales && <td className="px-3 py-2.5 text-right">{sale.aCredit ? <button disabled={cancellingSaleId === sale.id} onClick={() => void cancelCreditSale(sale)} className="text-[10px] font-bold text-rose-600 hover:text-rose-800 disabled:opacity-50">{cancellingSaleId === sale.id ? "Annulation…" : "Annuler"}</button> : <span className="text-[10px] text-slate-300">—</span>}</td>}</tr>)}</tbody></table></div> : <Empty>Pas encore d’achat validé pour ce client.</Empty>}
-      <div className="mb-3 mt-6 flex items-center justify-between"><h3 className="text-sm font-bold text-slate-800">Situation du compte</h3><span className="text-xs font-bold text-orange-700">{currency.format(clientDebts.reduce((sum, debt) => sum + Math.max(0, debt.solde), 0))} dû</span></div>
+      <div className="mb-5 flex items-center justify-between"><h3 className="text-sm font-bold text-slate-800">Historique d’achats</h3><span className="text-xs text-slate-500">{(clients.find((client) => client.id === clientDetail.id) ?? clientDetail).nombreAchats} vente(s) validée(s){clientSales.length < (clients.find((client) => client.id === clientDetail.id) ?? clientDetail).nombreAchats ? ` · ${clientSales.length} dernière(s) affichée(s)` : ""}</span></div>
+      {clientSales.length ? <div className="max-h-56 overflow-auto rounded-xl border border-slate-200"><table className="w-full text-left"><thead className="sticky top-0 bg-slate-50 text-xs font-bold uppercase text-slate-400"><tr><th className="px-3 py-2">Vente</th><th className="px-3 py-2">Date</th><th className="px-3 py-2">Articles</th><th className="px-3 py-2 text-right">Total</th>{canCancelSales && <th className="px-3 py-2 text-right">Action</th>}</tr></thead><tbody className="divide-y divide-slate-100">{clientSales.map((sale) => <tr key={sale.id}><td className="px-3 py-2.5 text-xs font-bold text-slate-700">{sale.code}</td><td className="px-3 py-2.5 text-xs text-slate-500">{dateTimeLabel(sale.dateVente)}</td><td className="px-3 py-2.5 text-xs text-slate-500">{sale.lignes.length}</td><td className="px-3 py-2.5 text-right text-xs font-bold text-slate-800">{currency.format(sale.montantTotal)}</td>{canCancelSales && <td className="px-3 py-2.5 text-right">{sale.aCredit ? <button disabled={cancellingSaleId === sale.id} onClick={() => void cancelCreditSale(sale)} className="text-xs font-bold text-rose-600 hover:text-rose-800 disabled:opacity-50">{cancellingSaleId === sale.id ? "Annulation…" : "Annuler"}</button> : <span className="text-xs text-slate-300">—</span>}</td>}</tr>)}</tbody></table></div> : <Empty>Pas encore d’achat validé pour ce client.</Empty>}
+      <div className="mb-3 mt-6 flex items-center justify-between"><h3 className="text-sm font-bold text-slate-800">Situation du compte</h3><span className="text-xs font-bold text-amber-800">{currency.format(clientDebts.reduce((sum, debt) => sum + Math.max(0, debt.solde), 0))} dû</span></div>
       {clientDebts.length ? <div className="max-h-40 overflow-auto rounded-xl border border-slate-200"><table className="w-full text-left"><tbody className="divide-y divide-slate-100">{clientDebts.map((debt) => <tr key={debt.id}><td className="px-3 py-2.5 text-xs font-semibold text-slate-700">{debt.numeroVente}</td><td className="px-3 py-2.5 text-xs text-slate-500">{dateLabel(debt.dateCreation)}</td><td className="px-3 py-2.5"><DebtBadge status={debt.statut} /></td><td className="px-3 py-2.5 text-right text-xs font-bold text-slate-800">{currency.format(debt.solde)}</td></tr>)}</tbody></table></div> : <Empty>Aucune dette client.</Empty>}
       <div className="mt-5 flex justify-end"><button onClick={() => { setClientDetail(null); openClientForm(clientDetail); }} className="button-secondary"><Pencil size={14} /> Modifier la fiche</button></div>
     </Modal>}
 
     {approbationDemandee && <ApprobationModal message={approbationDemandee.message} erreur={approbationDemandee.erreur} occupe={proformaSaving} libelleAction="Enregistrer le proforma" onAnnuler={() => setApprobationDemandee(null)} onSoumettre={(approbation) => { setApprobationDemandee(null); void envoyerProforma(approbation); }} />}
     {cashProforma && <Modal title={`Règlement · ${cashProforma.numero}`} onClose={() => busyProformaId === null && setCashProforma(null)}>
-      <div className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4"><p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Total à encaisser</p><p className="mt-1 text-xl font-extrabold text-emerald-900">{currency.format(cashProforma.montantTotal)}</p></div>
+      <div className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4"><p className="text-xs font-semibold text-emerald-700">Total à encaisser</p><p className="mt-1 text-xl font-extrabold text-emerald-900">{currency.format(cashProforma.montantTotal)}</p></div>
       <form onSubmit={(event) => void confirmCashConversion(event)} className="space-y-4">
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Mode de règlement"><select className="input-field" value={cashMode} onChange={(event) => { const mode = event.target.value as PaymentMode; setCashMode(mode); if (mode !== "ESPECES") setCashReceived(String(cashProforma.montantTotal)); }}>{paymentModes.map((mode) => <option key={mode.value} value={mode.value}>{mode.label}</option>)}</select></Field>
           <Field label="Montant reçu"><input required autoFocus type="number" min={cashProforma.montantTotal} step="any" className="input-field" value={cashReceived} onChange={(event) => setCashReceived(event.target.value)} /></Field>
         </div>
         {cashMode === "ESPECES" && Number(cashReceived) > cashProforma.montantTotal && <p className="rounded-xl bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-800">Monnaie à rendre : {currency.format(Number(cashReceived) - cashProforma.montantTotal)}</p>}
-        <p className="text-[10px] text-slate-500">La vente sera validée, le stock déduit et le montant ajouté à la caisse de la journée ouverte.</p>
+        <p className="text-xs text-slate-500">La vente sera validée, le stock déduit et le montant ajouté à la caisse de la journée ouverte.</p>
         <ModalActions busy={busyProformaId !== null} submitLabel="Encaisser et convertir" onCancel={() => setCashProforma(null)} />
       </form>
     </Modal>}
     {paymentDebt && <Modal wide title={`Règlement · ${paymentDebt.client}`} onClose={() => !paymentSaving && setPaymentDebt(null)}>
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-orange-200 bg-orange-50 p-4"><div><p className="text-[10px] font-bold uppercase tracking-wider text-orange-700">Solde restant · vente {paymentDebt.numeroVente}</p><p className="mt-1 text-xl font-extrabold text-orange-900">{currency.format(paymentDebt.solde)}</p></div><DebtBadge status={paymentDebt.statut} /></div>
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4"><div><p className="text-xs font-semibold text-amber-800">Solde restant · vente {paymentDebt.numeroVente}</p><p className="mt-1 text-xl font-extrabold text-amber-900">{currency.format(paymentDebt.solde)}</p></div><DebtBadge status={paymentDebt.statut} /></div>
       <form onSubmit={(event) => void savePayment(event)} className="space-y-4">
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Montant versé"><input required autoFocus type="number" min="0.0001" max={paymentDebt.solde} step="any" className="input-field" value={paymentAmount} onChange={(event) => setPaymentAmount(event.target.value)} /></Field>
@@ -625,10 +625,10 @@ export default function ClientsDettesPage() {
 
     {receipt && <div className="fixed inset-0 z-[70] grid place-items-center overflow-y-auto bg-slate-950/50 p-4 print:static print:block print:bg-white print:p-0">
       <section id="client-payment-receipt" className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl print:max-w-none print:rounded-none print:p-0 print:shadow-none">
-        <div className="mb-5 flex items-center justify-between print:hidden"><div><p className="text-xs font-bold uppercase tracking-wider text-emerald-600">Versement enregistré</p><h2 className="mt-1 text-lg font-bold text-slate-900">Reçu de règlement</h2></div><button onClick={() => setReceipt(null)} className="icon-button" aria-label="Fermer"><X size={16} /></button></div>
-        <div className="border-y border-dashed border-slate-300 py-5 text-center"><EnTeteDocument variante="ticket" /><p className="mt-2 text-[10px] text-slate-500">REÇU DE VERSEMENT CLIENT</p><p className="mt-4 text-2xl font-extrabold text-slate-900">{currency.format(receipt.payment.montant)}</p></div>
+        <div className="mb-5 flex items-center justify-between print:hidden"><div><h2 className="mt-1 text-lg font-bold text-slate-900">Reçu de règlement</h2></div><button onClick={() => setReceipt(null)} className="icon-button" aria-label="Fermer"><X size={16} /></button></div>
+        <div className="border-y border-dashed border-slate-300 py-5 text-center"><EnTeteDocument variante="ticket" /><p className="mt-2 text-xs text-slate-500">REÇU DE VERSEMENT CLIENT</p><p className="mt-4 text-2xl font-extrabold text-slate-900">{currency.format(receipt.payment.montant)}</p></div>
         <div className="space-y-3 py-5 text-xs"><ReceiptRow label="Client" value={receipt.debt.client} /><ReceiptRow label="Vente" value={receipt.debt.numeroVente} /><ReceiptRow label="Date" value={dateTimeLabel(receipt.payment.dateReglement)} /><ReceiptRow label="Mode" value={modeLabel(receipt.payment.modeReglement)} />{receipt.payment.reference && <ReceiptRow label="Référence" value={receipt.payment.reference} />}<ReceiptRow label="Reçu par" value={receipt.payment.recuPar || "Utilisateur"} /><ReceiptRow label="Solde restant" value={currency.format(Math.max(0, receipt.debt.solde - receipt.payment.montant))} /></div>
-        <p className="border-t border-dashed border-slate-300 pt-4 text-center text-[10px] text-slate-500">Merci. Conservez ce reçu comme justificatif de paiement.</p>
+        <p className="border-t border-dashed border-slate-300 pt-4 text-center text-xs text-slate-500">Merci. Conservez ce reçu comme justificatif de paiement.</p>
         <div className="mt-5 flex gap-2 print:hidden"><button onClick={() => void imprimer(document.getElementById("client-payment-receipt"))} className="button-primary flex-1"><Printer size={15} /> Imprimer le reçu</button><button onClick={() => setReceipt(null)} className="button-secondary">Terminer</button></div>
       </section>
       <style>{`@media print { body * { visibility: hidden !important; } #client-payment-receipt, #client-payment-receipt * { visibility: visible !important; } #client-payment-receipt { position: fixed; inset: 0 auto auto 0; width: 80mm; max-width: 80mm; padding: 4mm; color: #000 !important; background: #fff !important; } @page { size: 80mm auto; margin: 3mm; } }`}</style>
@@ -644,31 +644,31 @@ function modeLabel(mode: PaymentMode) {
   return paymentModes.find((item) => item.value === mode)?.label ?? mode;
 }
 
-function Metric({ title, count, icon }: { title: string; count: number | string; icon: ReactNode }) {
-  return <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><div><p className="text-xs font-semibold text-slate-500">{title}</p><p className="mt-1 text-2xl font-extrabold text-slate-900">{count}</p></div><span className="grid size-10 place-items-center rounded-xl bg-emerald-50 text-emerald-700">{icon}</span></div>;
+function Metric({ title, count }: { title: string; count: number | string }) {
+  return <Indicateur libelle={title} valeur={count} />;
 }
 
-function TabButton({ active, onClick, icon, children }: { active: boolean; onClick: () => void; icon: ReactNode; children: ReactNode }) {
-  return <button onClick={onClick} className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-[11px] font-bold transition ${active ? "bg-white text-emerald-700 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}>{icon}{children}</button>;
+function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
+  return <button onClick={onClick} className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold transition ${active ? "bg-white text-emerald-700 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}>{children}</button>;
 }
 
 function ClientsTable({ clients, loading, onDetail, onEdit, onDelete }: { clients: Client[]; loading: boolean; onDetail: (client: Client) => void; onEdit: (client: Client) => void; onDelete: (client: Client) => void }) {
   return <table className="w-full min-w-[760px] text-left">
-    <thead className="bg-slate-50/80 text-[10px] font-bold uppercase tracking-wider text-slate-400"><tr><th className="px-5 py-3">Client</th><th className="px-4 py-3">Téléphone</th><th className="px-4 py-3">Adresse</th><th className="px-4 py-3">Achats validés</th><th className="px-5 py-3 text-right">Actions</th></tr></thead>
-    <tbody className="divide-y divide-slate-100">{loading ? <LoadingRow cols={5} /> : clients.length ? clients.map((client) => <tr key={client.id} className="hover:bg-slate-50/70"><td className="px-5 py-3.5"><button onClick={() => onDetail(client)} className="flex items-center gap-2.5 text-left"><span className="grid size-9 place-items-center rounded-xl bg-emerald-50 text-emerald-700"><UserRound size={16} /></span><span><span className="block text-xs font-bold text-slate-800">{client.nom}</span><span className="mt-1 block text-[10px] text-slate-400">{client.email || "E-mail non renseigné"}</span></span></button></td><td className="px-4 py-3.5 text-xs text-slate-600">{client.telephone || "—"}</td><td className="max-w-56 truncate px-4 py-3.5 text-xs text-slate-600">{client.adresse || "—"}</td><td className="px-4 py-3.5 text-xs font-semibold text-slate-700">{client.nombreAchats}</td><td className="px-5 py-3.5"><div className="flex justify-end gap-1"><button onClick={() => onDetail(client)} title="Historique et fiche client" className="icon-button text-slate-400 hover:text-emerald-700"><History size={15} /></button><button onClick={() => onEdit(client)} title="Modifier" className="icon-button text-slate-400 hover:text-emerald-700"><Pencil size={15} /></button><button onClick={() => onDelete(client)} title="Supprimer" className="icon-button text-slate-400 hover:bg-rose-50 hover:text-rose-600"><Trash2 size={15} /></button></div></td></tr>) : <EmptyRow cols={5} message="Aucun client trouvé." />}</tbody>
+    <thead className="bg-slate-50/80 text-xs font-semibold text-slate-600"><tr><th className="px-5 py-3">Client</th><th className="px-4 py-3">Téléphone</th><th className="px-4 py-3">Adresse</th><th className="px-4 py-3">Achats validés</th><th className="px-5 py-3 text-right">Actions</th></tr></thead>
+    <tbody className="divide-y divide-slate-100">{loading ? <LoadingRow cols={5} /> : clients.length ? clients.map((client) => <tr key={client.id} className="hover:bg-slate-50/70"><td className="px-5 py-3.5"><button onClick={() => onDetail(client)} className="flex items-center gap-2.5 text-left"><span><span className="block text-xs font-bold text-slate-800">{client.nom}</span><span className="mt-1 block text-xs text-slate-400">{client.email || "E-mail non renseigné"}</span></span></button></td><td className="px-4 py-3.5 text-xs text-slate-600">{client.telephone || "—"}</td><td className="max-w-56 truncate px-4 py-3.5 text-xs text-slate-600">{client.adresse || "—"}</td><td className="px-4 py-3.5 text-xs font-semibold text-slate-700">{client.nombreAchats}</td><td className="px-5 py-3.5"><div className="flex justify-end gap-1"><button onClick={() => onDetail(client)} title="Historique et fiche client" className="icon-button text-slate-400 hover:text-emerald-700"><History size={15} /></button><button onClick={() => onEdit(client)} title="Modifier" className="icon-button text-slate-400 hover:text-emerald-700"><Pencil size={15} /></button><button onClick={() => onDelete(client)} title="Supprimer" className="icon-button text-slate-400 hover:bg-rose-50 hover:text-rose-600"><Trash2 size={15} /></button></div></td></tr>) : <EmptyRow cols={5} message="Aucun client trouvé." />}</tbody>
   </table>;
 }
 
 function ProformasTable({ proformas, loading, busyId, convertCreditId, onConvertCredit, onEdit, onStatus, onConvert, onDelete }: { proformas: Proforma[]; loading: boolean; busyId: number | null; convertCreditId: number | null; onConvertCredit: (value: number | null) => void; onEdit: (proforma: Proforma) => void; onStatus: (proforma: Proforma, status: "ENVOYEE" | "ACCEPTEE" | "REFUSEE") => void; onConvert: (proforma: Proforma) => void; onDelete: (proforma: Proforma) => void }) {
   return <table className="w-full min-w-[1020px] text-left">
-    <thead className="bg-slate-50/80 text-[10px] font-bold uppercase tracking-wider text-slate-400"><tr><th className="px-5 py-3">Proforma</th><th className="px-4 py-3">Client</th><th className="px-4 py-3">Émise le</th><th className="px-4 py-3">Validité</th><th className="px-4 py-3">Articles</th><th className="px-4 py-3">Montant</th><th className="px-4 py-3">Statut</th><th className="px-5 py-3 text-right">Actions</th></tr></thead>
+    <thead className="bg-slate-50/80 text-xs font-semibold text-slate-600"><tr><th className="px-5 py-3">Proforma</th><th className="px-4 py-3">Client</th><th className="px-4 py-3">Émise le</th><th className="px-4 py-3">Validité</th><th className="px-4 py-3">Articles</th><th className="px-4 py-3">Montant</th><th className="px-4 py-3">Statut</th><th className="px-5 py-3 text-right">Actions</th></tr></thead>
     <tbody className="divide-y divide-slate-100">{loading ? <LoadingRow cols={8} /> : proformas.length ? proformas.map((proforma) => {
       const busy = busyId === proforma.id;
-      return <tr key={proforma.id} className="hover:bg-slate-50/70"><td className="px-5 py-3.5"><p className="text-xs font-bold text-slate-800">{proforma.numero}</p><p className="mt-1 text-[10px] text-slate-400">{proforma.lignes.length} ligne(s)</p></td><td className="px-4 py-3.5 text-xs text-slate-600">{proforma.client || "Client comptoir"}</td><td className="px-4 py-3.5 text-xs text-slate-600">{dateLabel(proforma.dateEmission)}</td><td className="px-4 py-3.5 text-xs text-slate-600">{dateLabel(proforma.dateExpiration)}</td><td className="px-4 py-3.5 text-xs text-slate-600">{proforma.lignes.reduce((sum, line) => sum + line.quantite, 0)} unité(s)</td><td className="px-4 py-3.5 text-xs font-bold text-slate-800">{currency.format(proforma.montantTotal)}</td><td className="px-4 py-3.5"><ProformaBadge status={proforma.statut} /></td><td className="px-5 py-3.5"><div className="flex flex-wrap items-center justify-end gap-1">
-        {proforma.statut === "BROUILLON" && <><button disabled={busy} onClick={() => onEdit(proforma)} title="Modifier le brouillon" className="icon-button text-slate-400 hover:text-emerald-700"><Pencil size={14} /></button><button disabled={busy} onClick={() => onDelete(proforma)} title="Supprimer" className="icon-button text-slate-400 hover:text-rose-600"><Trash2 size={14} /></button><button disabled={busy} onClick={() => onStatus(proforma, "ENVOYEE")} className="button-secondary h-8 px-2.5 text-[10px]">Marquer envoyée</button></>}
-        {proforma.statut === "ENVOYEE" && <><button disabled={busy} onClick={() => onStatus(proforma, "ACCEPTEE")} className="inline-flex h-8 items-center gap-1 rounded-lg bg-emerald-600 px-2.5 text-[10px] font-bold text-white disabled:opacity-50">{busy ? <LoaderCircle size={12} className="animate-spin" /> : <Check size={12} />}Accepter</button><button disabled={busy} onClick={() => onStatus(proforma, "REFUSEE")} className="button-secondary h-8 px-2.5 text-[10px]">Refuser</button></>}
-        {proforma.statut === "ACCEPTEE" && <><label className="flex items-center gap-1 text-[9px] font-semibold text-slate-500"><input type="checkbox" checked={convertCreditId === proforma.id} onChange={(event) => onConvertCredit(event.target.checked ? proforma.id : null)} />À crédit</label><button disabled={busy} onClick={() => onConvert(proforma)} className="inline-flex h-8 items-center gap-1 rounded-lg bg-emerald-600 px-2.5 text-[10px] font-bold text-white disabled:opacity-50">{busy ? <LoaderCircle size={12} className="animate-spin" /> : <Check size={12} />}Convertir en vente</button></>}
-        {proforma.statut === "CONVERTIE" && proforma.venteId && <span className="text-[10px] font-semibold text-slate-500">Vente #{proforma.venteId}</span>}
+      return <tr key={proforma.id} className="hover:bg-slate-50/70"><td className="px-5 py-3.5"><p className="text-xs font-bold text-slate-800">{proforma.numero}</p><p className="mt-1 text-xs text-slate-400">{proforma.lignes.length} ligne(s)</p></td><td className="px-4 py-3.5 text-xs text-slate-600">{proforma.client || "Client comptoir"}</td><td className="px-4 py-3.5 text-xs text-slate-600">{dateLabel(proforma.dateEmission)}</td><td className="px-4 py-3.5 text-xs text-slate-600">{dateLabel(proforma.dateExpiration)}</td><td className="px-4 py-3.5 text-xs text-slate-600">{proforma.lignes.reduce((sum, line) => sum + line.quantite, 0)} unité(s)</td><td className="px-4 py-3.5 text-xs font-bold text-slate-800">{currency.format(proforma.montantTotal)}</td><td className="px-4 py-3.5"><ProformaBadge status={proforma.statut} /></td><td className="px-5 py-3.5"><div className="flex flex-wrap items-center justify-end gap-1">
+        {proforma.statut === "BROUILLON" && <><button disabled={busy} onClick={() => onEdit(proforma)} title="Modifier le brouillon" className="icon-button text-slate-400 hover:text-emerald-700"><Pencil size={14} /></button><button disabled={busy} onClick={() => onDelete(proforma)} title="Supprimer" className="icon-button text-slate-400 hover:text-rose-600"><Trash2 size={14} /></button><button disabled={busy} onClick={() => onStatus(proforma, "ENVOYEE")} className="button-secondary h-8 px-2.5 text-xs">Marquer envoyée</button></>}
+        {proforma.statut === "ENVOYEE" && <><button disabled={busy} onClick={() => onStatus(proforma, "ACCEPTEE")} className="inline-flex h-8 items-center gap-1 rounded-lg bg-emerald-600 px-2.5 text-xs font-bold text-white disabled:opacity-50">{busy ? <LoaderCircle size={12} className="animate-spin" /> : <Check size={12} />}Accepter</button><button disabled={busy} onClick={() => onStatus(proforma, "REFUSEE")} className="button-secondary h-8 px-2.5 text-xs">Refuser</button></>}
+        {proforma.statut === "ACCEPTEE" && <><label className="flex items-center gap-1 text-xs font-semibold text-slate-500"><input type="checkbox" checked={convertCreditId === proforma.id} onChange={(event) => onConvertCredit(event.target.checked ? proforma.id : null)} />À crédit</label><button disabled={busy} onClick={() => onConvert(proforma)} className="inline-flex h-8 items-center gap-1 rounded-lg bg-emerald-600 px-2.5 text-xs font-bold text-white disabled:opacity-50">{busy ? <LoaderCircle size={12} className="animate-spin" /> : <Check size={12} />}Convertir en vente</button></>}
+        {proforma.statut === "CONVERTIE" && proforma.venteId && <span className="text-xs font-semibold text-slate-500">Vente #{proforma.venteId}</span>}
       </div></td></tr>;
     }) : <EmptyRow cols={8} message="Aucune facture proforma trouvée." />}</tbody>
   </table>;
@@ -676,29 +676,29 @@ function ProformasTable({ proformas, loading, busyId, convertCreditId, onConvert
 
 function DebtsTable({ debts, loading, onPay }: { debts: Debt[]; loading: boolean; onPay: (debt: Debt) => void }) {
   return <table className="w-full min-w-[820px] text-left">
-    <thead className="bg-slate-50/80 text-[10px] font-bold uppercase tracking-wider text-slate-400"><tr><th className="px-5 py-3">Client</th><th className="px-4 py-3">Vente / date</th><th className="px-4 py-3">Montant initial</th><th className="px-4 py-3">Déjà réglé</th><th className="px-4 py-3">Reste à payer</th><th className="px-4 py-3">Statut</th><th className="px-5 py-3 text-right">Action</th></tr></thead>
-    <tbody className="divide-y divide-slate-100">{loading ? <LoadingRow cols={7} /> : debts.length ? debts.map((debt) => <tr key={debt.id} className="hover:bg-slate-50/70"><td className="px-5 py-3.5 text-xs font-bold text-slate-800">{debt.client}</td><td className="px-4 py-3.5"><p className="text-xs font-semibold text-slate-700">{debt.numeroVente}</p><p className="mt-1 text-[10px] text-slate-400">{dateLabel(debt.dateCreation)}</p></td><td className="px-4 py-3.5 text-xs text-slate-600">{currency.format(debt.montantInitial)}</td><td className="px-4 py-3.5 text-xs text-emerald-700">{currency.format(debt.montantRegle)}</td><td className="px-4 py-3.5 text-xs font-extrabold text-orange-700">{currency.format(debt.solde)}</td><td className="px-4 py-3.5"><DebtBadge status={debt.statut} /></td><td className="px-5 py-3.5 text-right"><button onClick={() => onPay(debt)} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-[10px] font-bold text-white hover:bg-emerald-700"><Banknote size={13} />Enregistrer un règlement</button></td></tr>) : <EmptyRow cols={7} message="Aucune créance non soldée." />}</tbody>
+    <thead className="bg-slate-50/80 text-xs font-semibold text-slate-600"><tr><th className="px-5 py-3">Client</th><th className="px-4 py-3">Vente / date</th><th className="px-4 py-3">Montant initial</th><th className="px-4 py-3">Déjà réglé</th><th className="px-4 py-3">Reste à payer</th><th className="px-4 py-3">Statut</th><th className="px-5 py-3 text-right">Action</th></tr></thead>
+    <tbody className="divide-y divide-slate-100">{loading ? <LoadingRow cols={7} /> : debts.length ? debts.map((debt) => <tr key={debt.id} className="hover:bg-slate-50/70"><td className="px-5 py-3.5 text-xs font-bold text-slate-800">{debt.client}</td><td className="px-4 py-3.5"><p className="text-xs font-semibold text-slate-700">{debt.numeroVente}</p><p className="mt-1 text-xs text-slate-400">{dateLabel(debt.dateCreation)}</p></td><td className="px-4 py-3.5 text-xs text-slate-600">{currency.format(debt.montantInitial)}</td><td className="px-4 py-3.5 text-xs text-emerald-700">{currency.format(debt.montantRegle)}</td><td className="px-4 py-3.5 text-xs font-extrabold text-amber-800">{currency.format(debt.solde)}</td><td className="px-4 py-3.5"><DebtBadge status={debt.statut} /></td><td className="px-5 py-3.5 text-right"><button onClick={() => onPay(debt)} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-xs font-bold text-white hover:bg-emerald-700"><Banknote size={13} />Enregistrer un règlement</button></td></tr>) : <EmptyRow cols={7} message="Aucune créance non soldée." />}</tbody>
   </table>;
 }
 
 function ProformaBadge({ status }: { status: Proforma["statut"] }) {
   const colors: Record<Proforma["statut"], string> = {
     BROUILLON: "bg-slate-100 text-slate-600",
-    ENVOYEE: "bg-blue-50 text-blue-700",
+    ENVOYEE: "bg-slate-100 text-slate-700",
     ACCEPTEE: "bg-emerald-50 text-emerald-700",
     REFUSEE: "bg-rose-50 text-rose-700",
-    EXPIREE: "bg-orange-50 text-orange-700",
-    CONVERTIE: "bg-violet-50 text-violet-700",
+    EXPIREE: "bg-amber-50 text-amber-800",
+    CONVERTIE: "bg-emerald-50 text-emerald-800",
   };
-  return <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${colors[status]}`}>{statusLabel(status)}</span>;
+  return <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${colors[status]}`}>{statusLabel(status)}</span>;
 }
 
 function DebtBadge({ status }: { status: Debt["statut"] }) {
   const config = status === "REGLEE" ? ["bg-emerald-50 text-emerald-700", "Soldé"]
-    : status === "PARTIELLEMENT_REGLEE" ? ["bg-orange-50 text-orange-700", "Partiellement réglé"]
+    : status === "PARTIELLEMENT_REGLEE" ? ["bg-amber-50 text-amber-800", "Partiellement réglé"]
       : status === "ANNULEE" ? ["bg-slate-100 text-slate-500", "Annulé"]
         : ["bg-rose-50 text-rose-700", "Non réglé"];
-  return <span className={`whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-bold ${config[0]}`}>{config[1]}</span>;
+  return <span className={`whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-bold ${config[0]}`}>{config[1]}</span>;
 }
 
 function Modal({ title, children, onClose, wide = false }: { title: string; children: ReactNode; onClose: () => void; wide?: boolean }) {
@@ -706,7 +706,7 @@ function Modal({ title, children, onClose, wide = false }: { title: string; chil
 }
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
-  return <label className="block min-w-0"><span className="mb-1.5 block text-[10px] font-bold text-slate-600">{label}</span>{children}</label>;
+  return <label className="block min-w-0"><span className="mb-1.5 block text-xs font-bold text-slate-600">{label}</span>{children}</label>;
 }
 
 function ModalActions({ busy, submitLabel, onCancel }: { busy: boolean; submitLabel: string; onCancel: () => void }) {

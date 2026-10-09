@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Ban,
-  Banknote,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
@@ -10,14 +9,13 @@ import {
   Printer,
   ReceiptText,
   Search,
-  ShoppingBag,
-  Tag,
-} from "lucide-react";
+  } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
 import ReceiptModal, { remisesDeLaVente, type Sale } from "../components/ReceiptModal";
 import { api } from "../services/api";
 import { apiErrorMessage as errorMessage } from "../services/apiError";
 import { moneyPrecise as money } from "../lib/format";
+import Indicateur from "../components/Indicateur";
 
 
 const paymentLabels: Record<string, string> = {
@@ -129,9 +127,8 @@ export default function VentesHistoriquePage() {
     <div className="space-y-6">
       <header className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
         <div>
-          <p className="mb-1 text-xs font-bold uppercase tracking-[0.16em] text-emerald-600">Suivi de la caisse</p>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900">Historique des ventes</h1>
-          <p className="mt-1.5 text-sm capitalize text-slate-500">{formatLongDay(day)}</p>
+          <h1 className="text-2xl font-bold text-slate-900">Historique des ventes</h1>
+          <p className="mt-1.5 text-sm text-slate-500 first-letter:uppercase">{formatLongDay(day)}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button onClick={() => setDay(shiftDay(day, -1))} className="icon-button" aria-label="Jour précédent"><ChevronLeft size={17} /></button>
@@ -164,10 +161,10 @@ export default function VentesHistoriquePage() {
       )}
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Kpi icon={<ShoppingBag size={18} />} label="Ventes validées" value={String(summary.count)} />
-        <Kpi icon={<Banknote size={18} />} label="Chiffre d’affaires TTC" value={money.format(summary.revenue)} />
-        <Kpi icon={<Tag size={18} />} label="Remises accordées" value={money.format(summary.discounts)} />
-        <Kpi icon={<Ban size={18} />} label="Ventes annulées" value={String(summary.cancelled)} />
+        <Kpi label="Ventes validées" value={String(summary.count)} />
+        <Kpi label="Chiffre d’affaires TTC" value={money.format(summary.revenue)} />
+        <Kpi label="Remises accordées" value={money.format(summary.discounts)} />
+        <Kpi label="Ventes annulées" value={String(summary.cancelled)} />
       </section>
 
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -185,7 +182,7 @@ export default function VentesHistoriquePage() {
 
         <div className="overflow-x-auto">
           <table className="w-full min-w-[860px] text-left">
-            <thead className="bg-slate-50/80 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            <thead className="bg-slate-50/80 text-xs font-semibold text-slate-600">
               <tr>
                 <th className="px-5 py-3">Heure</th>
                 <th className="px-4 py-3">Vente</th>
@@ -209,7 +206,7 @@ export default function VentesHistoriquePage() {
                     <td className="px-5 py-3 text-xs text-slate-500">{formatTime(sale.dateVente)}</td>
                     <td className="px-4 py-3">
                       <p className="text-xs font-bold text-slate-800">{sale.code}</p>
-                      <p className="mt-0.5 text-[10px] text-slate-400">{sale.lignes.reduce((total, line) => total + line.quantite, 0)} article(s)</p>
+                      <p className="mt-0.5 text-xs text-slate-400">{sale.lignes.reduce((total, line) => total + line.quantite, 0)} article(s)</p>
                     </td>
                     <td className="px-4 py-3 text-xs text-slate-600">{sale.client ?? "Client de passage"}</td>
                     <td className="px-4 py-3 text-xs text-slate-600">{sale.vendeur ?? "—"}</td>
@@ -219,17 +216,17 @@ export default function VentesHistoriquePage() {
                     <td className="px-4 py-3 text-right text-xs text-emerald-700">{discounts > 0 ? `−${money.format(discounts)}` : "—"}</td>
                     <td className={`px-4 py-3 text-right text-xs font-bold ${cancelled ? "text-slate-400 line-through" : "text-slate-900"}`}>{money.format(sale.montantTotal)}</td>
                     <td className="px-4 py-3">
-                      <span className={`rounded-full px-2 py-1 text-[9px] font-bold ${cancelled ? "bg-rose-50 text-rose-700" : "bg-emerald-50 text-emerald-700"}`}>
+                      <span className={`rounded-full px-2 py-1 text-xs font-bold ${cancelled ? "bg-rose-50 text-rose-700" : "bg-emerald-50 text-emerald-700"}`}>
                         {cancelled ? "Annulée" : "Validée"}
                       </span>
                     </td>
                     <td className="space-x-2 px-5 py-3 text-right">
                       {canCancel && !cancelled && !sale.aCredit && day === today && (
-                        <button disabled={cancellingId === sale.id} onClick={() => void cancelCashSale(sale)} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-rose-200 px-3 text-[10px] font-bold text-rose-700 hover:bg-rose-50 disabled:opacity-50" title="Annuler cette vente : le client rapporte les articles et est remboursé">
+                        <button disabled={cancellingId === sale.id} onClick={() => void cancelCashSale(sale)} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-rose-200 px-3 text-xs font-bold text-rose-700 hover:bg-rose-50 disabled:opacity-50" title="Annuler cette vente : le client rapporte les articles et est remboursé">
                           {cancellingId === sale.id ? <LoaderCircle size={13} className="animate-spin" /> : <Ban size={13} />} Annuler
                         </button>
                       )}
-                      <button onClick={() => setReceipt(sale)} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-[10px] font-bold text-slate-600 hover:border-emerald-300 hover:text-emerald-700" title="Réimprimer le reçu">
+                      <button onClick={() => setReceipt(sale)} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-bold text-slate-600 hover:border-emerald-300 hover:text-emerald-700" title="Réimprimer le reçu">
                         <Printer size={13} /> Reçu
                       </button>
                     </td>
@@ -246,7 +243,7 @@ export default function VentesHistoriquePage() {
             </tbody>
           </table>
         </div>
-        <p className="border-t border-slate-100 px-5 py-3 text-[11px] text-slate-500">
+        <p className="border-t border-slate-100 px-5 py-3 text-xs text-slate-500">
           {filtered.length} vente(s) affichée(s). Le bouton « Reçu » imprime un duplicata du ticket remis au client.
         </p>
       </section>
@@ -256,14 +253,6 @@ export default function VentesHistoriquePage() {
   );
 }
 
-function Kpi({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
-  return (
-    <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-      <div className="flex items-center justify-between">
-        <p className="text-[11px] font-semibold text-slate-500">{label}</p>
-        <span className="grid size-8 place-items-center rounded-lg bg-slate-50 text-slate-500">{icon}</span>
-      </div>
-      <p className="mt-3 text-2xl font-bold tracking-tight text-slate-900">{value}</p>
-    </article>
-  );
+function Kpi({ label, value }: { label: string; value: string }) {
+  return <Indicateur libelle={label} valeur={value} />;
 }

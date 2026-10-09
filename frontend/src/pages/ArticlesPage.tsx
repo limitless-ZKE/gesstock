@@ -3,7 +3,6 @@ import {
   AlertTriangle,
   ArrowDown,
   ArrowUp,
-  Boxes,
   Check,
   ChevronLeft,
   ChevronRight,
@@ -21,6 +20,7 @@ import {
 import { api } from "../services/api";
 import { apiErrorMessage as errorMessage } from "../services/apiError";
 import { money } from "../lib/format";
+import Indicateur from "../components/Indicateur";
 
 type Category = { id: number; nom: string; description: string | null; active: boolean; parentId: number | null };
 type Unit = { id: number; code: string; libelle: string };
@@ -374,8 +374,7 @@ export default function ArticlesPage() {
     <div className="space-y-6">
       <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
-          <p className="mb-1 text-xs font-bold uppercase tracking-[0.16em] text-emerald-600">Gestion des stocks</p>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900">Catalogue articles</h1>
+          <h1 className="text-2xl font-bold text-slate-900">Catalogue articles</h1>
           <p className="mt-1.5 text-sm text-slate-500">Gérez les références, les catégories, les unités et les niveaux de stock.</p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -387,9 +386,9 @@ export default function ArticlesPage() {
       {notice && <Notice error={noticeError} onClose={() => setNotice("")}>{notice}</Notice>}
 
       <section className="grid gap-3 sm:grid-cols-3">
-        <SummaryCard label="Références" value={articles.length} icon={<Boxes size={18} />} tone="emerald" />
-        <SummaryCard label="Stock bas" value={articles.filter((item) => item.quantiteStock > 0 && item.quantiteStock <= item.seuilAlerteStock).length} icon={<AlertTriangle size={18} />} tone="orange" />
-        <SummaryCard label="En rupture" value={articles.filter((item) => item.quantiteStock <= 0).length} icon={<AlertTriangle size={18} />} tone="red" />
+        <SummaryCard label="Références" value={articles.length} />
+        <SummaryCard label="Stock bas" value={articles.filter((item) => item.quantiteStock > 0 && item.quantiteStock <= item.seuilAlerteStock).length} />
+        <SummaryCard label="En rupture" value={articles.filter((item) => item.quantiteStock <= 0).length} />
       </section>
 
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -411,7 +410,7 @@ export default function ArticlesPage() {
         {error && <div className="m-4"><Notice error>{error}<button className="ml-2 underline" onClick={() => void loadData()}>Réessayer</button></Notice></div>}
         <div className="overflow-x-auto">
           <table className="w-full min-w-[900px] text-left">
-            <thead className="bg-slate-50/80 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            <thead className="bg-slate-50/80 text-xs font-semibold text-slate-600">
               <tr>
                 <SortHeader label="Article" active={sortKey === "designation"} direction={sortDirection} onClick={() => changeSort("designation")} />
                 <SortHeader label="Catégorie" active={sortKey === "categorie"} direction={sortDirection} onClick={() => changeSort("categorie")} />
@@ -431,15 +430,15 @@ export default function ArticlesPage() {
                       <tr key={article.id} className="transition hover:bg-slate-50/70">
                         <td className="px-4 py-3.5">
                           <div className="flex items-center gap-3">
-                            <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-emerald-50 text-emerald-700"><Boxes size={17} /></div>
-                            <div><p className="text-xs font-bold text-slate-800">{article.designation}</p><p className="mt-1 text-[10px] font-medium tracking-wide text-slate-400">{article.reference}</p></div>
+                            
+                            <div><p className="text-xs font-bold text-slate-800">{article.designation}</p><p className="mt-1 text-xs font-medium tracking-wide text-slate-400">{article.reference}</p></div>
                           </div>
                         </td>
                         <td className="px-4 py-3.5 text-xs text-slate-600">{article.categorie ?? "—"}</td>
-                        <td className="px-4 py-3.5 text-xs text-slate-600"><p>{money.format(article.prixAchat)}</p><p title="Coût moyen pondéré : valeur du stock divisée par sa quantité, base des marges" className="mt-1 text-[10px] text-slate-400">CMP {money.format(article.coutMoyen)}</p></td>
+                        <td className="px-4 py-3.5 text-xs text-slate-600"><p>{money.format(article.prixAchat)}</p><p title="Coût moyen pondéré : valeur du stock divisée par sa quantité, base des marges" className="mt-1 text-xs text-slate-400">CMP {money.format(article.coutMoyen)}</p></td>
                         <td className="px-4 py-3.5 text-xs font-bold text-slate-800">{money.format(article.prixVente)}</td>
-                        <td className="px-4 py-3.5"><p className="text-xs font-bold text-slate-800">{article.quantiteStock} <span className="font-normal text-slate-400">{article.uniteMesure ?? ""}</span></p><p className="mt-1 text-[10px] text-slate-400">Seuil : {article.seuilAlerteStock}</p></td>
-                        <td className="px-4 py-3.5"><span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold ${status.className}`}><span className={`size-1.5 rounded-full ${status.dot}`} />{status.label}</span></td>
+                        <td className="px-4 py-3.5"><p className="text-xs font-bold text-slate-800">{article.quantiteStock} <span className="font-normal text-slate-400">{article.uniteMesure ?? ""}</span></p><p className="mt-1 text-xs text-slate-400">Seuil : {article.seuilAlerteStock}</p></td>
+                        <td className="px-4 py-3.5"><span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ${status.className}`}><span className={`size-1.5 rounded-full ${status.dot}`} />{status.label}</span></td>
                         <td className="px-4 py-3.5">
                           <div className="flex justify-end gap-1">
                             <button title="Unités de vente" onClick={() => void openSaleUnits(article)} className="icon-button"><Settings2 size={15} /></button>
@@ -455,7 +454,7 @@ export default function ArticlesPage() {
           </table>
         </div>
         <div className="flex flex-col justify-between gap-3 border-t border-slate-100 px-4 py-3 sm:flex-row sm:items-center md:px-5">
-          <p className="text-[11px] text-slate-500">{filtered.length ? `Affichage ${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, filtered.length)} sur ${filtered.length} articles` : "0 article"}</p>
+          <p className="text-xs text-slate-500">{filtered.length ? `Affichage ${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, filtered.length)} sur ${filtered.length} articles` : "0 article"}</p>
           <div className="flex items-center gap-2">
             <button className="icon-button" aria-label="Page précédente" disabled={page <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))}><ChevronLeft size={16} /></button>
             <span className="text-xs font-semibold text-slate-600">Page {page} / {pageCount}</span>
@@ -473,7 +472,7 @@ export default function ArticlesPage() {
               <Field label={articleModal === "new" ? "Prix d’achat (XOF)" : "Dernier prix d’achat (XOF)"}><input required min="0" step="any" type="number" className="input-field" value={articleForm.prixAchat} onChange={(event) => setArticleForm({ ...articleForm, prixAchat: event.target.value })} /></Field>
               <Field label="Prix de vente (XOF)"><input required min="0" step="any" type="number" className="input-field" value={articleForm.prixVente} onChange={(event) => setArticleForm({ ...articleForm, prixVente: event.target.value })} /></Field>
               <Field label="Seuil d’alerte"><input required min="0" step="1" type="number" className="input-field" value={articleForm.seuilAlerteStock} onChange={(event) => setArticleForm({ ...articleForm, seuilAlerteStock: event.target.value })} /></Field>
-              <Field label={articleModal === "new" ? "Stock initial" : "Stock actuel (non modifiable ici)"}><input required min="0" step="1" type="number" readOnly={articleModal !== "new"} className="input-field read-only:bg-slate-50 read-only:text-slate-500" value={articleForm.quantiteStock} onChange={(event) => setArticleForm({ ...articleForm, quantiteStock: event.target.value })} /><span className="mt-1 block text-[10px] text-slate-400">{articleModal === "new" ? "Les variations de stock sont ensuite enregistrées par réception ou vente." : "Pour corriger le stock, utilisez « Ajuster le stock » dans la liste (motif obligatoire)."}</span></Field>
+              <Field label={articleModal === "new" ? "Stock initial" : "Stock actuel (non modifiable ici)"}><input required min="0" step="1" type="number" readOnly={articleModal !== "new"} className="input-field read-only:bg-slate-50 read-only:text-slate-500" value={articleForm.quantiteStock} onChange={(event) => setArticleForm({ ...articleForm, quantiteStock: event.target.value })} /><span className="mt-1 block text-xs text-slate-400">{articleModal === "new" ? "Les variations de stock sont ensuite enregistrées par réception ou vente." : "Pour corriger le stock, utilisez « Ajuster le stock » dans la liste (motif obligatoire)."}</span></Field>
               <Field label="Catégorie"><select className="input-field" value={articleForm.categorieId} onChange={(event) => setArticleForm({ ...articleForm, categorieId: event.target.value })}><option value="">Sans catégorie</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.nom}</option>)}</select></Field>
               <Field label="Unité de mesure principale"><select className="input-field" value={articleForm.uniteMesureId} onChange={(event) => setArticleForm({ ...articleForm, uniteMesureId: event.target.value })}><option value="">Sans unité</option>{units.map((unit) => <option key={unit.id} value={unit.id}>{unit.libelle} ({unit.code})</option>)}</select></Field>
             </div>
@@ -512,7 +511,7 @@ export default function ArticlesPage() {
                 <button disabled={savingCategory} className="button-primary w-full"><Plus size={15} /> Ajouter une catégorie</button>
               </form>
               <div className="mt-3 max-h-52 divide-y divide-slate-100 overflow-y-auto rounded-xl border border-slate-100">
-                {categories.map((category) => <div key={category.id} className="flex items-center justify-between px-3 py-2.5"><div><p className="text-xs font-semibold text-slate-700">{category.nom}</p>{category.description && <p className="mt-0.5 text-[10px] text-slate-400">{category.description}</p>}</div><button onClick={() => void deleteCategory(category)} className="icon-button" aria-label={`Supprimer ${category.nom}`}><Trash2 size={14} /></button></div>)}
+                {categories.map((category) => <div key={category.id} className="flex items-center justify-between px-3 py-2.5"><div><p className="text-xs font-semibold text-slate-700">{category.nom}</p>{category.description && <p className="mt-0.5 text-xs text-slate-400">{category.description}</p>}</div><button onClick={() => void deleteCategory(category)} className="icon-button" aria-label={`Supprimer ${category.nom}`}><Trash2 size={14} /></button></div>)}
                 {categories.length === 0 && <p className="p-4 text-xs text-slate-400">Aucune catégorie.</p>}
               </div>
             </div>
@@ -525,7 +524,7 @@ export default function ArticlesPage() {
                 {editingUnitId != null && <button type="button" onClick={cancelUnitEdit} className="button-secondary sm:px-3" aria-label="Annuler la modification"><X size={15} /></button>}
               </form>
               <div className="mt-3 max-h-52 divide-y divide-slate-100 overflow-y-auto rounded-xl border border-slate-100">
-                {units.map((unit) => <div key={unit.id} className="flex items-center justify-between px-3 py-2.5"><div><p className="text-xs font-semibold text-slate-700">{unit.libelle}</p><p className="mt-0.5 text-[10px] text-slate-400">{unit.code}</p></div><div className="flex shrink-0"><button onClick={() => startUnitEdit(unit)} className="icon-button" aria-label={`Modifier ${unit.libelle}`}><Pencil size={14} /></button><button onClick={() => void deleteUnit(unit)} className="icon-button" aria-label={`Supprimer ${unit.libelle}`}><Trash2 size={14} /></button></div></div>)}
+                {units.map((unit) => <div key={unit.id} className="flex items-center justify-between px-3 py-2.5"><div><p className="text-xs font-semibold text-slate-700">{unit.libelle}</p><p className="mt-0.5 text-xs text-slate-400">{unit.code}</p></div><div className="flex shrink-0"><button onClick={() => startUnitEdit(unit)} className="icon-button" aria-label={`Modifier ${unit.libelle}`}><Pencil size={14} /></button><button onClick={() => void deleteUnit(unit)} className="icon-button" aria-label={`Supprimer ${unit.libelle}`}><Trash2 size={14} /></button></div></div>)}
                 {units.length === 0 && <p className="p-4 text-xs text-slate-400">Aucune unité.</p>}
               </div>
             </div>
@@ -548,7 +547,7 @@ export default function ArticlesPage() {
             <div>
               <h3 className="mb-3 text-sm font-bold text-slate-800">Unités associées</h3>
               <div className="divide-y divide-slate-100 rounded-xl border border-slate-100">
-                {saleUnits.map((unit) => <div key={unit.id} className="flex items-center justify-between gap-3 px-3 py-3"><div className="min-w-0"><p className="truncate text-xs font-bold text-slate-700">{unit.code || unit.uniteMesureLibelle}</p><p className="mt-1 text-[10px] text-slate-400">1 unité = {unit.facteurConversion} {unit.uniteMesureLibelle} · {unit.prixVente == null ? "Prix article" : money.format(unit.prixVente)}</p></div><div className="flex shrink-0"><button onClick={() => editSaleUnit(unit)} className="icon-button" aria-label="Modifier"><Pencil size={14} /></button><button onClick={() => void deleteSaleUnit(unit)} className="icon-button" aria-label="Supprimer"><Trash2 size={14} /></button></div></div>)}
+                {saleUnits.map((unit) => <div key={unit.id} className="flex items-center justify-between gap-3 px-3 py-3"><div className="min-w-0"><p className="truncate text-xs font-bold text-slate-700">{unit.code || unit.uniteMesureLibelle}</p><p className="mt-1 text-xs text-slate-400">1 unité = {unit.facteurConversion} {unit.uniteMesureLibelle} · {unit.prixVente == null ? "Prix article" : money.format(unit.prixVente)}</p></div><div className="flex shrink-0"><button onClick={() => editSaleUnit(unit)} className="icon-button" aria-label="Modifier"><Pencil size={14} /></button><button onClick={() => void deleteSaleUnit(unit)} className="icon-button" aria-label="Supprimer"><Trash2 size={14} /></button></div></div>)}
                 {saleUnits.length === 0 && <p className="p-5 text-center text-xs text-slate-400">Aucune unité secondaire n’est définie.</p>}
               </div>
             </div>
@@ -561,13 +560,12 @@ export default function ArticlesPage() {
 
 function stockStatus(article: Article) {
   if (article.quantiteStock <= 0) return { label: "Rupture", className: "bg-rose-50 text-rose-700", dot: "bg-rose-500" };
-  if (article.quantiteStock <= article.seuilAlerteStock) return { label: "Stock bas", className: "bg-orange-50 text-orange-700", dot: "bg-orange-500" };
+  if (article.quantiteStock <= article.seuilAlerteStock) return { label: "Stock bas", className: "bg-amber-50 text-amber-800", dot: "bg-amber-500" };
   return { label: "En stock", className: "bg-emerald-50 text-emerald-700", dot: "bg-emerald-500" };
 }
 
-function SummaryCard({ label, value, icon, tone }: { label: string; value: number; icon: ReactNode; tone: "emerald" | "orange" | "red" }) {
-  const styles = tone === "emerald" ? "bg-emerald-50 text-emerald-700" : tone === "orange" ? "bg-orange-50 text-orange-700" : "bg-rose-50 text-rose-700";
-  return <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><div><p className="text-xs font-semibold text-slate-500">{label}</p><p className="mt-1 text-2xl font-extrabold text-slate-900">{value}</p></div><span className={`grid size-10 place-items-center rounded-xl ${styles}`}>{icon}</span></div>;
+function SummaryCard({ label, value }: { label: string; value: number }) {
+  return <Indicateur libelle={label} valeur={value} />;
 }
 
 function SortHeader({ label, active, direction, onClick }: { label: string; active: boolean; direction: "asc" | "desc"; onClick: () => void }) {
@@ -583,7 +581,7 @@ function Modal({ title, subtitle, children, onClose, wide = false }: { title: st
 }
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
-  return <label className="block"><span className="mb-1.5 block text-[11px] font-bold text-slate-600">{label}</span>{children}</label>;
+  return <label className="block"><span className="mb-1.5 block text-xs font-bold text-slate-600">{label}</span>{children}</label>;
 }
 
 function ModalActions({ busy, onCancel, submitLabel }: { busy: boolean; onCancel: () => void; submitLabel: string }) {

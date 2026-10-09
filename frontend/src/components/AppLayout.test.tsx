@@ -2,10 +2,12 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useAuth } from "../auth/AuthContext";
+import { useEntreprise } from "../entreprise/EntrepriseContext";
 import { api } from "../services/api";
 import AppLayout from "./AppLayout";
 
 vi.mock("../auth/AuthContext", () => ({ useAuth: vi.fn() }));
+vi.mock("../entreprise/EntrepriseContext", () => ({ useEntreprise: vi.fn() }));
 vi.mock("../services/api", () => ({ api: { get: vi.fn() } }));
 
 const TOUS_LES_LIENS = [
@@ -35,6 +37,7 @@ const liensVisibles = () => TOUS_LES_LIENS.filter((nom) => screen.queryByRole("l
 describe("menu de navigation selon les rôles", () => {
   beforeEach(() => {
     vi.mocked(api.get).mockResolvedValue({ data: { statut: "OUVERTE" } });
+    vi.mocked(useEntreprise).mockReturnValue({ entreprise: null, rafraichir: vi.fn(), logoUrl: () => null });
   });
 
   it("le caissier ne voit que la vente, les clients et la caisse", async () => {
@@ -68,6 +71,24 @@ describe("menu de navigation selon les rôles", () => {
     // (la vraie vérification se fait dans un navigateur, écran réduit).
     const zone = screen.getByRole("navigation").parentElement;
     expect(zone).toHaveClass("overflow-y-auto", "min-h-0", "flex-1");
+  });
+
+  it("porte le nom du magasin, pas celui du logiciel, quand l'entreprise est renseignée", async () => {
+    vi.mocked(useEntreprise).mockReturnValue({
+      entreprise: { nom: "Boutique Aminata" } as ReturnType<typeof useEntreprise>["entreprise"],
+      rafraichir: vi.fn(),
+      logoUrl: () => null,
+    });
+    afficher(["ADMIN"]);
+    expect(await screen.findByText("Boutique Aminata")).toBeInTheDocument();
+  });
+
+  it("regroupe les liens par thème et masque le titre d'un groupe vide pour ce rôle", async () => {
+    afficher(["CAISSIER"]);
+    await screen.findByText("Caisse ouverte");
+    expect(screen.getByText("Vente")).toBeInTheDocument();
+    expect(screen.queryByText("Stock")).not.toBeInTheDocument();
+    expect(screen.queryByText("Gestion")).not.toBeInTheDocument();
   });
 
   it("affiche l'écran demandé dans la zone de contenu", async () => {

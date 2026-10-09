@@ -132,8 +132,7 @@ export default function EntreprisePage() {
   return (
     <div className="space-y-6">
       <header>
-        <p className="mb-1 text-xs font-bold uppercase tracking-[0.16em] text-emerald-600">Administration</p>
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900">Entreprise</h1>
+        <h1 className="text-2xl font-bold text-slate-900">Entreprise</h1>
         <p className="mt-1.5 text-sm text-slate-500">
           Ces informations et ce logo s’impriment sur les tickets, reçus, rapports et feuilles d’inventaire. Modifiez-les ici : aucun
           redémarrage n’est nécessaire.
@@ -157,27 +156,27 @@ export default function EntreprisePage() {
           <form onSubmit={(event) => void enregistrer(event)} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="text-base font-bold text-slate-900">Informations</h2>
             <fieldset disabled={!peutModifier || busy} className="space-y-4">
-              <label className="block"><span className="mb-1.5 block text-[10px] font-bold text-slate-600">Nom de l’entreprise</span>
+              <label className="block"><span className="mb-1.5 block text-xs font-bold text-slate-600">Nom de l’entreprise</span>
                 <input required maxLength={150} className="input-field" value={form.nom} onChange={(event) => champ("nom", event.target.value)} />
               </label>
-              <label className="block"><span className="mb-1.5 block text-[10px] font-bold text-slate-600">Adresse</span>
+              <label className="block"><span className="mb-1.5 block text-xs font-bold text-slate-600">Adresse</span>
                 <textarea rows={2} maxLength={300} className="input-field h-auto resize-y py-3" value={form.adresse} onChange={(event) => champ("adresse", event.target.value)} />
               </label>
               <div className="grid gap-4 sm:grid-cols-2">
-                <label className="block"><span className="mb-1.5 block text-[10px] font-bold text-slate-600">Téléphone</span>
+                <label className="block"><span className="mb-1.5 block text-xs font-bold text-slate-600">Téléphone</span>
                   <input maxLength={40} className="input-field" value={form.telephone} onChange={(event) => champ("telephone", event.target.value)} />
                 </label>
-                <label className="block"><span className="mb-1.5 block text-[10px] font-bold text-slate-600">E-mail</span>
+                <label className="block"><span className="mb-1.5 block text-xs font-bold text-slate-600">E-mail</span>
                   <input type="email" maxLength={180} className="input-field" value={form.email} onChange={(event) => champ("email", event.target.value)} />
                 </label>
-                <label className="block"><span className="mb-1.5 block text-[10px] font-bold text-slate-600">RCCM / NINEA / SIRET</span>
+                <label className="block"><span className="mb-1.5 block text-xs font-bold text-slate-600">RCCM / NINEA / SIRET</span>
                   <input maxLength={80} className="input-field" value={form.identifiantLegal} onChange={(event) => champ("identifiantLegal", event.target.value)} />
                 </label>
-                <label className="block"><span className="mb-1.5 block text-[10px] font-bold text-slate-600">Site web</span>
+                <label className="block"><span className="mb-1.5 block text-xs font-bold text-slate-600">Site web</span>
                   <input maxLength={180} className="input-field" value={form.siteWeb} onChange={(event) => champ("siteWeb", event.target.value)} />
                 </label>
               </div>
-              <label className="block"><span className="mb-1.5 block text-[10px] font-bold text-slate-600">Message en bas des tickets</span>
+              <label className="block"><span className="mb-1.5 block text-xs font-bold text-slate-600">Message en bas des tickets</span>
                 <input maxLength={200} className="input-field" value={form.piedDePage} onChange={(event) => champ("piedDePage", event.target.value)} placeholder="Ex. : Merci de votre visite !" />
               </label>
               <label className="flex items-center gap-2 text-xs font-semibold text-slate-700">
@@ -220,7 +219,7 @@ export default function EntreprisePage() {
                 </div>
               )}
             </div>
-            <p className="text-[11px] leading-relaxed text-slate-500">
+            <p className="text-xs leading-relaxed text-slate-500">
               PNG ou JPEG, 2 Mo au plus. Le serveur contrôle l’image, la convertit en PNG et en prépare une version réduite pour chaque
               usage (ticket 80 mm, en-tête A4, miniature) : envoyez simplement votre meilleur fichier.
               {entreprise.logo && ` Logo actuel : ${entreprise.logo.largeur} × ${entreprise.logo.hauteur} px.`}
@@ -231,10 +230,10 @@ export default function EntreprisePage() {
         <aside className="space-y-6">
           <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm" aria-label="Aperçu du ticket">
             <h2 className="mb-4 text-base font-bold text-slate-900">Aperçu d’un ticket</h2>
-            <div className="mx-auto max-w-[72mm] rounded-lg border border-slate-200 p-4 font-mono text-[11px] text-slate-800">
+            <div className="mx-auto max-w-[72mm] rounded-lg border border-slate-200 p-4 font-mono text-xs text-slate-800">
               <EnTeteDocument variante="ticket" entreprise={apercu} />
-              <p className="mt-2 text-center text-[9px] uppercase tracking-[0.2em]">Ticket de vente</p>
-              {apercu.piedDePage && <p className="mt-4 text-center text-[9px] text-slate-500">{apercu.piedDePage}</p>}
+              <p className="mt-2 text-center text-xs uppercase tracking-[0.2em]">Ticket de vente</p>
+              {apercu.piedDePage && <p className="mt-4 text-center text-xs text-slate-500">{apercu.piedDePage}</p>}
             </div>
           </section>
           <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm" aria-label="Aperçu de l’en-tête A4">
