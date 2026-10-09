@@ -109,7 +109,7 @@ export default function AppLayout() {
           collapsed ? "w-[84px]" : "w-[264px]"
         } ${mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
       >
-        <div className="flex h-[78px] items-center justify-between border-b border-slate-100 px-5">
+        <div className="flex h-[78px] shrink-0 items-center justify-between border-b border-slate-100 px-5">
           <div className="flex items-center gap-3 overflow-hidden">
             <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-emerald-600 text-white shadow-sm shadow-emerald-200">
               <Boxes size={21} strokeWidth={2.4} />
@@ -132,7 +132,8 @@ export default function AppLayout() {
           </button>
         </div>
 
-        <div className={`px-4 pt-7 ${collapsed ? "px-3" : ""}`}>
+        {/* Seule cette zone défile : sans min-h-0 + overflow-y-auto, les liens qui dépassent la hauteur de l'écran sont coupés et inaccessibles. */}
+        <div className={`min-h-0 flex-1 overflow-y-auto overscroll-contain pb-4 pt-7 [scrollbar-width:thin] ${collapsed ? "px-3" : "px-4"}`}>
           {!collapsed && (
             <p className="mb-3 px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
               Espace de travail
@@ -163,7 +164,7 @@ export default function AppLayout() {
           </nav>
         </div>
 
-        <div className="mt-auto p-4">
+        <div className="shrink-0 border-t border-slate-100 p-4">
           {!collapsed && (
             <div className="rounded-2xl bg-slate-50 p-3.5">
               <div className="flex items-center gap-3">
