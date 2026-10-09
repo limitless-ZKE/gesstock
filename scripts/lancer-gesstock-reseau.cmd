@@ -9,6 +9,11 @@ set ADRESSE=192.168.1.75
 set MYSQL_UTILISATEUR=gesstock
 set MYSQL_MOT_DE_PASSE=CHANGEZ-MOI
 
+rem --- PREMIERE INSTALLATION SEULEMENT (base vide) : creer le premier administrateur. Retirer le "rem" des 2 lignes, mettre un mot de
+rem     passe de 12 caracteres au moins, lancer UNE fois, puis remettre le "rem" (le compte existe alors dans la base).
+rem set APP_ADMIN_USERNAME=patron
+rem set APP_ADMIN_PASSWORD=CHANGEZ-MOI-12-CARACTERES-AU-MOINS
+
 rem --- Reglages (normalement a ne pas toucher) ---
 set SPRING_PROFILES_ACTIVE=prod
 set DB_URL=jdbc:mysql://localhost:3306/gesstock_db?useSSL=false^&serverTimezone=UTC^&allowPublicKeyRetrieval=true

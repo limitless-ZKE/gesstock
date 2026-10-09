@@ -65,7 +65,7 @@ class MigrationsMysqlIT {
 
         try (ConfigurableApplicationContext contexte = demarrer(base, "--spring.flyway.baseline-on-migrate=false")) {
             JdbcTemplate jdbc = contexte.getBean(JdbcTemplate.class);
-            assertThat(versionsAppliquees(jdbc)).containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13");
+            assertThat(versionsAppliquees(jdbc)).containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14");
             assertThat(migrationsEnEchec(jdbc)).isZero();
             assertThat(derives(contexte, base)).as("enum Java absents de la base").isEmpty();
 
@@ -81,6 +81,9 @@ class MigrationsMysqlIT {
             jdbc.update(insertion, "INV-IT-3", "EN_SAISIE", utilisateurId); // la voie est libre une fois le premier annulé
             jdbc.update(insertion, "INV-IT-4", "VALIDE", utilisateurId);    // les inventaires terminés ne comptent pas
 
+            assertThat(jdbc.queryForList("SELECT name FROM roles ORDER BY name", String.class))
+                .as("installation neuve : les quatre rôles connus existent dès la première connexion (V14)")
+                .containsExactly("ADMIN", "CAISSIER", "GESTIONNAIRE", "MANAGER");
             compteFournisseurGarantiParLaBase(jdbc, utilisateurId);
         }
     }
@@ -107,8 +110,8 @@ class MigrationsMysqlIT {
         migrerJusqua(base, null);
 
         assertThat(jdbc.queryForList("SELECT name FROM roles ORDER BY name", String.class))
-            .as("VENDEUR et USER disparaissent, CAISSIER est créé, MANAGER est créé pour le compte qui l'avait en ancien champ")
-            .containsExactly("ADMIN", "CAISSIER", "MANAGER");
+            .as("VENDEUR et USER disparaissent, puis V14 complète avec les quatre rôles connus (CAISSIER et MANAGER existaient déjà par V4 et V7)")
+            .containsExactly("ADMIN", "CAISSIER", "GESTIONNAIRE", "MANAGER");
         assertThat(rolesDe(jdbc, "chef")).isEqualTo("ADMIN");
         assertThat(rolesDe(jdbc, "vendeur")).isEqualTo("CAISSIER");
         assertThat(rolesDe(jdbc, "double")).as("un seul CAISSIER malgré les deux anciens rôles").isEqualTo("CAISSIER");
@@ -160,7 +163,7 @@ class MigrationsMysqlIT {
         try (ConfigurableApplicationContext contexte = demarrer(base,
             "--spring.flyway.baseline-on-migrate=true", "--spring.flyway.baseline-version=3")) {
             JdbcTemplate jdbc = contexte.getBean(JdbcTemplate.class);
-            assertThat(versionsAppliquees(jdbc)).containsExactly("3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13");
+            assertThat(versionsAppliquees(jdbc)).containsExactly("3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14");
             assertThat(migrationsEnEchec(jdbc)).isZero();
         }
     }

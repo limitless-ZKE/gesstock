@@ -130,8 +130,8 @@ public class DataSeeder implements CommandLineRunner {
     }
 
     private boolean jeuDeDemoVide() {
-        return roleRepository.count() == 0
-            && utilisateurRepository.count() == 0
+        // Les rôles n'entrent pas dans ce test : la migration V14 les crée, base vide comprise.
+        return utilisateurRepository.count() == 0
             && categorieRepository.count() == 0
             && uniteMesureRepository.count() == 0
             && uniteVenteRepository.count() == 0
@@ -140,10 +140,13 @@ public class DataSeeder implements CommandLineRunner {
             && clientRepository.count() == 0;
     }
 
+    /** Les rôles sont des données de référence créées par la migration V14 : on les reprend, on ne les duplique pas. */
     private Role creerRole(String name) {
-        Role role = new Role();
-        role.setName(name);
-        return roleRepository.save(role);
+        return roleRepository.findByName(name).orElseGet(() -> {
+            Role role = new Role();
+            role.setName(name);
+            return roleRepository.save(role);
+        });
     }
 
     private void creerUtilisateur(String username, String rawPassword, Role role) {

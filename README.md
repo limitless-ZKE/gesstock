@@ -158,6 +158,12 @@ leur navigateur. Le programme embarque son interface (profil Maven `interface`) 
 5. **Fixer l'adresse du serveur** (réservation DHCP dans la box ou adresse IP fixe Windows) : si elle change, les postes ne trouvent plus GesStock.
 6. **Ouvrir** `http://ADRESSE:8080` depuis un autre poste ; connexion avec les comptes habituels.
 
+**Première installation chez un client (base vide)** : créer la base vide (`CREATE DATABASE gesstock_db CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;`),
+puis au PREMIER lancement seulement, définir `APP_ADMIN_USERNAME` et `APP_ADMIN_PASSWORD` (12 caractères au moins) : ils créent le premier
+administrateur, jamais un mot de passe par défaut. Le premier démarrage applique les 14 migrations et prend **2 à 3 minutes** (les suivants,
+une demi-minute). Les rôles ADMIN, MANAGER, GESTIONNAIRE et CAISSIER existent d'emblée (migration V14) : l'administrateur crée ensuite
+les comptes de l'équipe dans l'écran Administration, puis renseigne l'écran Entreprise, les catégories, unités et articles.
+
 À savoir :
 - L'interface construite appelle l'API en `/api`, sur le serveur qui la sert (aucun CORS, aucune adresse à régler). Seul `npm run dev`
   utilise l'adresse `http://localhost:8080/api` ; `VITE_API_BASE_URL` impose une autre adresse dans les deux cas.
@@ -213,6 +219,8 @@ Le contrôle de santé de Docker interroge `http://127.0.0.1:8081/actuator/healt
   les contraintes de montants tenues par la base.
 - `V12__retours_fournisseurs.sql` : retours au fournisseur et leurs lignes, compteur `quantite_retournee` (avec CHECK) sur les
   lignes de bon, lien mouvement de stock → retour.
+- `V14__roles_de_reference.sql` : crée les quatre rôles connus (ADMIN, MANAGER, GESTIONNAIRE, CAISSIER) s'ils manquent. Sur une installation
+  neuve, seul ADMIN existait, et il fallait créer les trois autres à la main avant de donner un compte à un caissier.
 - `V13__parametres_entreprise.sql` : informations de l'entreprise et logo (une seule ligne chacune, garantie par la base ; le
   logo dans une table à part pour ne pas être chargé avec les textes).
 - Une migration déjà appliquée ne se modifie jamais : toute évolution du schéma est un nouveau fichier
