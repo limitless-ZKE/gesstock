@@ -144,14 +144,14 @@ Un PC fait office de **serveur** (celui où tourne MySQL) ; les caisses et le bu
 leur navigateur. Le programme embarque son interface (profil Maven `interface`) : pas de second programme à lancer, pas de réglage
 à faire sur les autres postes. Chaque poste imprime ses tickets sur sa propre imprimante.
 
-1. **Construire** (sur le serveur, à refaire après chaque mise à jour du code) : `scriptsconstruire-pour-le-reseau.cmd`. Il construit
-   l'interface puis le programme `targetgesstock-0.0.1-SNAPSHOT.jar`. Avec Docker, `docker compose up -d --build` fait la même chose.
+1. **Construire** (sur le serveur, à refaire après chaque mise à jour du code) : `scripts\construire-pour-le-reseau.cmd`. Il construit
+   l'interface puis le programme `target\gesstock-0.0.1-SNAPSHOT.jar`. Avec Docker, `docker compose up -d --build` fait la même chose.
 2. **Créer un utilisateur MySQL dédié** (ne pas faire tourner un serveur de réseau avec `root`) :
    ```sql
    CREATE USER 'gesstock'@'localhost' IDENTIFIED BY 'un mot de passe solide';
    GRANT ALL PRIVILEGES ON gesstock_db.* TO 'gesstock'@'localhost';
    ```
-3. **Lancer** : modifier les 3 premières lignes de `scriptslancer-gesstock-reseau.cmd` (adresse IP du serveur, utilisateur et mot de passe
+3. **Lancer** : modifier les 3 premières lignes de `scripts\lancer-gesstock-reseau.cmd` (adresse IP du serveur, utilisateur et mot de passe
    MySQL), puis le lancer et laisser sa fenêtre ouverte. Il active le profil `prod` et `COOKIES_SECURE=false` (voir ci-dessous).
 4. **Autoriser le port 8080** dans le pare-feu Windows du serveur (PowerShell en administrateur ; réseau « privé » seulement) :
    `New-NetFirewallRule -DisplayName "GesStock 8080" -Direction Inbound -Protocol TCP -LocalPort 8080 -Action Allow -Profile Private`
@@ -171,11 +171,37 @@ les comptes de l'équipe dans l'écran Administration, puis renseigne l'écran E
   les mots de passe circulent en clair sur le réseau. Acceptable sur un réseau filaire privé ; sur un Wi-Fi partagé ou non fiable, placer
   un serveur web avec certificat (Caddy, nginx) devant GesStock. **Ne jamais exposer le port à Internet** sans HTTPS.
 - **Changer les mots de passe de démonstration** (`admin123`…) depuis l'écran Administration avant d'ouvrir l'accès au réseau.
-- Le serveur doit rester allumé et GesStock lancé pendant les heures d'ouverture ; rien ne le démarre automatiquement au démarrage de
-  Windows, et la sauvegarde de la base reste à planifier (`mysqldump`).
+- Le serveur doit rester allumé et GesStock lancé pendant les heures d'ouverture. Ce lancement « à la main » ne redémarre rien tout seul :
+  pour un client, utiliser le **kit de livraison** (section suivante), qui installe le démarrage automatique et la sauvegarde quotidienne.
 - Seul le serveur parle à MySQL ; la supervision (`/actuator/health`) reste sur le port local 8081, jamais sur le réseau.
 - Testé : profil `prod` sur une copie de la base, ouvert par l'adresse réseau du PC dans un vrai navigateur (connexion, tous les écrans,
   rechargement d'une page profonde, logo, tickets). Pas encore essayé avec un second PC physique ni avec le pare-feu activé.
+
+## Livrer chez un client (kit de livraison)
+
+`scripts\preparer-livraison.cmd` construit l'interface et le programme puis assemble `livraison\GesStock-AAAA-MM-JJ.zip` (option `rapide` : sans
+reconstruire). Le dossier `livraison\` n'est pas versionné. Le zip contient `gesstock.jar` et les fichiers de `scripts\kit-livraison\` :
+
+| Fichier | Rôle |
+|---|---|
+| `INSTALLATION.txt` | installation pas à pas chez le client (Java, MySQL, base, adresse fixe, réglages, tests, liste de remise) |
+| `EXPLOITATION.txt` | vie quotidienne, restauration d'une sauvegarde, mise à jour, retour arrière, que transmettre au support |
+| `configuration.cmd` | **seul fichier à modifier** : adresse, base, mot de passe MySQL, fuseau, TVA, premier administrateur, sauvegardes |
+| `installer.cmd` / `installer.ps1` | demande les droits administrateur ; crée la tâche « GesStock - Serveur » (démarrage avec Windows, compte SYSTEM, relance), la tâche « GesStock - Sauvegarde » (quotidienne) et la règle de pare-feu (réseau local seulement) ; `-Simulation` n'écrit rien |
+| `lancer.cmd` | profil `prod`, journaux dans `journaux\gesstock.log` (10 Mo × 30 fichiers, 300 Mo au plus), relance 30 s après tout arrêt |
+| `sauvegarder-base.cmd` | `mysqldump` → `.zip` vérifié (« Dump completed »), 30 jours conservés, copie sur un second disque si `DOSSIER_COPIE_SAUVEGARDE` est renseigné, mot de passe jamais sur la ligne de commande ; code de retour 1 en cas d'échec |
+| `arreter.cmd`, `demarrer.cmd`, `desinstaller.cmd` | arrêt (serveur **et** boucle de relance, ce dossier seulement), démarrage, retrait |
+
+Mise à jour chez un client : sauvegarde, `arreter.cmd`, remplacer `gesstock.jar` (sans toucher à `configuration.cmd`), `demarrer.cmd`. Les migrations
+Flyway ne sont pas réversibles : le retour arrière passe par la restauration de la sauvegarde faite juste avant.
+
+Testé pour de vrai (base MySQL jetable, utilisateur dédié sans droits globaux, dossier avec une espace dans son chemin) : première installation depuis le zip
+(14 migrations en 1 min 48, premier administrateur, connexion, interface et pages profondes servies), journal dans un fichier, sauvegarde (35 tables, zip
+lisible, copie sur le second emplacement, conservation à 30 jours sur les deux dossiers sans toucher aux fichiers étrangers), échecs de sauvegarde (mauvais
+mot de passe, second disque absent, `mysqldump` ou base introuvable : code 1, journal, aucun `.sql` ni fichier de mot de passe résiduel), relance
+automatique après arrêt brutal du programme, `arreter.ps1` (n'arrête que ce dossier), restauration d'une sauvegarde puis nouvelle connexion, `installer.ps1 -Simulation`.
+**Non testé** (il faut un administrateur et un autre PC) : l'enregistrement réel des tâches planifiées sous SYSTEM, la règle de pare-feu, le démarrage
+automatique après un redémarrage de Windows. `INSTALLATION.txt` fait donc faire ces vérifications sur place (étapes 7 à 10).
 
 ## Production (profil `prod`)
 

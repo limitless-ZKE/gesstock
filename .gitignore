@@ -53,3 +53,6 @@ frontend/tsconfig.tsbuildinfo
 hs_err_pid*.log
 replay_pid*.log
 *.tmp.*
+
+### Kit de livraison genere (scripts/preparer-livraison.cmd) ###
+/livraison/
