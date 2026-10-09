@@ -202,12 +202,13 @@ reconstruire). Le dossier `livraison\` n'est pas versionné. Le zip contient `ge
 
 | Fichier | Rôle |
 |---|---|
-| `INSTALLATION.txt` | installation pas à pas chez le client (Java, MySQL, base, adresse fixe, réglages, tests, liste de remise) |
+| `INSTALLATION.txt` | guide complet chez le client (Java 17, WampServer/MySQL, base, adresse fixe, réglages, installation, tests dont le **redémarrage sans ouvrir de session**, liste de sortie « avant de partir », dépannage) |
 | `EXPLOITATION.txt` | vie quotidienne, restauration d'une sauvegarde, mise à jour, retour arrière, que transmettre au support |
 | `configuration.cmd` | **seul fichier à modifier** : adresse, base, mot de passe MySQL, fuseau, TVA, premier administrateur, sauvegardes |
 | `installer.cmd` / `installer.ps1` | demande les droits administrateur ; crée la tâche « GesStock - Serveur » (démarrage avec Windows, compte SYSTEM, relance), la tâche « GesStock - Sauvegarde » (quotidienne) et la règle de pare-feu (réseau local seulement) ; `-Simulation` n'écrit rien |
 | `lancer.cmd` | profil `prod`, journaux dans `journaux\gesstock.log` (10 Mo × 30 fichiers, 300 Mo au plus), relance 30 s après tout arrêt |
 | `sauvegarder-base.cmd` | `mysqldump` → `.zip` vérifié (« Dump completed »), 30 jours conservés, copie sur un second disque si `DOSSIER_COPIE_SAUVEGARDE` est renseigné, mot de passe jamais sur la ligne de commande ; code de retour 1 en cas d'échec |
+| `verifier-installation.cmd` / `.ps1` | contrôle en un clic (administrateur) : réglages, Java, service MySQL en démarrage automatique et fermé au réseau, accès à la base, GesStock sur ce PC et sur l'adresse du réseau, adresse fixe, tâches planifiées, pare-feu, **GesStock lancé après le dernier démarrage de Windows**, sauvegardes (dont la copie), mise en veille ; `[OK]`/`[ATTENTION]`/`[ERREUR]` et rapport dans `journauxerification.txt` |
 | `arreter.cmd`, `demarrer.cmd`, `desinstaller.cmd` | arrêt (serveur **et** boucle de relance, ce dossier seulement), démarrage, retrait |
 
 Mise à jour chez un client : sauvegarde, `arreter.cmd`, remplacer `gesstock.jar` (sans toucher à `configuration.cmd`), `demarrer.cmd`. Les migrations
@@ -218,8 +219,10 @@ Testé pour de vrai (base MySQL jetable, utilisateur dédié sans droits globaux
 lisible, copie sur le second emplacement, conservation à 30 jours sur les deux dossiers sans toucher aux fichiers étrangers), échecs de sauvegarde (mauvais
 mot de passe, second disque absent, `mysqldump` ou base introuvable : code 1, journal, aucun `.sql` ni fichier de mot de passe résiduel), relance
 automatique après arrêt brutal du programme, `arreter.ps1` (n'arrête que ce dossier), restauration d'une sauvegarde puis nouvelle connexion, `installer.ps1 -Simulation`.
-**Non testé** (il faut un administrateur et un autre PC) : l'enregistrement réel des tâches planifiées sous SYSTEM, la règle de pare-feu, le démarrage
-automatique après un redémarrage de Windows. `INSTALLATION.txt` fait donc faire ces vérifications sur place (étapes 7 à 10).
+Installation réelle réussie ensuite sur le PC d'essai de l'utilisateur (Wamp + Java 17, tâches et pare-feu enregistrés). `verifier-installation.ps1` a été exécuté sur ce PC
+sans droits administrateur (les contrôles des tâches, du pare-feu et des processus sous SYSTEM n'y sont pas lisibles). **Non testé** : le démarrage automatique après un
+redémarrage réel de Windows, un second PC physique, `bind-address = 127.0.0.1` dans le `my.ini` de Wamp. `INSTALLATION.txt` (parties 11 et 12) fait donc faire ces
+vérifications sur place, avec une liste de sortie à cocher avant de quitter le client.
 
 ## Production (profil `prod`)
 
