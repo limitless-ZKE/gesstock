@@ -3,7 +3,6 @@ import {
   Boxes,
   Building2,
   ChartNoAxesCombined,
-  ChevronRight,
   ClipboardList,
   LayoutDashboard,
   LogOut,
@@ -19,25 +18,50 @@ import {
   Store,
   UsersRound,
   X,
+  type LucideIcon,
 } from "lucide-react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
+import { useEntreprise } from "../entreprise/EntrepriseContext";
 import { api } from "../services/api";
+import Marque from "./Marque";
 
-const navigation = [
-  { to: "/dashboard", label: "Tableau de bord", icon: LayoutDashboard },
-  { to: "/caisse", label: "Caisse & ventes", icon: ShoppingCart },
-  { to: "/historique-ventes", label: "Historique des ventes", icon: ReceiptText },
-  { to: "/caisse/mouvements", label: "Mouvements de caisse", icon: SlidersHorizontal },
-  { to: "/articles", label: "Articles", icon: Boxes },
-  { to: "/inventaires", label: "Inventaires", icon: ClipboardList },
-  { to: "/approvisionnements", label: "Approvisionnements", icon: PackagePlus },
-  { to: "/fournisseurs", label: "Fournisseurs", icon: Building2 },
-  { to: "/retours-fournisseurs", label: "Retours fournisseurs", icon: PackageMinus },
-  { to: "/clients-dettes", label: "Clients & dettes", icon: UsersRound },
-  { to: "/statistiques", label: "Statistiques", icon: ChartNoAxesCombined },
-  { to: "/entreprise", label: "Entreprise", icon: Store },
-  { to: "/admin/utilisateurs", label: "Administration", icon: ShieldCheck },
+interface Lien {
+  to: string;
+  label: string;
+  icon: LucideIcon;
+}
+
+/** Le menu suit le travail du magasin : on vend, on gère le stock, on pilote. Un titre de groupe disparaît si aucun de ses liens n'est permis. */
+const groupes: { titre: string | null; liens: Lien[] }[] = [
+  { titre: null, liens: [{ to: "/dashboard", label: "Tableau de bord", icon: LayoutDashboard }] },
+  {
+    titre: "Vente",
+    liens: [
+      { to: "/caisse", label: "Caisse & ventes", icon: ShoppingCart },
+      { to: "/historique-ventes", label: "Historique des ventes", icon: ReceiptText },
+      { to: "/caisse/mouvements", label: "Mouvements de caisse", icon: SlidersHorizontal },
+      { to: "/clients-dettes", label: "Clients & dettes", icon: UsersRound },
+    ],
+  },
+  {
+    titre: "Stock",
+    liens: [
+      { to: "/articles", label: "Articles", icon: Boxes },
+      { to: "/inventaires", label: "Inventaires", icon: ClipboardList },
+      { to: "/approvisionnements", label: "Approvisionnements", icon: PackagePlus },
+      { to: "/fournisseurs", label: "Fournisseurs", icon: Building2 },
+      { to: "/retours-fournisseurs", label: "Retours fournisseurs", icon: PackageMinus },
+    ],
+  },
+  {
+    titre: "Gestion",
+    liens: [
+      { to: "/statistiques", label: "Statistiques", icon: ChartNoAxesCombined },
+      { to: "/entreprise", label: "Entreprise", icon: Store },
+      { to: "/admin/utilisateurs", label: "Administration", icon: ShieldCheck },
+    ],
+  },
 ];
 
 interface CashSession {
@@ -47,10 +71,12 @@ interface CashSession {
 
 export default function AppLayout() {
   const { user, logout } = useAuth();
+  const { entreprise, logoUrl } = useEntreprise();
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [cashOpen, setCashOpen] = useState<boolean | null>(null);
+  const [logoEnErreur, setLogoEnErreur] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -80,23 +106,30 @@ export default function AppLayout() {
     navigate("/login", { replace: true });
   }
 
-  const roleLabel = user?.roles[0]?.replaceAll("_", " ") ?? "Utilisateur";
+  const roleLabel = user?.roles[0]?.replace(/^ROLE_/, "").replaceAll("_", " ").toLowerCase() ?? "utilisateur";
   const normalizedRoles = user?.roles.map((role) => role.toUpperCase().replace(/^ROLE_/, "")) ?? [];
-  const visibleNavigation = navigation.filter(({ to }) => {
-    if (to === "/admin/utilisateurs") return normalizedRoles.includes("ADMIN");
-    if (to === "/entreprise") return normalizedRoles.some((role) => ["ADMIN", "MANAGER"].includes(role));
-    if (["/approvisionnements", "/fournisseurs", "/retours-fournisseurs", "/inventaires"].includes(to)) {
-      return normalizedRoles.some((role) => ["ADMIN", "MANAGER", "GESTIONNAIRE"].includes(role));
+  const aUnDesRoles = (...roles: string[]) => normalizedRoles.some((role) => roles.includes(role));
+  const permis = (to: string): boolean => {
+    if (to === "/admin/utilisateurs") return aUnDesRoles("ADMIN");
+    if (to === "/entreprise") return aUnDesRoles("ADMIN", "MANAGER");
+    if (["/approvisionnements", "/fournisseurs", "/retours-fournisseurs", "/inventaires", "/statistiques"].includes(to)) {
+      return aUnDesRoles("ADMIN", "MANAGER", "GESTIONNAIRE");
     }
-    if (to === "/statistiques") return normalizedRoles.some((role) => ["ADMIN", "MANAGER", "GESTIONNAIRE"].includes(role));
-    if (to === "/caisse/mouvements") return normalizedRoles.some((role) => ["ADMIN", "MANAGER", "GESTIONNAIRE", "CAISSIER"].includes(role));
+    if (to === "/caisse/mouvements") return aUnDesRoles("ADMIN", "MANAGER", "GESTIONNAIRE", "CAISSIER");
     // Le tableau de bord lit des statistiques, et le catalogue se modifie : ni l'un ni l'autre ne concerne le caissier.
-    if (["/dashboard", "/articles"].includes(to)) return normalizedRoles.some((role) => ["ADMIN", "MANAGER", "GESTIONNAIRE"].includes(role));
+    if (["/dashboard", "/articles"].includes(to)) return aUnDesRoles("ADMIN", "MANAGER", "GESTIONNAIRE");
     return true;
-  });
+  };
+  const groupesVisibles = groupes
+    .map((groupe) => ({ ...groupe, liens: groupe.liens.filter(({ to }) => permis(to)) }))
+    .filter((groupe) => groupe.liens.length > 0);
+
+  const nomAffiche = entreprise?.nom ?? "GesStock";
+  const urlLogo = logoUrl("miniature");
+  const logo = urlLogo !== null && urlLogo !== logoEnErreur ? urlLogo : null;
 
   return (
-    <div className="min-h-screen bg-[#f5f7fb]">
+    <div className="min-h-screen bg-fond">
       {mobileOpen && (
         <button
           aria-label="Fermer le menu"
@@ -105,26 +138,32 @@ export default function AppLayout() {
         />
       )}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 flex flex-col border-r border-slate-200 bg-white transition-all duration-200 ${
-          collapsed ? "w-[84px]" : "w-[264px]"
+        className={`fixed inset-y-0 left-0 z-40 flex flex-col border-r border-slate-200 bg-white transition-[width,transform] duration-200 ${
+          collapsed ? "w-[68px]" : "w-[248px]"
         } ${mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
       >
-        <div className="flex h-[78px] shrink-0 items-center justify-between border-b border-slate-100 px-5">
-          <div className="flex items-center gap-3 overflow-hidden">
-            <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-emerald-600 text-white shadow-sm shadow-emerald-200">
-              <Boxes size={21} strokeWidth={2.4} />
-            </div>
+        {/* L'application porte le nom du magasin : c'est lui que le personnel reconnaît, pas la version du logiciel. */}
+        <div className={`flex h-16 shrink-0 items-center justify-between border-b border-slate-200 ${collapsed ? "px-3" : "px-4"}`}>
+          <div className="flex min-w-0 items-center gap-3">
+            {logo ? (
+              <img
+                src={logo}
+                alt=""
+                onError={() => setLogoEnErreur(logo)}
+                className="size-9 shrink-0 rounded-lg border border-slate-200 bg-white object-contain p-0.5"
+              />
+            ) : (
+              <Marque taille={36} className="text-emerald-600" />
+            )}
             {!collapsed && (
-              <div className="leading-tight">
-                <p className="font-extrabold tracking-tight text-slate-900">GesStock</p>
-                <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-600">
-                  Gestion 3.0
-                </p>
+              <div className="min-w-0 leading-tight">
+                <p className="truncate text-[15px] font-bold text-slate-900">{nomAffiche}</p>
+                <p className="truncate text-xs text-slate-500">{entreprise ? "GesStock" : "Gestion de commerce"}</p>
               </div>
             )}
           </div>
           <button
-            className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 lg:hidden"
+            className="icon-button lg:hidden"
             onClick={() => setMobileOpen(false)}
             aria-label="Fermer la navigation"
           >
@@ -133,110 +172,79 @@ export default function AppLayout() {
         </div>
 
         {/* Seule cette zone défile : sans min-h-0 + overflow-y-auto, les liens qui dépassent la hauteur de l'écran sont coupés et inaccessibles. */}
-        <div className={`min-h-0 flex-1 overflow-y-auto overscroll-contain pb-4 pt-7 [scrollbar-width:thin] ${collapsed ? "px-3" : "px-4"}`}>
-          {!collapsed && (
-            <p className="mb-3 px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
-              Espace de travail
-            </p>
-          )}
-          <nav className="space-y-1.5">
-            {visibleNavigation.map(({ to, label, icon: Icon }) => (
-              <NavLink
-                key={to}
-                to={to}
-                title={collapsed ? label : undefined}
-                onClick={() => setMobileOpen(false)}
-                className={({ isActive }) =>
-                  `group flex h-11 items-center gap-3 rounded-xl px-3 text-[13px] font-semibold transition ${
-                    isActive
-                      ? "bg-emerald-50 text-emerald-700"
-                      : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
-                  } ${collapsed ? "justify-center px-0" : ""}`
-                }
-              >
-                <Icon size={18} strokeWidth={2} />
-                {!collapsed && <span>{label}</span>}
-                {!collapsed && to === "/caisse" && (
-                  <ChevronRight className="ml-auto opacity-50" size={15} />
-                )}
-              </NavLink>
+        <div className={`min-h-0 flex-1 overflow-y-auto overscroll-contain pb-4 pt-3 [scrollbar-width:thin] ${collapsed ? "px-2" : "px-3"}`}>
+          <nav aria-label="Navigation principale">
+            {groupesVisibles.map((groupe, index) => (
+              <div key={groupe.titre ?? "accueil"} className={index === 0 ? "" : collapsed ? "mt-3 border-t border-slate-200 pt-3" : "mt-4"}>
+                {groupe.titre && !collapsed && <p className="mb-1 px-3 text-xs font-semibold text-slate-500">{groupe.titre}</p>}
+                <div className="space-y-0.5">
+                  {groupe.liens.map(({ to, label, icon: Icon }) => (
+                    <NavLink
+                      key={to}
+                      to={to}
+                      title={collapsed ? label : undefined}
+                      onClick={() => setMobileOpen(false)}
+                      className={({ isActive }) =>
+                        `flex h-9 items-center gap-3 rounded-lg border-l-[3px] px-2.5 text-sm transition-colors ${
+                          isActive
+                            ? "border-emerald-600 bg-emerald-50 font-semibold text-emerald-800"
+                            : "border-transparent font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                        } ${collapsed ? "justify-center px-0" : ""}`
+                      }
+                    >
+                      <Icon size={18} strokeWidth={1.9} className="shrink-0" />
+                      {!collapsed && <span className="truncate">{label}</span>}
+                    </NavLink>
+                  ))}
+                </div>
+              </div>
             ))}
           </nav>
         </div>
 
-        <div className="shrink-0 border-t border-slate-100 p-4">
-          {!collapsed && (
-            <div className="rounded-2xl bg-slate-50 p-3.5">
-              <div className="flex items-center gap-3">
-                <div className="grid size-9 shrink-0 place-items-center rounded-full bg-slate-200 text-xs font-bold text-slate-700">
-                  {user?.username.slice(0, 2).toUpperCase()}
-                </div>
-                <div className="min-w-0">
-                  <p className="truncate text-xs font-bold text-slate-800">{user?.username}</p>
-                  <p className="mt-0.5 truncate text-[10px] font-medium text-slate-500">{roleLabel}</p>
-                </div>
-              </div>
-              <button
-                onClick={handleLogout}
-                className="mt-3 flex w-full items-center gap-2 rounded-lg px-2 py-2 text-xs font-semibold text-slate-500 hover:bg-white hover:text-rose-600"
-              >
-                <LogOut size={15} />
-                Déconnexion
-              </button>
-            </div>
-          )}
+        <div className="hidden shrink-0 border-t border-slate-200 p-2 lg:block">
           <button
             onClick={() => setCollapsed((value) => !value)}
-            className="mt-3 hidden w-full items-center justify-center rounded-lg p-2 text-slate-400 hover:bg-slate-100 lg:flex"
+            className={`flex h-9 w-full items-center gap-2 rounded-lg px-2.5 text-sm font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 ${collapsed ? "justify-center px-0" : ""}`}
             aria-label={collapsed ? "Déployer la barre latérale" : "Rétracter la barre latérale"}
           >
-            {collapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}
+            {collapsed ? <PanelLeftOpen size={17} /> : <><PanelLeftClose size={17} /> Réduire le menu</>}
           </button>
         </div>
       </aside>
 
-      <div className={`min-h-screen transition-[padding] duration-200 ${collapsed ? "lg:pl-[84px]" : "lg:pl-[264px]"}`}>
-        <header className="sticky top-0 z-20 flex h-[78px] items-center justify-between border-b border-slate-200/80 bg-white/90 px-4 backdrop-blur md:px-8">
+      <div className={`min-h-screen transition-[padding] duration-200 ${collapsed ? "lg:pl-[68px]" : "lg:pl-[248px]"}`}>
+        <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-slate-200 bg-white px-4 md:px-6">
           <div className="flex items-center gap-3">
             <button
-              className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 lg:hidden"
+              className="icon-button lg:hidden"
               onClick={() => setMobileOpen(true)}
               aria-label="Ouvrir la navigation"
             >
               <Menu size={20} />
             </button>
-            <div className="hidden items-center gap-2 text-xs font-medium text-slate-400 sm:flex">
-              <span>GesStock</span>
-              <ChevronRight size={14} />
-              <span className="text-slate-700">Gestion des opérations</span>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <div
-              className={`flex items-center gap-2 rounded-full px-3 py-2 text-[11px] font-bold ${
-                cashOpen === true
-                  ? "bg-emerald-50 text-emerald-700"
-                  : cashOpen === false
-                    ? "bg-amber-50 text-amber-700"
-                    : "bg-slate-100 text-slate-500"
+            <p
+              className={`flex items-center gap-2 text-sm font-semibold ${
+                cashOpen === true ? "text-emerald-800" : cashOpen === false ? "text-amber-800" : "text-slate-500"
               }`}
             >
-              <span className={`size-1.5 rounded-full ${cashOpen === true ? "bg-emerald-500" : cashOpen === false ? "bg-amber-500" : "bg-slate-400"}`} />
+              <span className={`size-2 rounded-full ${cashOpen === true ? "bg-emerald-600" : cashOpen === false ? "bg-amber-600" : "bg-slate-400"}`} />
               Caisse {cashOpen === true ? "ouverte" : cashOpen === false ? "fermée" : "indisponible"}
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="hidden text-right leading-tight sm:block">
+              <p className="text-sm font-semibold text-slate-900">{user?.username}</p>
+              <p className="text-xs capitalize text-slate-500">{roleLabel}</p>
             </div>
-            <button
-              onClick={handleLogout}
-              className="rounded-xl border border-slate-200 p-2.5 text-slate-500 hover:border-rose-200 hover:text-rose-600"
-              aria-label="Déconnexion"
-              title="Déconnexion"
-            >
-              <LogOut size={17} />
+            <button onClick={handleLogout} className="icon-button" aria-label="Déconnexion" title="Déconnexion">
+              <LogOut size={18} />
             </button>
           </div>
         </header>
-        <main className="mx-auto w-full max-w-[1440px] p-4 md:p-8">
+        <main className="mx-auto w-full max-w-[1440px] p-4 md:p-6">
           {/* Le menu reste affiché pendant le chargement d'un écran. */}
-          <Suspense fallback={<p role="status" className="py-24 text-center text-sm font-medium text-slate-400">Chargement…</p>}>
+          <Suspense fallback={<p role="status" className="py-24 text-center text-sm font-medium text-slate-500">Chargement…</p>}>
             <Outlet />
           </Suspense>
         </main>
