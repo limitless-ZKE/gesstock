@@ -1,18 +1,16 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   ArrowDownToLine,
-  CalendarDays,
-  ChartNoAxesCombined,
   CircleAlert,
-  FileSpreadsheet,
-  FileText,
-  LoaderCircle,
   } from "lucide-react";
 import { api } from "../services/api";
 import { apiErrorMessage as messageFor } from "../services/apiError";
 import { money } from "../lib/format";
+import BoutonsExport from "../components/BoutonsExport";
 import EnTeteDocument from "../components/EnTeteDocument";
 import Indicateur from "../components/Indicateur";
+import SelecteurPeriode, { type Periode } from "../components/SelecteurPeriode";
+import { aujourdhui, debutDuMois } from "../lib/dates";
 
 type CategoryMargin = {
   categorieId: number | null;
@@ -66,10 +64,6 @@ type Report = {
   sessionsCaisse: CashSession[];
   journalActivites: JournalActivity[];
 };
-type PeriodPreset = "today" | "month" | "custom";
-
-const isoToday = () => new Date().toISOString().slice(0, 10);
-const monthStart = () => `${isoToday().slice(0, 7)}-01`;
 
 function dateLabel(value: string) {
   return new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium" }).format(new Date(`${value.slice(0, 10)}T00:00:00`));
@@ -81,80 +75,30 @@ function dateTimeLabel(value: string | null) {
 }
 
 export default function StatistiquesPage() {
-  const [preset, setPreset] = useState<PeriodPreset>("month");
-  const [startDate, setStartDate] = useState(monthStart);
-  const [endDate, setEndDate] = useState(isoToday);
+  const [periode, setPeriode] = useState<Periode>(() => ({ debut: debutDuMois(), fin: aujourdhui() }));
   const [report, setReport] = useState<Report | null>(null);
   const [loading, setLoading] = useState(true);
-  const [exporting, setExporting] = useState<"excel" | "pdf" | null>(null);
   const [error, setError] = useState("");
-  const [exportError, setExportError] = useState("");
+  const [exportError, setExportError] = useState<string | null>(null);
+  // Une réponse tardive d'une ancienne période ne doit pas écraser celle qu'on vient de choisir.
+  const derniereDemande = useRef(0);
 
-  // N'utilise que des setters (stables) : la période est passée en paramètre, jamais lue dans l'état.
-  const loadReport = useCallback(async (start: string, end: string) => {
-    if (!start || !end || end < start) {
-      setError("La date de fin doit être égale ou postérieure à la date de début.");
-      return;
-    }
+  const loadReport = useCallback(async (choisie: Periode) => {
+    const demande = ++derniereDemande.current;
     setLoading(true);
     setError("");
-    setExportError("");
+    setExportError(null);
     try {
-      const { data } = await api.get<Report>("/statistiques/rapport", { params: { debut: start, fin: end } });
-      setReport(data);
+      const { data } = await api.get<Report>("/statistiques/rapport", { params: { debut: choisie.debut, fin: choisie.fin } });
+      if (demande === derniereDemande.current) setReport(data);
     } catch (reason) {
-      setError(messageFor(reason, "Le rapport financier n’a pas pu être chargé."));
+      if (demande === derniereDemande.current) setError(messageFor(reason, "Le rapport financier n’a pas pu être chargé."));
     } finally {
-      setLoading(false);
+      if (demande === derniereDemande.current) setLoading(false);
     }
   }, []);
 
-  // Premier chargement : la période par défaut est celle des états initiaux ci-dessus (début du mois → aujourd'hui).
-  useEffect(() => { void loadReport(monthStart(), isoToday()); }, [loadReport]);
-
-  function selectPreset(next: PeriodPreset) {
-    setPreset(next);
-    if (next === "today") {
-      const day = isoToday();
-      setStartDate(day);
-      setEndDate(day);
-      void loadReport(day, day);
-    } else if (next === "month") {
-      const first = monthStart();
-      const last = isoToday();
-      setStartDate(first);
-      setEndDate(last);
-      void loadReport(first, last);
-    }
-  }
-
-  async function download(format: "excel" | "pdf") {
-    if (!startDate || !endDate || endDate < startDate) {
-      setExportError("Sélectionnez une période valide avant l’export.");
-      return;
-    }
-    setExporting(format);
-    setExportError("");
-    try {
-      const extension = format === "excel" ? "xlsx" : "pdf";
-      const { data } = await api.get<Blob>(`/statistiques/rapport/${format}`, {
-        params: { debut: startDate, fin: endDate },
-        responseType: "blob",
-      });
-      const url = URL.createObjectURL(data);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = `gesstock-rapport-${startDate}-${endDate}.${extension}`;
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      URL.revokeObjectURL(url);
-    } catch (reason) {
-      setExportError(messageFor(reason, `L’export ${format.toUpperCase()} a échoué.`));
-    } finally {
-      setExporting(null);
-    }
-  }
+  useEffect(() => { void loadReport(periode); }, [periode, loadReport]);
 
   const maxCategoryMargin = useMemo(() => Math.max(0, ...(report?.margesParCategorie.map((item) => Math.max(0, item.margeBrute)) ?? [])), [report]);
   const maxArticleMargin = useMemo(() => Math.max(0, ...(report?.margesParArticle.map((item) => Math.max(0, item.margeBrute)) ?? [])), [report]);
@@ -163,24 +107,13 @@ export default function StatistiquesPage() {
     <div className="hidden print:block"><EnTeteDocument variante="a4" /></div>
     <header className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
       <div><h1 className="text-2xl font-bold text-slate-900">Rapports & statistiques</h1><p className="mt-1.5 text-sm text-slate-500">Analysez le chiffre d’affaires, les marges et les sessions de caisse.</p><p className="mt-1 text-xs text-slate-400">Le chiffre d’affaires est TTC ; les marges produit sont calculées hors TVA, après remises.</p></div>
-      <div className="flex flex-wrap gap-2"><button disabled={!!exporting || !report} onClick={() => void download("excel")} className="button-secondary h-10"><FileSpreadsheet size={15} />{exporting === "excel" ? "Export…" : "Excel"}</button><button disabled={!!exporting || !report} onClick={() => void download("pdf")} className="button-secondary h-10"><FileText size={15} />{exporting === "pdf" ? "Export…" : "PDF"}</button></div>
+      <BoutonsExport chemin="/statistiques/rapport" periode={periode} nomDuFichier="gesstock-rapport" desactive={loading || !report} onErreur={setExportError} />
     </header>
 
-    <section className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:flex-row md:items-end md:justify-between md:p-5">
-      <div><p className="mb-2 text-xs font-semibold text-slate-500">Période d’analyse</p><div className="flex gap-1 rounded-xl bg-slate-100 p-1">
-        <PresetButton active={preset === "today"} onClick={() => selectPreset("today")}>Aujourd’hui</PresetButton>
-        <PresetButton active={preset === "month"} onClick={() => selectPreset("month")}>Ce mois</PresetButton>
-        <PresetButton active={preset === "custom"} onClick={() => setPreset("custom")}>Personnalisée</PresetButton>
-      </div></div>
-      <form onSubmit={(event) => { event.preventDefault(); void loadReport(startDate, endDate); }} className="flex flex-col gap-2 sm:flex-row sm:items-end">
-        <label className="block"><span className="mb-1 block text-xs font-bold text-slate-500">Du</span><span className="relative block"><CalendarDays size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input type="date" required value={startDate} onChange={(event) => { setStartDate(event.target.value); setPreset("custom"); }} className="input-field h-10 pl-9" /></span></label>
-        <label className="block"><span className="mb-1 block text-xs font-bold text-slate-500">Au</span><span className="relative block"><CalendarDays size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input type="date" required min={startDate} value={endDate} onChange={(event) => { setEndDate(event.target.value); setPreset("custom"); }} className="input-field h-10 pl-9" /></span></label>
-        <button disabled={loading} className="button-primary h-10 min-w-36">{loading ? <LoaderCircle size={15} className="animate-spin" /> : <ChartNoAxesCombined size={15} />}Analyser</button>
-      </form>
-    </section>
+    <SelecteurPeriode periode={periode} onChange={setPeriode} chargement={loading} titre="Période d’analyse" libelleBouton="Analyser" />
 
-    {error && <div role="alert" className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-800"><CircleAlert size={15} />{error}<button onClick={() => void loadReport(startDate, endDate)} className="ml-auto underline">Réessayer</button></div>}
-    {exportError && <div role="alert" className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-800"><CircleAlert size={15} />{exportError}<button onClick={() => setExportError("")} className="ml-auto underline">Fermer</button></div>}
+    {error && <div role="alert" className="flex items-center gap-2 border-l-4 border-rose-600 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800"><CircleAlert size={16} />{error}<button onClick={() => void loadReport(periode)} className="ml-auto font-semibold underline">Réessayer</button></div>}
+    {exportError && <div role="alert" className="flex items-center gap-2 border-l-4 border-amber-600 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900"><CircleAlert size={16} />{exportError}<button onClick={() => setExportError(null)} className="ml-auto font-semibold underline">Fermer</button></div>}
 
     <section className="grid gap-3 sm:grid-cols-3">
       <Kpi title="Chiffre d’affaires" value={report ? money.format(report.chiffreAffaires) : "—"} loading={loading} />
@@ -222,10 +155,6 @@ export default function StatistiquesPage() {
 
 function Kpi({ title, value, loading }: { title: string; value: string; loading: boolean }) {
   return <Indicateur libelle={title} valeur={loading ? "…" : value} />;
-}
-
-function PresetButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
-  return <button type="button" onClick={onClick} className={`rounded-lg px-3 py-2 text-xs font-bold transition ${active ? "bg-white text-emerald-700 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}>{children}</button>;
 }
 
 function Empty({ children }: { children: ReactNode }) {

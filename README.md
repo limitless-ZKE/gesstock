@@ -138,6 +138,24 @@ Seuls ces quatre rôles existent. Les anciens rôles `VENDEUR` et `USER` sont fu
   s'ajoute). La caisse lit le régime sur `GET /api/caisse/parametres`. Les proformas n'appliquent pas de TVA : à traiter
   le jour où la TVA est activée.
 
+## États à imprimer par période (historique des ventes, journal de caisse)
+
+Les deux écrans partagent le sélecteur de période de l'écran Statistiques (aujourd'hui, hier, ce mois, ou deux dates) et deux boutons :
+**Excel** (pour retravailler les chiffres) et **PDF** (A4 paysage, avec le nom et le logo de l'entreprise, numéro de page, à imprimer).
+Tous les rôles y ont accès : ils lisent déjà ces données écran par écran (voir `SecurityConfig`). Une période va de 1 à 366 jours
+(`400 REQUETE_INVALIDE` si la fin précède le début ou si la période est trop longue) ; l'écran, lui, n'accepte aucune date future.
+
+| Écran | API (même contenu en JSON, `/excel` et `/pdf`) | Contenu |
+|---|---|---|
+| Historique des ventes | `GET /api/ventes/historique?debut=&fin=` | une ligne par vente (validées et annulées), résumé (nombre, chiffre d'affaires TTC, remises, annulées), sous-total par jour sur plusieurs jours ; Excel : feuille « Articles vendus » en plus |
+| Mouvements de caisse > onglet « Journal de caisse » | `GET /api/caisse/journal?debut=&fin=` | par journée de caisse : fond, ventes en espèces, règlements de dettes en espèces, sorties, solde théorique, espèces comptées, écart, et chaque écriture avec son solde ; PDF à signer (visas) |
+
+Règles du journal (les mêmes que le solde théorique de la clôture, `SessionCaisseService`) : une vente annulée n'y figure plus et son
+remboursement n'est pas une sortie de plus ; une vente à crédit n'a rien rapporté ; Mobile Money, carte ou virement ne passent pas par le
+tiroir-caisse et sont résumés à part ; un règlement de dette hors espèces n'est jamais rattaché à la session. Le dernier solde de chaque
+journée est donc toujours celui que la caisse affiche à la clôture (test `JournalCaisseServiceTests`). L'écran affiche au plus 5 000 ventes,
+les documents 50 000 : au-delà, le serveur demande une période plus courte au lieu de ralentir.
+
 ## Plusieurs postes sur un réseau local (une seule adresse)
 
 Un PC fait office de **serveur** (celui où tourne MySQL) ; les caisses et le bureau ouvrent simplement `http://ADRESSE-DU-SERVEUR:8080` dans
