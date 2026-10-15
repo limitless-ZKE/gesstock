@@ -28,6 +28,29 @@ INSTALLATION (4 gestes)
    Identifiant : admin        Mot de passe : celui qui vous a été communiqué (il n'est écrit nulle part ici).
 
 
+DÉMARRAGE AUTOMATIQUE (recommandé chez un client)
+-------------------------------------------------
+Sans cela, GesStock s'arrête quand le PC s'éteint et il faut double-cliquer à nouveau sur demarrer.cmd. Avec le démarrage
+automatique, GesStock se lance tout seul avec Windows, sans aucune fenêtre ni message, et le navigateur s'ouvre sur la page de
+connexion quand GesStock est prêt.
+
+1. Vérifiez d'abord que tout marche avec demarrer.cmd (les 4 gestes ci-dessus), puis fermez la fenêtre de demarrer.cmd.
+2. Double-cliquez sur  installer-demarrage-automatique.cmd , répondez "Oui" à la demande de Windows, puis attendez le message
+   vert "GesStock fonctionne et démarrera tout seul avec ce PC". Une fois fait, n'utilisez plus demarrer.cmd.
+3. Vérifiez : Démarrer > Redémarrer, connectez-vous à Windows et attendez. Le navigateur s'ouvre tout seul sur la page de
+   connexion, mais seulement quand GesStock est vraiment prêt : environ 2 minutes après le démarrage sur un PC récent à disque
+   SSD ; sur un vieux PC à disque dur classique, Windows lui-même est très lent juste après le démarrage et cela peut prendre
+   10 minutes ou plus (le navigateur attend patiemment jusqu'à 20 minutes, il ne s'ouvre pas avant). Le serveur démarre même
+   si personne ne se connecte à Windows : les autres postes du réseau y accèdent dès qu'il est prêt.
+   Chez un client, un disque SSD est le meilleur investissement : le même GesStock y démarre en moins de 30 secondes.
+
+Le sous-dossier "outils" contient le reste :
+  arreter.cmd                        arrête GesStock (avant une mise à jour du programme ou une restauration de la base)
+  desactiver-demarrage-automatique.cmd   retire le démarrage automatique (la base et les fichiers ne sont pas touchés)
+Mise à jour de gesstock.jar : arreter.cmd, remplacer gesstock.jar par le nouveau, puis relancer
+installer-demarrage-automatique.cmd (il relance GesStock tout de suite).
+
+
 APRÈS LA PREMIÈRE CONNEXION
 ---------------------------
 - Changez le mot de passe de l'administrateur : menu "Administration", modifier l'utilisateur "admin".
@@ -38,16 +61,18 @@ APRÈS LA PREMIÈRE CONNEXION
 
 RÉGLAGES (facultatif)
 ---------------------
-Ouvrez demarrer.cmd avec le Bloc-notes (clic droit > Modifier) : les cinq lignes "set" tout en haut donnent le port, le
-fuseau horaire du pays (Africa/Dakar, Africa/Abidjan, Africa/Douala...), le taux de TVA (0 = pas de TVA) et si les prix
-sont TTC (true) ou HT (false). Enregistrez, fermez la fenêtre de GesStock et relancez demarrer.cmd.
+Ouvrez demarrer.cmd avec le Bloc-notes (clic droit > Modifier) : les lignes "set" tout en haut donnent le port, le
+fuseau horaire du pays (Africa/Dakar, Africa/Abidjan, Africa/Douala...), le taux de TVA (0 = pas de TVA), si les prix
+sont TTC (true) ou HT (false), la mémoire de Java et ses options (réglées pour un démarrage rapide : ne les changez pas
+sans raison). Enregistrez, puis arrêtez GesStock (outils\arreter.cmd) et relancez-le (demarrer.cmd, ou
+installer-demarrage-automatique.cmd si le démarrage automatique est installé).
 
 
 À SAVOIR
 --------
-- Ce dossier ne contient ni sauvegarde automatique ni démarrage automatique avec Windows : après un redémarrage du PC,
-  il faut double-cliquer à nouveau sur demarrer.cmd. Les données sont dans MySQL (C:\wamp64\bin\mysql) : faites une
+- Ce dossier ne contient pas de sauvegarde automatique. Les données sont dans MySQL (C:\wamp64\bin\mysql) : faites une
   copie régulière de la base (icône Wamp > phpMyAdmin > base "{{NOM_BASE}}" > Exporter).
+- Sans le démarrage automatique, après un redémarrage du PC il faut double-cliquer à nouveau sur demarrer.cmd.
 - Les messages de GesStock sont dans le sous-dossier "journaux" (créé au premier démarrage).
 - En cas de problème, envoyez une photo de l'écran et le fichier journaux\gesstock.log.
 

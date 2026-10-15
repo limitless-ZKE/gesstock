@@ -245,10 +245,25 @@ Le serveur a seulement besoin de Java 17 et de WampServer : on copie le dossier,
   chaque client et après chaque nouvelle migration. Options : `-Destination`, `-Admin`, `-MotDePasseAdmin`, `-NomBase`, `-Utilisateur`, `-Port`, `-MotDePasseRoot`.
 - `importer-la-base.cmd` refuse d'effacer une base déjà remplie sans que l'on tape `EFFACER` ; `demarrer.cmd` refuse un Java inférieur à 17 et relance GesStock
   s'il s'arrête.
-- **Ni démarrage automatique avec Windows ni sauvegarde planifiée** : c'est le rôle du kit complet ci-dessus.
+- **Démarrage automatique, sans fenêtre** : `installer-demarrage-automatique.cmd` (une fois, administrateur, relançable après une mise à jour) enregistre la
+  tâche « GesStock - Serveur » (au démarrage de Windows + 1 minute, compte `SYSTEM` donc aucune fenêtre ni session nécessaire, relance si arrêt, lance
+  `demarrer.cmd silencieux` qui ne fait jamais de pause), un raccourci du dossier Démarrage de tous les utilisateurs qui lance `outils\ouvrir-navigateur.vbs`
+  (invisible : il attend que GesStock réponde sur le port lu dans `demarrer.cmd`, puis ouvre le navigateur par défaut sur la page de connexion ; au bout de 7 minutes
+  sans réponse il l'ouvre quand même), et la règle de pare-feu du réseau local (indispensable : lancé par Windows, GesStock n'affiche pas la question « autoriser
+  l'accès ? »). `outils\arreter.cmd` arrête GesStock avant une mise à jour ; `outils\desactiver-demarrage-automatique.cmd` retire tout. Pas de sauvegarde planifiée
+  (c'est le rôle du kit complet).
+- **Mettre à jour un dossier déjà livré** sans toucher à sa base : `preparer-livraison-simple.cmd -MettreAJour -Destination <dossier>` copie le nouveau `gesstock.jar`
+  et les scripts, et relit dans son `demarrer.cmd` le port, la base, le compte, le mot de passe MySQL, le fuseau et la TVA (aucun Java ni WampServer requis).
 - Vérifié de bout en bout avec d'autres noms de base, de compte et de port : import, refus de réimporter, démarrage en 56 s, connexion de l'administrateur dans
   Edge par l'adresse du réseau, quantité saisie, vente à crédit, dette créée. Le vrai dossier livré a été démarré sur son propre SQL (importé sous d'autres noms) : connexion
-  de l'administrateur acceptée, mauvais mot de passe refusé.
+  de l'administrateur acceptée, mauvais mot de passe refusé. Démarrage automatique : testés sans droits administrateur seulement la simulation de l'installation et du
+  retrait, le code de la tâche (enregistrée puis supprimée pour l'utilisateur courant) et du raccourci, `demarrer.cmd silencieux` lancé sans fenêtre, et
+  `ouvrir-navigateur.vbs` (attend un serveur absent puis le voit prêt 30 s après son lancement). **Non testés** (il faut un administrateur et un vrai redémarrage) :
+  l'enregistrement de la tâche sous `SYSTEM`, la règle de pare-feu, le raccourci du dossier Démarrage et l'ouverture réelle du navigateur à la connexion.
+  **Premier vrai redémarrage** (PC de 2011, i5-2410M, disque dur 5400 tr/min) : tâche, raccourci et navigateur ont fonctionné, mais GesStock n'a été prêt que plus de vingt minutes
+  après le démarrage de Windows (le navigateur s'était ouvert avant). Cause mesurée : la tâche tournait en priorité « inférieure à la normale » (défaut du Planificateur,
+  `Win32_Process.Priority` = 6 contre 8), et Java a mis dix minutes à arriver au premier message pendant que Windows et l'ouverture de session saturaient le disque. Corrections :
+  priorité normale, `demarrer.cmd` qui attend MySQL, options Java (`-XX:TieredStopAtLevel=1 -XX:+UseSerialGC`, démarrage 33 s → 24 s à chaud), navigateur qui attend 20 minutes.
 
 ## Production (profil `prod`)
 

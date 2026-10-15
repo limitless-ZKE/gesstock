@@ -7,17 +7,24 @@ setlocal
 title GesStock
 cd /d "%~dp0"
 
+rem Lance par la tache du demarrage automatique ("demarrer.cmd silencieux") : personne ne peut appuyer sur une touche, donc jamais de pause.
+set "PAUSE=pause"
+if /i "%~1"=="silencieux" set "PAUSE=rem"
+
 rem ------------------------------------------------ reglages a adapter au client
 set PORT={{PORT}}
 set FUSEAU_HORAIRE=Africa/Dakar
 set TAUX_TVA=0
 set PRIX_TTC=false
 set MEMOIRE_JAVA=768m
+rem Options de la machine virtuelle Java : demarrage plus rapide sur un PC modeste (mesure : 33 s -> 24 s sur un PC de 2011). Effacer
+rem la ligne ci-dessous (garder "set OPTIONS_JAVA=") pour revenir aux reglages par defaut de Java.
+set OPTIONS_JAVA=-XX:TieredStopAtLevel=1 -XX:+UseSerialGC
 rem ------------------------------------------------
 
 if not exist "%~dp0gesstock.jar" (
   echo gesstock.jar est introuvable dans ce dossier.
-  pause
+  %PAUSE%
   exit /b 1
 )
 
@@ -72,9 +79,23 @@ echo.
 echo  Le premier demarrage prend environ une minute. Gardez cette fenetre ouverte.
 echo.
 
+rem --- Attendre MySQL : au demarrage de Windows il est parfois plus long a se lancer que GesStock, et lancer Java pour rien coute
+rem     une minute sur un PC modeste. On attend (10 minutes au plus) que le port 3306 soit ouvert, puis on essaie quand meme. ---
+set /a ESSAIS_MYSQL=0
+netstat -an | findstr /r /c:":3306 *0\.0\.0\.0:0" >nul
+if not errorlevel 1 goto mysql_pret
+echo  Attente de MySQL (WampServer)...
+:attente_mysql
+set /a ESSAIS_MYSQL+=1
+if %ESSAIS_MYSQL% GEQ 120 goto mysql_pret
+ping -n 6 127.0.0.1 >nul
+netstat -an | findstr /r /c:":3306 *0\.0\.0\.0:0" >nul
+if errorlevel 1 goto attente_mysql
+:mysql_pret
+
 rem Si GesStock s'arrete (MySQL pas encore pret, par exemple), il est relance au bout de 30 secondes.
 :boucle
-"%JAVA_EXE%" -Xmx%MEMOIRE_JAVA% -jar "%~dp0gesstock.jar" >nul 2>>"%~dp0journaux\erreurs.log"
+"%JAVA_EXE%" -Xmx%MEMOIRE_JAVA% %OPTIONS_JAVA% -jar "%~dp0gesstock.jar" >nul 2>>"%~dp0journaux\erreurs.log"
 echo [%date% %time%] GesStock s'est arrete (code %errorlevel%) : nouvel essai dans 30 secondes. >> "%~dp0journaux\lancer.log"
 echo  GesStock s'est arrete : nouvel essai dans 30 secondes. Voir le dossier journaux si cela se repete.
 rem "ping" plutot que "timeout" : timeout echoue quand la fenetre n'est pas interactive.
@@ -84,12 +105,12 @@ goto boucle
 :java_absent
 echo.
 echo  Java 17 est introuvable sur ce PC. Installez-le, puis relancez demarrer.cmd.
-pause
+%PAUSE%
 exit /b 1
 
 :java_ancien
 echo.
 echo  La version de Java trouvee est la %JAVA_VERSION% : GesStock demande Java 17 ou plus recent.
 echo  Installez Java 17, puis relancez demarrer.cmd.
-pause
+%PAUSE%
 exit /b 1
