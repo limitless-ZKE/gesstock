@@ -260,6 +260,10 @@ Le serveur a seulement besoin de Java 17 et de WampServer : on copie le dossier,
   retrait, le code de la tâche (enregistrée puis supprimée pour l'utilisateur courant) et du raccourci, `demarrer.cmd silencieux` lancé sans fenêtre, et
   `ouvrir-navigateur.vbs` (attend un serveur absent puis le voit prêt 30 s après son lancement). **Non testés** (il faut un administrateur et un vrai redémarrage) :
   l'enregistrement de la tâche sous `SYSTEM`, la règle de pare-feu, le raccourci du dossier Démarrage et l'ouverture réelle du navigateur à la connexion.
+  **Premier vrai redémarrage** (PC de 2011, i5-2410M, disque dur 5400 tr/min) : tâche, raccourci et navigateur ont fonctionné, mais GesStock n'a été prêt que plus de vingt minutes
+  après le démarrage de Windows (le navigateur s'était ouvert avant). Cause mesurée : la tâche tournait en priorité « inférieure à la normale » (défaut du Planificateur,
+  `Win32_Process.Priority` = 6 contre 8), et Java a mis dix minutes à arriver au premier message pendant que Windows et l'ouverture de session saturaient le disque. Corrections :
+  priorité normale, `demarrer.cmd` qui attend MySQL, options Java (`-XX:TieredStopAtLevel=1 -XX:+UseSerialGC`, démarrage 33 s → 24 s à chaud), navigateur qui attend 20 minutes.
 
 ## Production (profil `prod`)
 
