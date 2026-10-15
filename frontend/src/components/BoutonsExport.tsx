@@ -10,6 +10,8 @@ type Format = "excel" | "pdf";
 interface BoutonsExportProps {
   /** Chemin de l'API qui sert « /excel » et « /pdf » pour une période (ex. « /ventes/historique »). */
   chemin: string;
+  /** Paramètres ajoutés à la période, par exemple le caissier dont on imprime le journal. */
+  parametres?: Record<string, string>;
   periode: Periode;
   /** Début du nom du fichier téléchargé : « gesstock-historique-ventes » donne gesstock-historique-ventes-2026-10-01-2026-10-09.pdf. */
   nomDuFichier: string;
@@ -23,14 +25,14 @@ interface BoutonsExportProps {
  * Les deux documents à imprimer d'une période, comme sur l'écran des statistiques : Excel pour retravailler les chiffres, PDF
  * pour imprimer. Le serveur les prépare (avec le nom et le logo de l'entreprise) ; le navigateur les enregistre.
  */
-export default function BoutonsExport({ chemin, periode, nomDuFichier, desactive = false, onErreur }: BoutonsExportProps) {
+export default function BoutonsExport({ chemin, parametres, periode, nomDuFichier, desactive = false, onErreur }: BoutonsExportProps) {
   const [enCours, setEnCours] = useState<Format | null>(null);
 
   async function exporter(format: Format) {
     setEnCours(format);
     onErreur(null);
     try {
-      const { data } = await api.get<Blob>(`${chemin}/${format}`, { params: { debut: periode.debut, fin: periode.fin }, responseType: "blob" });
+      const { data } = await api.get<Blob>(`${chemin}/${format}`, { params: { debut: periode.debut, fin: periode.fin, ...parametres }, responseType: "blob" });
       telecharger(data, `${nomDuFichier}-${periode.debut}-${periode.fin}.${format === "excel" ? "xlsx" : "pdf"}`);
     } catch (raison) {
       onErreur(apiErrorMessage(await lireErreurDeFichier(raison), `L’export ${format === "excel" ? "Excel" : "PDF"} a échoué.`));

@@ -5,7 +5,7 @@ import { api } from "../services/api";
 import { apiErrorMessage as messageFor } from "../services/apiError";
 import { money } from "../lib/format";
 import Indicateur from "../components/Indicateur";
-import JournalCaissePeriode from "../components/JournalCaissePeriode";
+import JournalCaisse from "../components/JournalCaisse";
 
 type Session = {
   id: number;
@@ -104,7 +104,7 @@ export default function CaisseMouvementsPage() {
       <Onglet actif={onglet === "session"} onClick={() => setOnglet("session")}>Session en cours</Onglet>
       <Onglet actif={onglet === "journal"} onClick={() => setOnglet("journal")}>Journal de caisse</Onglet>
     </div>
-    {onglet === "journal" ? <JournalCaissePeriode /> : <>
+    {onglet === "journal" ? <JournalCaisse /> : <>
     {notice && <div role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-semibold text-emerald-800">{notice}<button onClick={() => setNotice("")} className="float-right"><X size={14} /></button></div>}
     {error && <div role="alert" className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-900"><CircleAlert size={15} className="mt-0.5 shrink-0" /><span>{error}</span><button onClick={() => void loadData()} className="ml-auto underline">Actualiser</button></div>}
     <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
