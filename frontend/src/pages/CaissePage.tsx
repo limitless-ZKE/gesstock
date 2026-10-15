@@ -7,6 +7,7 @@ import {
   ChevronDown,
   CircleAlert,
   CreditCard,
+  HandCoins,
   Minus,
   Package,
   Plus,
@@ -19,6 +20,7 @@ import {
   X,
 } from "lucide-react";
 import ApprobationModal, { type Approbation } from "../components/ApprobationModal";
+import QuantiteSaisie from "../components/QuantiteSaisie";
 import ReceiptModal, { type Sale } from "../components/ReceiptModal";
 import { api } from "../services/api";
 import { apiErrorMessage as messageFor, parseApiError } from "../services/apiError";
@@ -63,6 +65,8 @@ type CashSession = {
 };
 type SaleResponse = Sale;
 type PaymentMode = "ESPECES" | "MOBILE_MONEY" | "CARTE" | "VIREMENT";
+/** Le crédit n'est pas un mode de règlement : la vente devient une dette du client, rien n'est encaissé. */
+type ChoixReglement = PaymentMode | "CREDIT";
 // prixNegocie : prix convenu avec le client pour cette ligne (texte saisi) ; vide = prix catalogue.
 type CartLine = { article: Article; quantite: number; promotionId: number | null; prixNegocie: string };
 
@@ -129,7 +133,7 @@ export default function CaissePage() {
   const [closingAmount, setClosingAmount] = useState("");
   const [sessionBusy, setSessionBusy] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
-  const [paymentMode, setPaymentMode] = useState<PaymentMode>("ESPECES");
+  const [paymentMode, setPaymentMode] = useState<ChoixReglement>("ESPECES");
   const [amountReceived, setAmountReceived] = useState("");
   const [checkoutBusy, setCheckoutBusy] = useState(false);
   const [approbationDemandee, setApprobationDemandee] = useState<{ message: string; erreur: string } | null>(null);
@@ -312,12 +316,19 @@ export default function CaissePage() {
       showNotice(`Prix négocié invalide pour « ${invalidLine.article.designation} ». ${negotiatedPriceError(invalidLine)}`, true);
       return;
     }
+    // À crédit : ni mode de règlement ni montant reçu, la vente est inscrite en dette au nom du client.
+    const modeReglement = paymentMode === "CREDIT" ? null : paymentMode;
+    const aCredit = modeReglement === null;
+    if (aCredit && !clientId) {
+      showNotice("Une vente à crédit doit être rattachée à un client : choisissez-le dans le panier.", true);
+      return;
+    }
     const received = Number(amountReceived);
-    if (!Number.isFinite(received) || received < cartTotals.total) {
+    if (!aCredit && (!Number.isFinite(received) || received < cartTotals.total)) {
       showNotice("Le montant reçu doit être supérieur ou égal au total à payer.", true);
       return;
     }
-    if (paymentMode !== "ESPECES" && received !== cartTotals.total) {
+    if (!aCredit && modeReglement !== "ESPECES" && received !== cartTotals.total) {
       showNotice("Pour un règlement sans espèces, saisissez exactement le total à payer.", true);
       return;
     }
@@ -326,10 +337,10 @@ export default function CaissePage() {
     try {
       const request = {
         clientId: clientId ? Number(clientId) : null,
-        aCredit: false,
+        aCredit,
         tauxTva: fiscal.tauxTva,
-        modeReglement: paymentMode,
-        montantRecu: received,
+        modeReglement,
+        montantRecu: aCredit ? null : received,
         approbation,
         lignes: cart.map((line) => ({
           articleId: line.article.id,
@@ -381,9 +392,12 @@ export default function CaissePage() {
 
   const amountTendered = Number(amountReceived) || 0;
   const change = Math.max(0, amountTendered - cartTotals.total);
-  const paymentAmountValid = paymentMode === "ESPECES"
-    ? amountTendered >= cartTotals.total
-    : amountTendered === cartTotals.total;
+  const paymentAmountValid = paymentMode === "CREDIT"
+    ? clientId !== ""
+    : paymentMode === "ESPECES"
+      ? amountTendered >= cartTotals.total
+      : amountTendered === cartTotals.total;
+  const clientNom = clients.find((client) => String(client.id) === clientId)?.nom ?? null;
 
   return (
     <div className="space-y-5">
@@ -542,7 +556,12 @@ export default function CaissePage() {
                     <div className="mt-3 flex items-center justify-between gap-2">
                       <div className="flex items-center rounded-lg border border-slate-200">
                         <button onClick={() => changeQuantity(line.article.id, line.quantite - 1)} className="grid size-8 place-items-center text-slate-500 hover:bg-slate-50" aria-label="Diminuer quantité"><Minus size={13} /></button>
-                        <span className="w-8 text-center text-xs font-bold">{line.quantite}</span>
+                        <QuantiteSaisie
+                          valeur={line.quantite}
+                          max={line.article.quantiteStock}
+                          libelle={`Quantité de ${line.article.designation}`}
+                          onChange={(quantite) => changeQuantity(line.article.id, quantite)}
+                        />
                         <button onClick={() => changeQuantity(line.article.id, line.quantite + 1)} disabled={line.quantite >= line.article.quantiteStock} className="grid size-8 place-items-center text-slate-500 hover:bg-slate-50 disabled:opacity-30" aria-label="Augmenter quantité"><Plus size={13} /></button>
                       </div>
                       <p className="text-xs font-extrabold text-slate-900">{money2.format(unitPrice * line.quantite)}</p>
@@ -628,6 +647,7 @@ export default function CaissePage() {
           amountReceived={amountReceived}
           change={change}
           paymentAmountValid={paymentAmountValid}
+          clientNom={clientNom}
           busy={checkoutBusy}
           draftCreated={pendingDraft !== null}
           onPaymentMode={setPaymentMode}
@@ -724,6 +744,7 @@ function PaymentModal({
   amountReceived,
   change,
   paymentAmountValid,
+  clientNom,
   busy,
   draftCreated,
   onPaymentMode,
@@ -732,20 +753,22 @@ function PaymentModal({
   onSubmit,
 }: {
   amount: number;
-  paymentMode: PaymentMode;
+  paymentMode: ChoixReglement;
   amountReceived: string;
   change: number;
   paymentAmountValid: boolean;
+  /** Nom du client choisi dans le panier ; null pour un client de passage (pas de vente à crédit possible). */
+  clientNom: string | null;
   busy: boolean;
   draftCreated: boolean;
-  onPaymentMode: (mode: PaymentMode) => void;
+  onPaymentMode: (mode: ChoixReglement) => void;
   onAmountReceived: (amount: string) => void;
   onClose: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
   return (
     <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-slate-950/50 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose(); }}>
-      <form onSubmit={onSubmit} className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+      <form role="dialog" aria-modal="true" aria-label="Règlement" onSubmit={onSubmit} className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
         <div className="flex items-start justify-between">
           <div><h2 className="mt-1 text-xl font-bold text-slate-900">Règlement</h2></div>
           <button type="button" onClick={onClose} disabled={busy} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100" aria-label="Fermer"><X size={18} /></button>
@@ -771,20 +794,44 @@ function PaymentModal({
                 {paymentMode === value && <Check size={14} className="ml-auto" />}
               </button>
             ))}
+            <button
+              type="button"
+              onClick={() => onPaymentMode("CREDIT")}
+              disabled={draftCreated || clientNom === null}
+              className={`col-span-2 flex items-center gap-2 rounded-xl border px-3 py-3 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                paymentMode === "CREDIT" ? "border-emerald-500 bg-emerald-50 text-emerald-800 ring-1 ring-emerald-500" : "border-slate-200 text-slate-600 hover:bg-slate-50"
+              }`}
+            >
+              <HandCoins size={16} />À crédit
+              {paymentMode === "CREDIT" && <Check size={14} className="ml-auto" />}
+            </button>
           </div>
+          {clientNom === null && <p className="mt-2 text-xs text-slate-500">Choisissez d’abord un client dans le panier pour vendre à crédit.</p>}
         </fieldset>
         {draftCreated && <p className="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">Le brouillon est déjà enregistré. Les informations de règlement sont verrouillées pendant la nouvelle tentative de validation.</p>}
-        <label className="mt-5 block">
-          <span className="mb-2 block text-xs font-bold text-slate-700">{paymentMode === "ESPECES" ? "Montant reçu (XOF)" : "Montant encaissé (XOF)"}</span>
-          <input autoFocus disabled={draftCreated} className="input-field h-12 text-base font-bold" min={amount} step="any" type="number" required value={amountReceived} onChange={(event) => onAmountReceived(event.target.value)} />
-        </label>
-        <div className={`mt-3 flex items-center justify-between rounded-xl px-4 py-3 ${paymentMode === "ESPECES" ? "bg-emerald-50" : "bg-slate-50"}`}>
-          <span className="text-xs font-semibold text-slate-600">{paymentMode === "ESPECES" ? "Monnaie à rendre" : "Rendu de monnaie"}</span>
-          <span className="text-sm font-extrabold text-slate-900">{paymentMode === "ESPECES" ? currency.format(change) : currency.format(0)}</span>
-        </div>
+        {paymentMode === "CREDIT" ? (
+          <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900">
+            <p className="font-bold">Rien n’est encaissé maintenant.</p>
+            <p className="mt-1">
+              {currency.format(amount)} seront inscrits en dette au nom de <strong>{clientNom}</strong>. Le règlement se fera plus tard,
+              depuis « Clients & dettes ».
+            </p>
+          </div>
+        ) : (
+          <>
+            <label className="mt-5 block">
+              <span className="mb-2 block text-xs font-bold text-slate-700">{paymentMode === "ESPECES" ? "Montant reçu (XOF)" : "Montant encaissé (XOF)"}</span>
+              <input autoFocus disabled={draftCreated} className="input-field h-12 text-base font-bold" min={amount} step="any" type="number" required value={amountReceived} onChange={(event) => onAmountReceived(event.target.value)} />
+            </label>
+            <div className={`mt-3 flex items-center justify-between rounded-xl px-4 py-3 ${paymentMode === "ESPECES" ? "bg-emerald-50" : "bg-slate-50"}`}>
+              <span className="text-xs font-semibold text-slate-600">{paymentMode === "ESPECES" ? "Monnaie à rendre" : "Rendu de monnaie"}</span>
+              <span className="text-sm font-extrabold text-slate-900">{paymentMode === "ESPECES" ? currency.format(change) : currency.format(0)}</span>
+            </div>
+          </>
+        )}
         <div className="mt-6 flex gap-3">
           <button type="button" disabled={busy} onClick={onClose} className="h-11 flex-1 rounded-xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50">Annuler</button>
-          <button disabled={busy || !paymentAmountValid} className="h-11 flex-[1.4] rounded-xl bg-emerald-600 text-sm font-bold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">{busy ? "Validation…" : "Valider et encaisser"}</button>
+          <button disabled={busy || !paymentAmountValid} className="h-11 flex-[1.4] rounded-xl bg-emerald-600 text-sm font-bold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">{busy ? "Validation…" : paymentMode === "CREDIT" ? "Valider à crédit" : "Valider et encaisser"}</button>
         </div>
       </form>
     </div>
