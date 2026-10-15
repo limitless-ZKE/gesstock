@@ -37,9 +37,12 @@ connexion quand GesStock est prêt.
 1. Vérifiez d'abord que tout marche avec demarrer.cmd (les 4 gestes ci-dessus), puis fermez la fenêtre de demarrer.cmd.
 2. Double-cliquez sur  installer-demarrage-automatique.cmd , répondez "Oui" à la demande de Windows, puis attendez le message
    vert "GesStock fonctionne et démarrera tout seul avec ce PC". Une fois fait, n'utilisez plus demarrer.cmd.
-3. Vérifiez : Démarrer > Redémarrer, connectez-vous à Windows et attendez. Une à quatre minutes plus tard, le navigateur
-   s'ouvre tout seul sur la page de connexion. Le serveur démarre même si personne ne se connecte à Windows : les autres postes
-   du réseau y accèdent dès qu'il est prêt.
+3. Vérifiez : Démarrer > Redémarrer, connectez-vous à Windows et attendez. Le navigateur s'ouvre tout seul sur la page de
+   connexion, mais seulement quand GesStock est vraiment prêt : environ 2 minutes après le démarrage sur un PC récent à disque
+   SSD ; sur un vieux PC à disque dur classique, Windows lui-même est très lent juste après le démarrage et cela peut prendre
+   10 minutes ou plus (le navigateur attend patiemment jusqu'à 20 minutes, il ne s'ouvre pas avant). Le serveur démarre même
+   si personne ne se connecte à Windows : les autres postes du réseau y accèdent dès qu'il est prêt.
+   Chez un client, un disque SSD est le meilleur investissement : le même GesStock y démarre en moins de 30 secondes.
 
 Le sous-dossier "outils" contient le reste :
   arreter.cmd                        arrête GesStock (avant une mise à jour du programme ou une restauration de la base)
@@ -58,9 +61,11 @@ APRÈS LA PREMIÈRE CONNEXION
 
 RÉGLAGES (facultatif)
 ---------------------
-Ouvrez demarrer.cmd avec le Bloc-notes (clic droit > Modifier) : les cinq lignes "set" tout en haut donnent le port, le
-fuseau horaire du pays (Africa/Dakar, Africa/Abidjan, Africa/Douala...), le taux de TVA (0 = pas de TVA) et si les prix
-sont TTC (true) ou HT (false). Enregistrez, fermez la fenêtre de GesStock et relancez demarrer.cmd.
+Ouvrez demarrer.cmd avec le Bloc-notes (clic droit > Modifier) : les lignes "set" tout en haut donnent le port, le
+fuseau horaire du pays (Africa/Dakar, Africa/Abidjan, Africa/Douala...), le taux de TVA (0 = pas de TVA), si les prix
+sont TTC (true) ou HT (false), la mémoire de Java et ses options (réglées pour un démarrage rapide : ne les changez pas
+sans raison). Enregistrez, puis arrêtez GesStock (outils\arreter.cmd) et relancez-le (demarrer.cmd, ou
+installer-demarrage-automatique.cmd si le démarrage automatique est installé).
 
 
 À SAVOIR

@@ -213,6 +213,9 @@ if ($MettreAJour) {
     foreach ($cle in 'FUSEAU_HORAIRE', 'TAUX_TVA', 'PRIX_TTC', 'MEMOIRE_JAVA') {
         $reglagesConserves[$cle] = Ancienne-Valeur $ancienDemarrer "^set $cle=([^\r\n]*)" $cle
     }
+    # Reglage ajoute apres les premieres livraisons : s'il manque chez le client, la valeur du modele s'applique.
+    $optionsJava = [regex]::Match($ancienDemarrer, '(?m)^set OPTIONS_JAVA=([^\r\n]*)')
+    if ($optionsJava.Success) { $reglagesConserves['OPTIONS_JAVA'] = $optionsJava.Groups[1].Value }
     $contenuSql = $null
 } else {
     $java = Trouver-Java

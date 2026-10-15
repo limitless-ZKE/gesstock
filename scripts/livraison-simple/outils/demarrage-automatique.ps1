@@ -123,14 +123,16 @@ Faire 'Arret du GesStock en cours (lance a la main ou par une installation prece
     $code = & (Join-Path $outils 'arreter.ps1')
 }
 
-# Serveur : demarre avec Windows (apres 1 minute, pour laisser MySQL se lancer), sans limite de duree, relance si arrete.
-# Sous le compte SYSTEM, Windows ne montre aucune fenetre : rien ne s'affiche pendant le demarrage.
+# Serveur : demarre avec Windows (30 secondes apres, demarrer.cmd attend lui-meme que MySQL soit pret), sans limite de duree,
+# relance si arrete. Sous le compte SYSTEM, Windows ne montre aucune fenetre : rien ne s'affiche pendant le demarrage.
+# Priorite 4 = normale : une tache planifiee est sinon lancee en priorite "inferieure a la normale" (7), et GesStock, deja lourd a
+# demarrer, perdait toute la course contre Windows et l'ouverture de session (mesure : plus de 20 minutes sur un PC de 2011).
 $demarrer = Join-Path $dossier 'demarrer.cmd'
 $actionServeur = New-ScheduledTaskAction -Execute 'cmd.exe' -Argument ('/c ""' + $demarrer + '" silencieux"') -WorkingDirectory $dossier
 $declencheur = New-ScheduledTaskTrigger -AtStartup
-$declencheur.Delay = 'PT1M'
+$declencheur.Delay = 'PT30S'
 $reglagesServeur = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable `
-    -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero) -MultipleInstances IgnoreNew
+    -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero) -MultipleInstances IgnoreNew -Priority 4
 $compteSysteme = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
 Faire "Tache planifiee '$tacheServeur' : GesStock demarre avec Windows, sans fenetre (compte SYSTEM, relance en cas d'arret)" {
     Register-ScheduledTask -TaskName $tacheServeur -Action $actionServeur -Trigger $declencheur -Settings $reglagesServeur `
@@ -169,9 +171,9 @@ if ($Simulation) {
 
 # Attendre que GesStock reponde.
 Ecrire ''
-Ecrire "Attente du demarrage de GesStock (jusqu'a 6 minutes) " 'White'
+Ecrire "Attente du demarrage de GesStock (jusqu'a 10 minutes sur un PC lent) " 'White'
 $pret = $false
-$limite = (Get-Date).AddMinutes(6)
+$limite = (Get-Date).AddMinutes(10)
 while ((Get-Date) -lt $limite) {
     try {
         Invoke-WebRequest -Uri "http://127.0.0.1:$port/" -UseBasicParsing -TimeoutSec 5 | Out-Null
@@ -197,4 +199,5 @@ $adresses = @(Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue
 foreach ($adresse in $adresses) { Ecrire "  Depuis les autres postes du reseau :  http://$($adresse.IPAddress):$port" 'Green' }
 Ecrire ''
 Ecrire 'POUR VERIFIER : redemarrez ce PC (Demarrer > Redemarrer), connectez-vous a Windows et attendez : le navigateur s''ouvre tout seul' 'Cyan'
-Ecrire 'sur la page de connexion de GesStock, deux a quatre minutes apres le demarrage du PC.' 'Cyan'
+Ecrire 'sur la page de connexion de GesStock, une fois GesStock pret : environ deux minutes sur un PC recent a disque SSD, plus sur un' 'Cyan'
+Ecrire 'vieux PC a disque dur classique (le navigateur attend, il ne s''ouvre pas avant).' 'Cyan'

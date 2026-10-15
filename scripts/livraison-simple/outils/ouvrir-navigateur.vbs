@@ -1,7 +1,8 @@
 ' Ouvre GesStock dans le navigateur par defaut des que le serveur repond, sans aucune fenetre pendant l'attente.
 ' Lance par Windows a l'ouverture de session (dossier "Demarrage"), apres installer-demarrage-automatique.cmd.
-' Le port est lu dans demarrer.cmd (ligne "set PORT=..."). Si le serveur ne repond pas au bout de 7 minutes, le navigateur
-' s'ouvre quand meme : l'utilisateur voit alors que la page ne charge pas, au lieu de ne rien voir.
+' Le port est lu dans demarrer.cmd (ligne "set PORT=..."). Un PC lent peut mettre plus de dix minutes a demarrer GesStock juste
+' apres le demarrage de Windows : on attend jusqu'a 20 minutes. Si le serveur ne repond toujours pas, le navigateur s'ouvre quand
+' meme : l'utilisateur voit alors que la page ne charge pas, au lieu de ne rien voir.
 ' Essai sans navigateur :  wscript //B ouvrir-navigateur.vbs essai [secondes]   (le resultat est dans journaux\navigateur.log)
 Option Explicit
 
@@ -24,7 +25,7 @@ End If
 adresse = "http://localhost:" & port & "/"
 
 essai = False
-attenteMax = 420
+attenteMax = 1200
 If WScript.Arguments.Count > 0 Then essai = (LCase(WScript.Arguments(0)) = "essai")
 If WScript.Arguments.Count > 1 Then attenteMax = CLng(WScript.Arguments(1))
 
