@@ -143,6 +143,11 @@ public class SecurityConfig {
 
                 // Caisse et ventes. L'annulation d'une vente (retour de stock, dette, remboursement) est réservée
                 // aux responsables : elle peut faire sortir de l'argent de la caisse.
+                // Le journal COMPLET de la journée montre les lignes de tous les caissiers : réservé aux responsables, comme la liste
+                // des comptes dont on peut demander le journal. Un caissier lit le sien (/api/caisse/journal/caissier), que le
+                // contrôleur limite à son propre nom.
+                .requestMatchers(GET, "/api/caisse/journal", "/api/caisse/journal/excel", "/api/caisse/journal/pdf", "/api/caisse/journal/caissiers")
+                    .hasAnyRole(ADMIN, MANAGER, GESTIONNAIRE)
                 .requestMatchers("/api/referentiels/sessions-caisse/**", "/api/caisse/**")
                     .hasAnyRole(ADMIN, MANAGER, GESTIONNAIRE, CAISSIER)
                 .requestMatchers(POST, "/api/ventes/*/annulation").hasAnyRole(ADMIN, MANAGER)

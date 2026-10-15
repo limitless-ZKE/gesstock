@@ -33,14 +33,23 @@ class ImpressionsHttpTests {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"ADMIN", "MANAGER", "GESTIONNAIRE", "CAISSIER"})
-    void lesQuatreRolesConsultentLesDeuxEtats(String role) throws Exception {
+    @ValueSource(strings = {"ADMIN", "MANAGER", "GESTIONNAIRE"})
+    void lesResponsablesConsultentLesDeuxEtats(String role) throws Exception {
         for (String chemin : CHEMINS) {
             mockMvc.perform(get(chemin).param("debut", aujourdhui()).param("fin", aujourdhui()).with(user("u").roles(role)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.debut").value(aujourdhui()))
                 .andExpect(jsonPath("$.fin").value(aujourdhui()));
         }
+    }
+
+    /** Le journal complet montre les lignes de tous les caissiers : un caissier lit le sien (voir JournalCaissierHttpTests). */
+    @Test
+    void unCaissierLitLHistoriqueDesVentesMaisPasLeJournalCompletDeLaCaisse() throws Exception {
+        mockMvc.perform(get("/api/ventes/historique").param("debut", aujourdhui()).param("fin", aujourdhui()).with(user("u").roles("CAISSIER")))
+            .andExpect(status().isOk());
+        mockMvc.perform(get("/api/caisse/journal").param("debut", aujourdhui()).param("fin", aujourdhui()).with(user("u").roles("CAISSIER")))
+            .andExpect(status().isForbidden());
     }
 
     @Test
