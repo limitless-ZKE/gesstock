@@ -15,11 +15,11 @@ import {
   ShoppingBag,
   Smartphone,
   Trash2,
-  UserRound,
   WalletCards,
   X,
 } from "lucide-react";
 import ApprobationModal, { type Approbation } from "../components/ApprobationModal";
+import ChampClient from "../components/ChampClient";
 import QuantiteSaisie from "../components/QuantiteSaisie";
 import ReceiptModal, { type Sale } from "../components/ReceiptModal";
 import { api } from "../services/api";
@@ -520,16 +520,7 @@ export default function CaissePage() {
           </div>
 
           <div className="space-y-4 p-5 md:p-6">
-            <label className="block">
-              <span className="mb-2 flex items-center gap-2 text-xs font-bold text-slate-600"><UserRound size={15} /> Client (facultatif)</span>
-              <span className="relative block">
-                <select value={clientId} onChange={(event) => setClientId(event.target.value)} className="input-field appearance-none pr-9">
-                  <option value="">Client de passage</option>
-                  {clients.map((client) => <option key={client.id} value={client.id}>{client.nom}{client.telephone ? ` · ${client.telephone}` : ""}</option>)}
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-              </span>
-            </label>
+            <ChampClient clients={clients} valeur={clientId} onChange={setClientId} />
 
             <div className="max-h-[335px] min-h-[150px] space-y-3 overflow-y-auto pr-1">
               {cart.length === 0 ? (
