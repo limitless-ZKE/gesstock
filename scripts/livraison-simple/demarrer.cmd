@@ -7,6 +7,10 @@ setlocal
 title GesStock
 cd /d "%~dp0"
 
+rem Lance par la tache du demarrage automatique ("demarrer.cmd silencieux") : personne ne peut appuyer sur une touche, donc jamais de pause.
+set "PAUSE=pause"
+if /i "%~1"=="silencieux" set "PAUSE=rem"
+
 rem ------------------------------------------------ reglages a adapter au client
 set PORT={{PORT}}
 set FUSEAU_HORAIRE=Africa/Dakar
@@ -17,7 +21,7 @@ rem ------------------------------------------------
 
 if not exist "%~dp0gesstock.jar" (
   echo gesstock.jar est introuvable dans ce dossier.
-  pause
+  %PAUSE%
   exit /b 1
 )
 
@@ -84,12 +88,12 @@ goto boucle
 :java_absent
 echo.
 echo  Java 17 est introuvable sur ce PC. Installez-le, puis relancez demarrer.cmd.
-pause
+%PAUSE%
 exit /b 1
 
 :java_ancien
 echo.
 echo  La version de Java trouvee est la %JAVA_VERSION% : GesStock demande Java 17 ou plus recent.
 echo  Installez Java 17, puis relancez demarrer.cmd.
-pause
+%PAUSE%
 exit /b 1
