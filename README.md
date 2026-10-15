@@ -224,6 +224,22 @@ sans droits administrateur (les contrôles des tâches, du pare-feu et des proce
 redémarrage réel de Windows, un second PC physique, `bind-address = 127.0.0.1` dans le `my.ini` de Wamp. `INSTALLATION.txt` (parties 11 et 12) fait donc faire ces
 vérifications sur place, avec une liste de sortie à cocher avant de quitter le client.
 
+### Livraison simple (sans installateur)
+
+`scripts\preparer-livraison-simple.cmd` (après `scripts\construire-pour-le-reseau.cmd`) produit sur le Bureau le dossier `GesStock-Livraison-Simple` :
+`gesstock.jar`, `base-de-lancement.sql`, `importer-la-base.cmd`, `demarrer.cmd`, `LISEZ-MOI.txt` (modèles dans `scripts\livraison-simple\`).
+Le serveur a seulement besoin de Java 17 et de WampServer : on copie le dossier, on double-clique `importer-la-base.cmd` (une fois), puis `demarrer.cmd`.
+
+- **La base est fabriquée par GesStock lui-même** : une base jetable de ce PC est migrée par Flyway et reçoit le premier administrateur (mot de passe
+  **aléatoire à chaque préparation**, affiché une seule fois ; le SQL ne contient que son empreinte BCrypt), puis elle est exportée et supprimée. À refaire pour
+  chaque client et après chaque nouvelle migration. Options : `-Destination`, `-Admin`, `-MotDePasseAdmin`, `-NomBase`, `-Utilisateur`, `-Port`, `-MotDePasseRoot`.
+- `importer-la-base.cmd` refuse d'effacer une base déjà remplie sans que l'on tape `EFFACER` ; `demarrer.cmd` refuse un Java inférieur à 17 et relance GesStock
+  s'il s'arrête.
+- **Ni démarrage automatique avec Windows ni sauvegarde planifiée** : c'est le rôle du kit complet ci-dessus.
+- Vérifié de bout en bout avec d'autres noms de base, de compte et de port : import, refus de réimporter, démarrage en 56 s, connexion de l'administrateur dans
+  Edge par l'adresse du réseau, quantité saisie, vente à crédit, dette créée. Le vrai dossier livré a été démarré sur son propre SQL (importé sous d'autres noms) : connexion
+  de l'administrateur acceptée, mauvais mot de passe refusé.
+
 ## Production (profil `prod`)
 
 ```sh
