@@ -73,8 +73,11 @@ function etat(journee: Journee): string {
  * Journal de caisse d'une période : une ligne par journée (espèces entrées, sorties, solde, espèces comptées, écart), dépliable
  * pour lire chaque écriture avec son solde. Le même contenu s'imprime en PDF (à signer) ou s'exporte en Excel.
  */
-export default function JournalCaissePeriode() {
-  const [periode, setPeriode] = useState<Periode>(() => ({ debut: aujourdhui(), fin: aujourdhui() }));
+export default function JournalCaissePeriode({ periode: periodeFournie, onPeriode }: { periode?: Periode; onPeriode?: (periode: Periode) => void } = {}) {
+  // La période peut être pilotée par l'écran qui change de caissier sans la perdre ; seul, le journal garde la sienne.
+  const [periodeInterne, setPeriodeInterne] = useState<Periode>(() => ({ debut: aujourdhui(), fin: aujourdhui() }));
+  const periode = periodeFournie ?? periodeInterne;
+  const setPeriode = onPeriode ?? setPeriodeInterne;
   const [journal, setJournal] = useState<Journal | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");

@@ -108,7 +108,7 @@ describe("historique des ventes par période", () => {
     await utilisateur.click(screen.getByRole("button", { name: "Page suivante" }));
     expect(screen.getByRole("button", { name: "Page suivante" })).toBeDisabled();
     expect(screen.getByText("120 vente(s), montants en francs CFA. Le bouton « Reçu » imprime un duplicata du ticket remis au client.")).toBeInTheDocument();
-  });
+  }, 20000);   // 120 lignes affichées trois fois : 3 s seul, plus de 5 s quand toute la suite tourne en parallèle
 
   it("n'offre l'annulation qu'à un responsable, pour une vente au comptant validée du jour", async () => {
     vi.mocked(api.get).mockResolvedValue({ data: historique([
