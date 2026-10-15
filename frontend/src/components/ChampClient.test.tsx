@@ -43,6 +43,24 @@ describe("champ de recherche d'un client", () => {
     expect(options().join("|")).not.toContain("Fatou");
   });
 
+  it("range d'abord les noms qui commencent par la recherche, puis ceux dont un mot commence, puis ceux qui la contiennent", async () => {
+    const utilisateur = userEvent.setup();
+    const clients = [
+      { id: 1, nom: "Ahmadou Ba", telephone: null },         // « mad » au milieu d'un mot : en dernier
+      { id: 2, nom: "Boutique Madina", telephone: null },    // un mot commence par « mad »
+      { id: 3, nom: "Madeleine Fall", telephone: null },     // le nom commence par « mad » : en premier
+      { id: 4, nom: "Fatou Diamad", telephone: null },       // « mad » à la fin d'un mot : en dernier aussi
+    ];
+    render(<ChampClient clients={clients} valeur="" onChange={() => undefined} />);
+
+    await utilisateur.type(champ(), "mad");
+
+    expect(options()).toEqual([
+      expect.stringContaining("Madeleine Fall"), expect.stringContaining("Boutique Madina"),
+      expect.stringContaining("Ahmadou Ba"), expect.stringContaining("Fatou Diamad"),
+    ]);
+  });
+
   it("ignore les majuscules et les accents", async () => {
     const utilisateur = userEvent.setup();
     render(<Monter />);

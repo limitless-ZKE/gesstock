@@ -100,9 +100,11 @@ public class JournalCaissierExportService {
     }
 
     private static void sectionPdf(Document document, JournalCaissierJour jour) throws DocumentException {
-        Paragraph titre = ExportSupport.paragraphe("Journée du " + ExportSupport.jour(jour.journee()) + " — session " + jour.code(), ExportSupport.gras(11), 6);
+        Paragraph titre = ExportSupport.paragraphe("Journée du " + ExportSupport.jour(jour.journee()) + " — session " + jour.code(), ExportSupport.gras(11), 1);
         titre.setKeepTogether(true);
         document.add(titre);
+        // Une seconde ligne sépare le titre du tableau (collé, il serait rogné par l'en-tête du tableau), comme dans le journal complet.
+        document.add(ExportSupport.paragraphe(jour.nombreVentes() + (jour.nombreVentes() > 1 ? " ventes validées" : " vente validée") + " ce jour-là", ExportSupport.normal(8.5f), 6));
 
         if (!jour.ecritures().isEmpty()) {
             TableauPdf tableau = TableauPdf.creer(new float[] {0.7f, 0.9f, 3.8f, 1.7f, 1.2f, 1.2f, 1.2f},

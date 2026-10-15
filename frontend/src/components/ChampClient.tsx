@@ -17,17 +17,21 @@ const MAX_AFFICHES = 30;
 const normaliser = (texte: string) => texte.normalize("NFD").replace(/[̀-ͯ]/g, "").toLocaleLowerCase("fr").trim();
 const chiffres = (texte: string) => texte.replace(/\D/g, "");
 
-/** Les clients qui correspondent, les noms qui commencent par la recherche (ou un de leurs mots) d'abord, puis les autres. */
+/**
+ * Les clients qui correspondent. Rang : le nom commence par la recherche (0), un de ses mots commence par elle (1), elle est
+ * ailleurs dans le nom (2), seul le téléphone correspond (3). À rang égal, l'ordre de la liste est conservé.
+ */
 function filtrer(clients: Client[], requete: string): Client[] {
   if (requete === "") return clients;
   const chiffresRecherches = chiffres(requete);
   const classes: { client: Client; rang: number }[] = [];
   for (const client of clients) {
     const nom = normaliser(client.nom);
-    if (nom.startsWith(requete) || nom.split(/\s+/).some((mot) => mot.startsWith(requete))) classes.push({ client, rang: 0 });
-    else if (nom.includes(requete)) classes.push({ client, rang: 1 });
+    if (nom.startsWith(requete)) classes.push({ client, rang: 0 });
+    else if (nom.split(/\s+/).some((mot) => mot.startsWith(requete))) classes.push({ client, rang: 1 });
+    else if (nom.includes(requete)) classes.push({ client, rang: 2 });
     else if (client.telephone && (normaliser(client.telephone).includes(requete)
-      || (chiffresRecherches.length >= 3 && chiffres(client.telephone).includes(chiffresRecherches)))) classes.push({ client, rang: 2 });
+      || (chiffresRecherches.length >= 3 && chiffres(client.telephone).includes(chiffresRecherches)))) classes.push({ client, rang: 3 });
   }
   return classes.sort((a, b) => a.rang - b.rang).map(({ client }) => client);
 }
