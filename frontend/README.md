@@ -60,7 +60,10 @@ cours et le meilleur jour seulement, info-bulle au survol et au clavier, tableau
 
 `SelecteurPeriode` (aujourd'hui, hier, ce mois, deux dates ; refuse une fin avant le début ou dans le futur) et `BoutonsExport` (Excel et PDF préparés par
 le serveur, enregistrés par `telecharger()`) sont partagés par `/statistiques`, `/historique-ventes` et l'onglet « Journal de caisse » de
-`/caisse/mouvements` (`JournalCaissePeriode`). Les dates sont celles du poste (`lib/dates.ts`), jamais `toISOString()`, qui donne « hier » juste
+`/caisse/mouvements`. Cet onglet montre `JournalCaisse`, qui choisit selon le rôle : un caissier voit `JournalCaissierPeriode` (son propre journal, sans
+fond de caisse ni solde du tiroir ; le serveur lui impose son nom) ; `ADMIN`, `MANAGER` et `GESTIONNAIRE` voient `JournalCaissePeriode` (journal complet) avec une liste
+« Caissier » qui bascule sur le journal d'un caissier en gardant la période choisie. Dans la caisse, `ChampClient` remplace la liste déroulante des clients par une recherche
+(nom ou téléphone, sans accents ni majuscules ; clavier compris) et `QuantiteSaisie` permet de taper la quantité d'une ligne du panier. Les dates sont celles du poste (`lib/dates.ts`), jamais `toISOString()`, qui donne « hier » juste
 après minuit dans un fuseau en avance sur UTC. Un téléchargement qui échoue renvoie son erreur dans un blob : `lireErreurDeFichier()` le relit
 pour afficher le message du serveur. L'historique charge des lignes légères (le ticket complet se relit au clic sur « Reçu »), pagine par 50 et
 refuse de répondre à une réponse tardive d'une ancienne période.
