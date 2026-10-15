@@ -1,0 +1,54 @@
+GESSTOCK - INSTALLATION SIMPLE
+==============================
+
+Ce dossier contient :
+  gesstock.jar              le programme (avec son interface)
+  base-de-lancement.sql     la base de données prête à l'emploi : toutes les tables et le compte administrateur
+  importer-la-base.cmd      met la base dans MySQL (une seule fois)
+  demarrer.cmd              lance GesStock
+
+Ce qu'il faut déjà avoir sur le serveur : Java 17 et WampServer (icône verte, MySQL 8.4).
+
+
+INSTALLATION (4 gestes)
+-----------------------
+1. Copiez tout ce dossier sur le serveur, à un endroit simple, par exemple  C:\GesStock
+   (pas sur le Bureau, pas dans Téléchargements).
+
+2. Double-cliquez sur  importer-la-base.cmd  (une seule fois).
+   Vous devez voir : "Base importée".
+   Si le message parle d'une base qui existe déjà, c'est qu'une installation est déjà là : ne tapez PAS "EFFACER",
+   sauf si vous voulez repartir de zéro (tout serait perdu).
+
+3. Double-cliquez sur  demarrer.cmd  et gardez la fenêtre ouverte (la fermer arrête GesStock).
+   Attendez environ une minute. Windows peut demander d'autoriser Java sur le réseau : cliquez sur "Autoriser".
+
+4. Ouvrez Chrome ou Edge et tapez  http://localhost:8080  (la fenêtre de demarrer.cmd affiche aussi les adresses
+   à utiliser depuis les autres postes, par exemple  http://192.168.1.23:8080).
+   Identifiant : admin        Mot de passe : celui qui vous a été communiqué (il n'est écrit nulle part ici).
+
+
+APRÈS LA PREMIÈRE CONNEXION
+---------------------------
+- Changez le mot de passe de l'administrateur : menu "Administration", modifier l'utilisateur "admin".
+- Menu "Entreprise" : nom, adresse, téléphone, logo (ils apparaissent sur les tickets et les documents imprimés).
+- Menu "Administration" : un compte par personne (ADMIN, MANAGER, GESTIONNAIRE, CAISSIER).
+- Menu "Articles" : catégories, unités, articles. Menu "Caisse & ventes" : ouvrir la caisse, puis vendre.
+
+
+RÉGLAGES (facultatif)
+---------------------
+Ouvrez demarrer.cmd avec le Bloc-notes (clic droit > Modifier) : les cinq lignes "set" tout en haut donnent le port, le
+fuseau horaire du pays (Africa/Dakar, Africa/Abidjan, Africa/Douala...), le taux de TVA (0 = pas de TVA) et si les prix
+sont TTC (true) ou HT (false). Enregistrez, fermez la fenêtre de GesStock et relancez demarrer.cmd.
+
+
+À SAVOIR
+--------
+- Ce dossier ne contient ni sauvegarde automatique ni démarrage automatique avec Windows : après un redémarrage du PC,
+  il faut double-cliquer à nouveau sur demarrer.cmd. Les données sont dans MySQL (C:\wamp64\bin\mysql) : faites une
+  copie régulière de la base (icône Wamp > phpMyAdmin > base "{{NOM_BASE}}" > Exporter).
+- Les messages de GesStock sont dans le sous-dossier "journaux" (créé au premier démarrage).
+- En cas de problème, envoyez une photo de l'écran et le fichier journaux\gesstock.log.
+
+Version : {{VERSION}}

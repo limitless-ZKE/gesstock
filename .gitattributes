@@ -9,3 +9,4 @@
 # Scripts et modes d'emploi du kit de livraison : fins de ligne Windows, identiques sur tous les postes.
 *.ps1 text eol=crlf
 scripts/kit-livraison/*.txt text eol=crlf
+scripts/livraison-simple/*.txt text eol=crlf
