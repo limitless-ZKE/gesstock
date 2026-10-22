@@ -41,7 +41,7 @@
 		<dependency>
 			<groupId>org.springdoc</groupId>
 			<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
-			<version>3.0.0</version>
+			<version>3.1.1</version>
 		</dependency>
 
 		<dependency>
@@ -87,14 +87,14 @@
 		<dependency>
 			<groupId>com.github.librepdf</groupId>
 			<artifactId>openpdf</artifactId>
-			<version>1.3.30</version>
+			<version>1.4.2</version>
 		</dependency>
 
 		<!-- Apache POI pour la génération de fichiers Excel (.xlsx) -->
 		<dependency>
 			<groupId>org.apache.poi</groupId>
 			<artifactId>poi-ooxml</artifactId>
-			<version>5.4.1</version>
+			<version>5.5.1</version>
 		</dependency>
 	</dependencies>
 
