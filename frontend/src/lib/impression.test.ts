@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { PontAndroid } from "./android";
 import { attendreImages, imprimer } from "./impression";
 
 /** Une image « en cours de chargement » : jsdom ne charge rien, on pilote donc `complete` et les événements à la main. */
@@ -60,6 +61,21 @@ describe("impression", () => {
     await impression;
 
     expect(window.print).toHaveBeenCalledTimes(1);
+  });
+
+  it("dans l'application Android, imprime par le téléphone : une vue web Android n'imprime pas d'elle-même", async () => {
+    const imprimerAndroid = vi.fn();
+    const fenetre = window as Window & { GesStockAndroid?: PontAndroid };
+    fenetre.GesStockAndroid = { enregistrerFichier: vi.fn(), imprimer: imprimerAndroid };
+    document.title = "GesStock 3.0";
+    try {
+      await imprimer(zone);
+    } finally {
+      delete fenetre.GesStockAndroid;
+    }
+
+    expect(imprimerAndroid).toHaveBeenCalledWith("GesStock 3.0");
+    expect(window.print).not.toHaveBeenCalled();
   });
 
   it("attend toutes les images, pas seulement la première", async () => {

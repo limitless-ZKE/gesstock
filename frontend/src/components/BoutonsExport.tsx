@@ -33,7 +33,7 @@ export default function BoutonsExport({ chemin, parametres, periode, nomDuFichie
     onErreur(null);
     try {
       const { data } = await api.get<Blob>(`${chemin}/${format}`, { params: { debut: periode.debut, fin: periode.fin, ...parametres }, responseType: "blob" });
-      telecharger(data, `${nomDuFichier}-${periode.debut}-${periode.fin}.${format === "excel" ? "xlsx" : "pdf"}`);
+      await telecharger(data, `${nomDuFichier}-${periode.debut}-${periode.fin}.${format === "excel" ? "xlsx" : "pdf"}`);
     } catch (raison) {
       onErreur(apiErrorMessage(await lireErreurDeFichier(raison), `L’export ${format === "excel" ? "Excel" : "PDF"} a échoué.`));
     } finally {
