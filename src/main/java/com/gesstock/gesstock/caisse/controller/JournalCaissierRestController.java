@@ -5,6 +5,7 @@ import com.gesstock.gesstock.caisse.dto.JournalCaissierResponse;
 import com.gesstock.gesstock.caisse.service.JournalCaisseService;
 import com.gesstock.gesstock.caisse.service.JournalCaissierExportService;
 import com.gesstock.gesstock.common.exception.RequeteInvalideException;
+import com.gesstock.gesstock.security.PerimetreVendeur;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -19,7 +20,6 @@ import org.springframework.web.bind.annotation.RestController;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Set;
 
 /**
  * Journal de caisse d'UN caissier, à l'écran puis en Excel ou en PDF à imprimer et signer. Un caissier ne lit que le sien : son nom
@@ -30,8 +30,6 @@ import java.util.Set;
 @RestController
 @RequestMapping("/api/caisse/journal")
 public class JournalCaissierRestController {
-
-    private static final Set<String> ROLES_RESPONSABLES = Set.of("ROLE_ADMIN", "ROLE_MANAGER", "ROLE_GESTIONNAIRE");
 
     private final JournalCaisseService journalService;
     private final JournalCaissierExportService exportService;
@@ -89,9 +87,8 @@ public class JournalCaissierRestController {
 
     /** Le caissier dont le journal est servi : le sien pour un caissier, celui qui est nommé pour un responsable. */
     private static String caissierAutorise(Authentication authentication, String demande) {
-        boolean responsable = authentication.getAuthorities().stream().anyMatch(droit -> ROLES_RESPONSABLES.contains(droit.getAuthority()));
         boolean nomme = demande != null && !demande.isBlank();
-        if (responsable) {
+        if (PerimetreVendeur.responsable(authentication)) {
             if (!nomme) throw new RequeteInvalideException("Choisissez le caissier dont vous voulez le journal.");
             return demande.trim();
         }

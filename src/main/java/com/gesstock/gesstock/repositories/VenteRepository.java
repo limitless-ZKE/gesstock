@@ -50,6 +50,22 @@ public interface VenteRepository extends JpaRepository<Vente, Long> {
     List<Vente> findByStatutAndDateVenteGreaterThanEqualAndDateVenteLessThan(
         StatutVente statut, LocalDateTime debut, LocalDateTime fin);
 
+    /**
+     * Les ventes d'une période (historiques), d'un vendeur ou de tous ({@code vendeur} nul), les plus récentes d'abord, avec tout
+     * ce que les historiques lisent. Jointure externe : une vente sans vendeur reste dans « tous les vendeurs ».
+     */
+    @EntityGraph(attributePaths = {"lignesVente", "lignesVente.article", "lignesVente.uniteVente", "lignesVente.promotion",
+        "client", "vendeur", "proforma", "sessionCaisse", "detteClient"})
+    @Query("select v from Vente v left join v.vendeur compte where v.statut in :statuts and v.dateVente >= :debut and v.dateVente < :fin "
+        + "and (:vendeur is null or lower(compte.username) = lower(:vendeur)) order by v.dateVente desc, v.id desc")
+    List<Vente> ventesDeLaPeriode(@Param("statuts") java.util.Collection<StatutVente> statuts, @Param("debut") LocalDateTime debut,
+        @Param("fin") LocalDateTime fin, @Param("vendeur") String vendeur);
+
+    @Query("select count(v) from Vente v left join v.vendeur compte where v.statut in :statuts and v.dateVente >= :debut and v.dateVente < :fin "
+        + "and (:vendeur is null or lower(compte.username) = lower(:vendeur))")
+    long compterVentesDeLaPeriode(@Param("statuts") java.util.Collection<StatutVente> statuts, @Param("debut") LocalDateTime debut,
+        @Param("fin") LocalDateTime fin, @Param("vendeur") String vendeur);
+
     /** Les ventes rattachées à une session de caisse, dans l'ordre du temps (journal de caisse). */
     @EntityGraph(attributePaths = {"client", "vendeur"})
     List<Vente> findBySessionCaisseIdAndStatutInOrderByDateVenteAscIdAsc(
