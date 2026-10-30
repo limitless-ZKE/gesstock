@@ -16,6 +16,7 @@ const DashboardPage = lazy(() => import("./pages/DashboardPage"));
 const EntreprisePage = lazy(() => import("./pages/EntreprisePage"));
 const FournisseursPage = lazy(() => import("./pages/FournisseursPage"));
 const InventairesPage = lazy(() => import("./pages/InventairesPage"));
+const JournalOperationsPage = lazy(() => import("./pages/JournalOperationsPage"));
 const RetoursFournisseursPage = lazy(() => import("./pages/RetoursFournisseursPage"));
 const StatistiquesPage = lazy(() => import("./pages/StatistiquesPage"));
 const VentesHistoriquePage = lazy(() => import("./pages/VentesHistoriquePage"));
@@ -58,6 +59,7 @@ export default function App() {
             <Route path="/admin/utilisateurs" element={<AdminUsersPage />} />
             <Route path="/clients-dettes" element={<ClientsDettesPage />} />
             <Route path="/statistiques" element={<StatistiquesPage />} />
+            <Route path="/journal-operations" element={<JournalOperationsPage />} />
           </Route>
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

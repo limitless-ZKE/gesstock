@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Le serveur GesStock est sur le réseau du magasin et répond en HTTP : sans cette autorisation, Android 9 et plus refusent de
+     s'y connecter. Sans connexion, le serveur ne sert que l'écran d'accueil ; le Wi-Fi du magasin doit avoir un mot de passe. -->
+<network-security-config xmlns:tools="http://schemas.android.com/tools">
+    <base-config
+        cleartextTrafficPermitted="true"
+        tools:ignore="InsecureBaseConfiguration" />
+</network-security-config>

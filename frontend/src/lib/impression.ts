@@ -1,3 +1,5 @@
+import { pontAndroid } from "./android";
+
 /**
  * Attend que les images de la zone à imprimer (le logo de l'entreprise) soient chargées. Sans cela, imprimer juste après
  * l'ouverture d'un ticket donne un ticket sans logo : la boîte d'impression se fige sur l'état de la page à cet instant.
@@ -20,8 +22,13 @@ export async function attendreImages(zone: ParentNode | null, delaiMaxMs = 3000)
   await Promise.race([chargees, new Promise<void>((resolve) => window.setTimeout(resolve, delaiMaxMs))]);
 }
 
-/** Imprime la page une fois les images de {@code zone} chargées. */
+/**
+ * Imprime la page une fois les images de {@code zone} chargées. Dans l'application Android, `window.print()` ne fait rien :
+ * c'est l'application qui ouvre la fenêtre d'impression du téléphone.
+ */
 export async function imprimer(zone: ParentNode | null): Promise<void> {
   await attendreImages(zone);
-  window.print();
+  const pont = pontAndroid();
+  if (pont) pont.imprimer(document.title);
+  else window.print();
 }

@@ -140,16 +140,36 @@ Seuls ces quatre rôles existent. Les anciens rôles `VENDEUR` et `USER` sont fu
 
 ## États à imprimer par période (historique des ventes, journal de caisse)
 
-Les deux écrans partagent le sélecteur de période de l'écran Statistiques (aujourd'hui, hier, ce mois, ou deux dates) et deux boutons :
+Les écrans partagent le sélecteur de période de l'écran Statistiques (aujourd'hui, hier, ce mois, ou deux dates) et deux boutons :
 **Excel** (pour retravailler les chiffres) et **PDF** (A4 paysage, avec le nom et le logo de l'entreprise, numéro de page, à imprimer).
-Tous les rôles lisent l'historique des ventes ; le **journal complet** de la journée (lignes de tous les caissiers) est réservé à `ADMIN`,
-`MANAGER` et `GESTIONNAIRE` (voir `SecurityConfig`) : un caissier lit et imprime **son propre journal** (voir plus bas). Une période va de 1 à 366 jours
-(`400 REQUETE_INVALIDE` si la fin précède le début ou si la période est trop longue) ; l'écran, lui, n'accepte aucune date future.
+Le **journal complet** de la journée (lignes de tous les caissiers) est réservé à `ADMIN`, `MANAGER` et `GESTIONNAIRE` (voir `SecurityConfig`) : un
+caissier lit et imprime **son propre journal** (voir plus bas). Une période va de 1 à 366 jours (`400 REQUETE_INVALIDE` si la fin précède le début ou si
+la période est trop longue) ; l'écran, lui, n'accepte aucune date future.
 
 | Écran | API (même contenu en JSON, `/excel` et `/pdf`) | Contenu |
 |---|---|---|
-| Historique des ventes | `GET /api/ventes/historique?debut=&fin=` | une ligne par vente (validées et annulées), résumé (nombre, chiffre d'affaires TTC, remises, annulées), sous-total par jour sur plusieurs jours ; Excel : feuille « Articles vendus » en plus |
+| Historique des ventes > « Toutes les ventes » | `GET /api/ventes/historique?debut=&fin=[&vendeur=]` | une ligne par vente (validées et annulées), résumé (nombre, chiffre d'affaires TTC, remises, annulées), sous-total par jour sur plusieurs jours ; Excel : feuille « Articles vendus » en plus |
+| Historique des ventes > « Ventes soldées » | `GET /api/ventes/historique/soldees?debut=&fin=[&vendeur=]` | les ventes de la période **entièrement payées** : au comptant, ou à crédit dont la dette est réglée jusqu'au dernier franc (« Crédit soldé le » : date du dernier règlement) ; une vente à crédit y figure à la **date de la vente**, dès que sa dette est soldée ; résumé : nombre, montant, dont comptant, dont crédits soldés |
+| Historique des ventes > « Règlements de dettes » | `GET /api/ventes/historique/reglements?debut=&fin=[&vendeur=]` | chaque paiement reçu sur une dette (date du paiement) : client, vente d'origine, montant, moyen, référence, **encaissé par**, **reste dû juste après** (tous les règlements de la dette comptent, même ceux d'avant la période ; « Soldée », « Dette annulée ») ; résumé : nombre, total, détail par moyen de paiement, dettes soldées |
 | Mouvements de caisse > onglet « Journal de caisse » | `GET /api/caisse/journal?debut=&fin=` | par journée de caisse : fond, ventes en espèces, règlements de dettes en espèces, sorties, solde théorique, espèces comptées, écart, et chaque écriture avec son solde ; PDF à signer (visas) |
+| Gestion > Journal des opérations | `GET /api/journal-activites/operations?debut=&fin=[&utilisateur=][&famille=]` | qui a fait quoi, quand : chaque opération en clair (« Vente annulée », « Clôture de la caisse », « Article modifié »…) avec son détail, sa famille et son auteur ; résumé par utilisateur et par type d'opération ; réservé à `ADMIN`, `MANAGER`, `GESTIONNAIRE` |
+
+**Journal des opérations** (décisions de l'utilisateur, 2026-10-30). Réservé aux responsables (`/api/journal-activites/**`) ; pour tous les utilisateurs ou un
+seul (`utilisateur=`), toutes les opérations ou une famille (`famille=` : `VENTES`, `CAISSE`, `CLIENTS`, `STOCK`, `FOURNISSEURS`, `CATALOGUE`, `COMPTES`,
+`ENTREPRISE`, `AUTRES`). Les libellés et familles viennent de `OperationsConnues` (une opération inconnue garde ses mots d'origine, dans « Autres »).
+Depuis cette version, le journal enregistre aussi : chaque **connexion** réussie ou refusée, avec le poste (`adresse_ip`) et la raison du refus (mot de passe
+ou compte inconnu, compte désactivé ; rattachée au compte visé s'il existe) ; chaque **article** créé, modifié (seuls les champs changés, dont l'ancien et le
+nouveau prix) ou supprimé ; les **catégories**, les **unités de vente** (prix), les **clients** et les **comptes d'utilisateurs** (rôles, désactivation,
+changement de mot de passe, jamais le mot de passe lui-même). L'auteur est le compte connecté (`JournalActiviteService.enregistrer` avec un nom nul).
+Conséquence voulue : un compte qui s'est connecté une fois ne peut plus être supprimé (clé étrangère du journal) ; il se désactive. Tests :
+`JournalOperationsTests`, `JournalOperationsHttpTests`, `JournalOperationsPage.test.tsx`.
+
+**Historiques par vendeur** (décisions de l'utilisateur, 2026-10-30). Les trois onglets de l'historique gardent la même période et le même vendeur. Un
+**responsable** voit tous les vendeurs, ou celui qu'il choisit (`vendeur=`, nom du compte, sans souci des majuscules ; la liste vient de
+`GET /api/caisse/journal/caissiers`) ; un **caissier** ne voit que les siens : le serveur impose son nom, en nommer un autre est refusé (`403`)
+(`PerimetreVendeur`). « Vendeur » est le vendeur de la vente pour les ventes, et **le compte qui a encaissé** pour les règlements de dettes (comme le
+journal de caisse par caissier). Les documents nomment le vendeur sous le titre (« vendeur : marie » ou « tous les vendeurs ») et dans le nom du fichier.
+Tests : `HistoriquesParVendeurTests`, `HistoriquesParVendeurHttpTests`, `VentesHistoriquePage.test.tsx`.
 
 **Journal de caisse par caissier.** `GET /api/caisse/journal/caissier?debut=&fin=[&caissier=]` (et `/excel`, `/pdf`) ne garde que ce qu'un compte a fait lui-même :
 ses ventes (le vendeur de la vente), les règlements de dettes qu'il a encaissés, ses sorties, journée par journée (les journées où il n'a rien fait
@@ -204,6 +224,35 @@ les comptes de l'équipe dans l'écran Administration, puis renseigne l'écran E
 - Seul le serveur parle à MySQL ; la supervision (`/actuator/health`) reste sur le port local 8081, jamais sur le réseau.
 - Testé : profil `prod` sur une copie de la base, ouvert par l'adresse réseau du PC dans un vrai navigateur (connexion, tous les écrans,
   rechargement d'une page profonde, logo, tickets). Pas encore essayé avec un second PC physique ni avec le pare-feu activé.
+
+## Téléphones et tablettes Android (application GesStock)
+
+`android/` contient une petite application Android (Java, sans bibliothèque, Android 8.0 et plus) : une vue web plein écran qui affiche
+l'interface servie par le PC serveur, à l'adresse réglée au premier lancement (`192.168.1.75:8080` ; sans port, 8080). Elle n'embarque
+aucune page : une mise à jour de GesStock sur le serveur arrive sur les téléphones sans réinstaller l'application. Le téléphone doit être
+sur le Wi-Fi du magasin, et le serveur servir l'interface sur le réseau (section précédente, ou livraison simple), en HTTP.
+
+- **Construire** : `scripts\construire-apk.cmd` (la première fois sur un PC : `-InstallerOutils`, qui installe les outils Android, environ
+  300 Mo, dans `%LOCALAPPDATA%\Android\Sdk`). Au premier passage, il crée la **clé de signature** dans `%USERPROFILE%\.gesstock\android`
+  (hors du dépôt, avec son mot de passe aléatoire) : **à sauvegarder**, car une nouvelle version ne s'installe par-dessus l'ancienne que
+  signée avec la même clé. Il lance ensuite les tests, construit l'APK signée et dépose `GesStock.apk` et `LISEZ-MOI.txt` (modèle dans
+  `scripts\android\`) dans le dossier `GesStock-Android` du Bureau. Sous le capot : `android\gradlew.bat clean test assembleRelease` (Gradle 8.10,
+  plugin Android 8.7, SDK 35). La CI construit aussi l'application (non signée) et lance ses tests.
+- **Ce que l'application ajoute à la vue web** : le réglage de l'adresse avec vérification (la page d'accueil doit porter le nom GesStock ;
+  « Enregistrer quand même » si le serveur est éteint), un écran « serveur injoignable » (Réessayer, Changer l'adresse), le raccourci
+  « Serveur » de l'icône (appui long), une navigation limitée au serveur (les autres liens s'ouvrent dans le navigateur), les fenêtres
+  `confirm()` au nom de GesStock, le choix d'un fichier (logo), le bouton Retour, et le pont `window.GesStockAndroid`
+  (`frontend/src/lib/android.ts`). Une vue web Android n'imprime pas (`window.print()` n'y fait rien) et ne sait pas enregistrer un fichier
+  préparé dans la page : `imprimer()` et `telecharger()` passent donc par l'application, qui ouvre la fenêtre d'impression d'Android ou
+  enregistre le fichier dans `Téléchargements/GesStock` puis l'ouvre. Tout nouvel export ou impression doit passer par ces deux fonctions.
+- **Impression** : par le service d'impression d'Android (imprimante réseau, « Enregistrer au format PDF »). Une imprimante de tickets
+  demande l'application de service d'impression de son fabricant.
+- **Testé** : 17 tests unitaires de l'application (adresse tapée, noms de fichiers, vérification du serveur contre un petit serveur local),
+  analyse `lint` sans erreur, APK signée inspectée (`aapt2`, `apksigner`) ; l'interface dans Edge simulant un téléphone (écran de 390 px,
+  identité de l'application, faux pont) contre un vrai serveur : connexion, menu, vente, ticket imprimé par le pont et jamais par
+  `window.print`, exports PDF et Excel confiés au pont avec des fichiers valides, aucun défilement horizontal. **Essayée par l'utilisateur sur
+  son téléphone le 2026-10-30 : « tout est bon »** (sans détail de ce qu'il a essayé ; jamais essayé ici : Android 8 et 9, imprimante de
+  tickets). Sur un téléphone, le panier de la caisse est sous le catalogue (il faut défiler).
 
 ## Livrer chez un client (kit de livraison)
 

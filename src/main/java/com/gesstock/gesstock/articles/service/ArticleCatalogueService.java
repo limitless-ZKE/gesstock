@@ -11,6 +11,7 @@ import com.gesstock.gesstock.entities.CategorieArticle;
 import com.gesstock.gesstock.entities.MouvementStock;
 import com.gesstock.gesstock.entities.TypeMouvementStock;
 import com.gesstock.gesstock.entities.UniteMesure;
+import com.gesstock.gesstock.journal.service.JournalActiviteService;
 import com.gesstock.gesstock.repositories.ArticleRepository;
 import com.gesstock.gesstock.repositories.CategorieArticleRepository;
 import com.gesstock.gesstock.repositories.MouvementStockRepository;
@@ -19,7 +20,9 @@ import com.gesstock.gesstock.repositories.UtilisateurRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -31,19 +34,22 @@ public class ArticleCatalogueService {
     private final UniteMesureRepository uniteMesureRepository;
     private final MouvementStockRepository mouvementStockRepository;
     private final UtilisateurRepository utilisateurRepository;
+    private final JournalActiviteService journalService;
 
     public ArticleCatalogueService(
         ArticleRepository articleRepository,
         CategorieArticleRepository categorieRepository,
         UniteMesureRepository uniteMesureRepository,
         MouvementStockRepository mouvementStockRepository,
-        UtilisateurRepository utilisateurRepository
+        UtilisateurRepository utilisateurRepository,
+        JournalActiviteService journalService
     ) {
         this.articleRepository = articleRepository;
         this.categorieRepository = categorieRepository;
         this.uniteMesureRepository = uniteMesureRepository;
         this.mouvementStockRepository = mouvementStockRepository;
         this.utilisateurRepository = utilisateurRepository;
+        this.journalService = journalService;
     }
 
     @Transactional(readOnly = true)
@@ -74,6 +80,10 @@ public class ArticleCatalogueService {
         Article article = new Article();
         remplir(article, request, true);
         Article enregistre = articleRepository.save(article);
+        journalService.enregistrer("CREATION", "ARTICLE", enregistre.getId(), "Article " + enregistre.getReference() + " « "
+            + enregistre.getDesignation() + " » créé : prix de vente " + texte(enregistre.getPrix()) + ", prix d'achat "
+            + texte(enregistre.getPrixAchat()) + (enregistre.getQuantiteStock() > 0 ? ", stock de départ " + enregistre.getQuantiteStock() : ""),
+            username);
         if (enregistre.getQuantiteStock() > 0) {
             MouvementStock mouvement = new MouvementStock();
             mouvement.setType(TypeMouvementStock.STOCK_INITIAL);
@@ -102,12 +112,49 @@ public class ArticleCatalogueService {
             throw new RequeteInvalideException(
                 "Le stock ne se modifie pas depuis la fiche article : utilisez « Ajuster le stock » (motif obligatoire)");
         }
+        String avant = article.getReference() + " « " + article.getDesignation() + " »";
+        List<String> changements = new ArrayList<>();
+        String reference = article.getReference();
+        String designation = article.getDesignation();
+        BigDecimal prix = article.getPrix();
+        BigDecimal prixAchat = article.getPrixAchat();
+        int seuil = article.getSeuilAlerte();
+        String categorie = article.getCategorie() == null ? "aucune" : article.getCategorie().getNom();
         remplir(article, request, false);
-        return CatalogueMapper.toResponse(articleRepository.save(article));
+        noter(changements, "référence", reference, article.getReference());
+        noter(changements, "désignation", designation, article.getDesignation());
+        if (differents(prix, article.getPrix())) changements.add("prix de vente " + texte(prix) + " → " + texte(article.getPrix()));
+        if (differents(prixAchat, article.getPrixAchat())) changements.add("prix d'achat " + texte(prixAchat) + " → " + texte(article.getPrixAchat()));
+        if (seuil != article.getSeuilAlerte()) changements.add("seuil d'alerte " + seuil + " → " + article.getSeuilAlerte());
+        noter(changements, "catégorie", categorie, article.getCategorie() == null ? "aucune" : article.getCategorie().getNom());
+        Article enregistre = articleRepository.save(article);
+        if (!changements.isEmpty()) {
+            journalService.enregistrer("MODIFICATION", "ARTICLE", id, "Article " + avant + " : " + String.join(" ; ", changements), null);
+        }
+        return CatalogueMapper.toResponse(enregistre);
     }
 
     public void supprimer(Long id) {
-        articleRepository.delete(trouver(id));
+        Article article = trouver(id);
+        articleRepository.delete(article);
+        journalService.enregistrer("SUPPRESSION", "ARTICLE", id,
+            "Article " + article.getReference() + " « " + article.getDesignation() + " » supprimé (prix de vente " + texte(article.getPrix()) + ")", null);
+    }
+
+    /** « désignation « Riz » → « Riz local » », seulement si la valeur a changé. */
+    private static void noter(List<String> changements, String champ, String avant, String apres) {
+        if (!java.util.Objects.equals(avant, apres)) {
+            changements.add(champ + " « " + avant + " » → « " + apres + " »");
+        }
+    }
+
+    private static boolean differents(BigDecimal avant, BigDecimal apres) {
+        return avant == null ? apres != null : apres == null || avant.compareTo(apres) != 0;
+    }
+
+    /** 1300.0000 → « 1300 » : le montant tel qu'on l'écrit, sans zéros inutiles. */
+    private static String texte(BigDecimal montant) {
+        return montant == null ? "—" : montant.stripTrailingZeros().toPlainString();
     }
 
     private void remplir(Article article, ArticleRequest request, boolean creation) {

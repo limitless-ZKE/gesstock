@@ -22,8 +22,8 @@ public final class InterfaceWeb {
      */
     public static final String[] PAGES = {
         "/", "/login", "/dashboard", "/caisse", "/caisse/mouvements", "/historique-ventes", "/articles", "/inventaires",
-        "/approvisionnements", "/fournisseurs", "/retours-fournisseurs", "/clients-dettes", "/statistiques", "/entreprise",
-        "/admin/utilisateurs",
+        "/approvisionnements", "/fournisseurs", "/retours-fournisseurs", "/clients-dettes", "/statistiques", "/journal-operations",
+        "/entreprise", "/admin/utilisateurs",
     };
 
     /** Fichiers produits par la construction de l'interface (Vite) : page d'entrée, icône et fichiers à empreinte. */

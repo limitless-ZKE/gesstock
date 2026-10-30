@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Barre d'état blanche aux icônes foncées : elle prolonge l'en-tête blanc de GesStock. -->
+    <style name="Base.Theme.GesStock" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:colorPrimary">@color/vert</item>
+        <item name="android:colorPrimaryDark">@color/blanc</item>
+        <item name="android:colorAccent">@color/vert</item>
+        <item name="android:windowBackground">@color/blanc</item>
+        <item name="android:statusBarColor">@color/blanc</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+
+    <style name="Theme.GesStock" parent="Base.Theme.GesStock" />
+
+    <!-- Écran de l'adresse du serveur : sur le fond gris-vert de GesStock, barres comprises. -->
+    <style name="Theme.GesStock.Reglage">
+        <item name="android:windowBackground">@color/fond</item>
+        <item name="android:statusBarColor">@color/fond</item>
+    </style>
+</resources>

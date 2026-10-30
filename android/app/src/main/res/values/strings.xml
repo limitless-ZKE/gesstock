@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools" tools:locale="fr">
+    <string name="app_name">GesStock</string>
+
+    <!-- Réglage de l'adresse du serveur -->
+    <string name="adresse_titre">Adresse du serveur</string>
+    <string name="adresse_aide">Tapez l’adresse affichée sur le PC serveur quand GesStock démarre, par exemple 192.168.1.75:8080. Le téléphone doit être connecté au même Wi-Fi que ce PC.</string>
+    <string name="adresse_connecter">Se connecter</string>
+    <string name="adresse_enregistrer_quand_meme">Enregistrer quand même</string>
+    <string name="adresse_invalide">Cette adresse n’est pas valable. Exemple : 192.168.1.75:8080</string>
+    <string name="adresse_verification">Connexion à %1$s…</string>
+    <string name="adresse_injoignable">Aucune réponse de %1$s.\n\nVérifiez que le téléphone est connecté au même Wi-Fi que le PC serveur, que GesStock y est démarré, et l’adresse tapée.</string>
+    <string name="adresse_autre_serveur">Un serveur répond à %1$s, mais ce n’est pas GesStock. Vérifiez le numéro après les deux-points : celui de GesStock est en général 8080.</string>
+
+    <!-- Serveur injoignable pendant l'utilisation -->
+    <string name="erreur_titre">Le serveur GesStock ne répond pas</string>
+    <string name="erreur_message">Adresse : %1$s\n\nVérifiez que le téléphone est connecté au Wi-Fi du magasin et que GesStock est démarré sur le PC serveur.\n\nDétail : %2$s</string>
+    <string name="reessayer">Réessayer</string>
+    <string name="changer_adresse">Changer l’adresse du serveur</string>
+
+    <!-- Fenêtres de confirmation de la page -->
+    <string name="ok">OK</string>
+    <string name="annuler">Annuler</string>
+
+    <!-- Fichiers (exports PDF et Excel, logo de l'entreprise) -->
+    <string name="aucun_choix_de_fichier">Aucune application de ce téléphone ne permet de choisir un fichier.</string>
+    <string name="fichier_enregistre">Enregistré dans Téléchargements/GesStock : %1$s</string>
+    <string name="fichier_non_enregistre">Le fichier n’a pas pu être enregistré (%1$s).</string>
+    <string name="fichier_sans_application">Aucune application de ce téléphone ne sait ouvrir ce fichier : il est dans Téléchargements/GesStock.</string>
+    <string name="stockage_refuse">Sans l’accès au stockage, le fichier ne peut pas être enregistré.</string>
+
+    <!-- Raccourci de l'icône (appui long) -->
+    <string name="raccourci_court">Serveur</string>
+    <string name="raccourci_long">Adresse du serveur</string>
+</resources>

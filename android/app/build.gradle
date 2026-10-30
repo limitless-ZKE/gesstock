@@ -1,0 +1,59 @@
+plugins {
+    id "com.android.application"
+}
+
+// Clé de signature : hors du dépôt, jamais commitée. Une mise à jour de l'application ne s'installe par-dessus l'ancienne que si
+// elle est signée avec la MÊME clé : scripts\construire-apk.cmd la crée au premier passage (voir README, « Application Android »).
+def fichierCle = file(System.getenv("GESSTOCK_CLE_ANDROID") ?: "${System.getProperty("user.home")}/.gesstock/android/cle.properties")
+def cle = new Properties()
+if (fichierCle.exists()) {
+    fichierCle.withInputStream { cle.load(it) }
+}
+
+android {
+    namespace = "com.gesstock.mobile"
+    compileSdk = 35
+
+    defaultConfig {
+        applicationId = "com.gesstock.mobile"
+        // Android 8.0 et plus : la quasi-totalité des téléphones en service.
+        minSdk = 26
+        targetSdk = 35
+        versionCode = 1
+        versionName = "1.0"
+    }
+
+    signingConfigs {
+        if (fichierCle.exists()) {
+            create("gesstock") {
+                storeFile = new File(fichierCle.parentFile, cle.getProperty("fichier"))
+                storePassword = cle.getProperty("motDePasse")
+                keyAlias = cle.getProperty("alias")
+                keyPassword = cle.getProperty("motDePasse")
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled = false
+            if (fichierCle.exists()) {
+                signingConfig = signingConfigs.gesstock
+            }
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    buildFeatures {
+        // Le numéro de version s'ajoute à l'identité du navigateur (« GesStockAndroid/1.0 ») : utile dans les journaux du serveur.
+        buildConfig = true
+    }
+}
+
+dependencies {
+    testImplementation "junit:junit:4.13.2"
+}

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Les couleurs de l'interface web (frontend/src/index.css). -->
+<resources>
+    <color name="vert">#1F6048</color>
+    <color name="blanc">#FFFFFF</color>
+    <color name="fond">#F2F4F1</color>
+    <color name="texte">#181B18</color>
+    <color name="texte_doux">#575D56</color>
+</resources>

@@ -56,3 +56,9 @@ replay_pid*.log
 
 ### Kit de livraison genere (scripts/preparer-livraison.cmd) ###
 /livraison/
+
+### Application Android : cache de Gradle et reglages locaux. La cle de signature vit hors du depot (~/.gesstock/android). ###
+/android/.gradle/
+/android/local.properties
+*.jks
+*.keystore

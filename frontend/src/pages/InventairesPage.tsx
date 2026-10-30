@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
 import { money } from "../lib/format";
+import { telecharger } from "../lib/telechargement";
 import { api } from "../services/api";
 import { apiErrorMessage as errorMessage } from "../services/apiError";
 
@@ -197,14 +198,7 @@ export default function InventairesPage() {
     if (!selected) return;
     try {
       const { data } = await api.get<Blob>(`/inventaires/${selected.id}/export.xlsx`, { responseType: "blob" });
-      const url = URL.createObjectURL(data);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = `${selected.code}.xlsx`;
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      URL.revokeObjectURL(url);
+      await telecharger(data, `${selected.code}.xlsx`);
     } catch (reason) {
       setNotice({ text: errorMessage(reason, "L’export a échoué."), isError: true });
     }

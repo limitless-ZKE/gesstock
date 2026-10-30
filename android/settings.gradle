@@ -1,0 +1,19 @@
+// Application Android de GesStock : une vue web qui affiche l'interface servie par le serveur du magasin (voir README).
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+rootProject.name = "gesstock-android"
+include ":app"

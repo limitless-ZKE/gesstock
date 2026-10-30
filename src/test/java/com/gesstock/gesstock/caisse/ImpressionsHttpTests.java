@@ -68,13 +68,14 @@ class ImpressionsHttpTests {
             .andExpect(jsonPath("$.ventes").isArray());
     }
 
+    /** Un caissier n'imprime que SES ventes : son nom est dans le nom du fichier (voir HistoriquesParVendeurHttpTests). */
     @Test
     void lePdfEtLExcelSontTelechargeablesAvecUnNomParlant() throws Exception {
         String periode = aujourdhui() + "-" + aujourdhui();
         var pdf = mockMvc.perform(get("/api/ventes/historique/pdf").param("debut", aujourdhui()).param("fin", aujourdhui()).with(user("u").roles("CAISSIER")))
             .andExpect(status().isOk())
             .andExpect(content().contentType("application/pdf"))
-            .andExpect(header().string("Content-Disposition", "attachment; filename=gesstock-historique-ventes-" + periode + ".pdf"))
+            .andExpect(header().string("Content-Disposition", "attachment; filename=gesstock-historique-ventes-u-" + periode + ".pdf"))
             .andReturn().getResponse().getContentAsByteArray();
         assertThat(new String(pdf, 0, 5)).isEqualTo("%PDF-");
 
