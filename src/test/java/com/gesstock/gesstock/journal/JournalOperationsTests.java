@@ -170,9 +170,11 @@ class JournalOperationsTests {
     @Test
     void lesDocumentsReprennentLesMemesOperations() throws Exception {
         preparerLaJournee();
+        operation("MODIFICATION", "ARTICLE", "admin", 12, "Article EAU-001 « Eau 1,5 L » : prix de vente 400 → 450");
 
         String deLAdmin = texteDuPdf(exportService.exporterPdf(JOUR, JOUR, "admin", null));
         assertThat(deLAdmin).contains("Journal des opérations", "utilisateur : admin", "Vente annulée", "Ouverture de la caisse", "erreur de saisie")
+            .as("la flèche, absente de la police des PDF, devient « -> »").contains("prix de vente 400 -> 450")
             .doesNotContain("Vente validée");
 
         String connexions = texteDuPdf(exportService.exporterPdf(JOUR, JOUR, null, Famille.COMPTES));

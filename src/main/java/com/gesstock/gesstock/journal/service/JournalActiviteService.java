@@ -21,6 +21,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 @Service
 @Transactional
@@ -74,7 +75,8 @@ public class JournalActiviteService {
             activite.setUtilisateur(utilisateur);
             activite.setEntiteId(utilisateur.getId());
         });
-        String poste = adresseIp == null || adresseIp.isBlank() ? "" : ", depuis le poste " + adresseIp;
+        String poste = adresseIp == null || adresseIp.isBlank() ? ""
+            : CE_PC.contains(adresseIp) ? ", depuis le PC serveur" : ", depuis le poste " + adresseIp;
         String compteVise = compte.map(utilisateur -> "compte " + utilisateur.getUsername())
             .orElse("identifiant inconnu « " + tronquer(nom, 80) + " »");
         activite.setDetails(raison == null
@@ -82,6 +84,9 @@ public class JournalActiviteService {
             : "Connexion refusée pour " + (compte.isPresent() ? "le " : "l'") + compteVise + " (" + raison + ")" + poste);
         journalRepository.save(activite);
     }
+
+    /** Les adresses d'une connexion faite sur le PC serveur lui-même (navigateur ouvert sur « localhost »). */
+    private static final Set<String> CE_PC = Set.of("127.0.0.1", "::1", "0:0:0:0:0:0:0:1");
 
     private static String compteConnecte() {
         Authentication authentification = SecurityContextHolder.getContext().getAuthentication();

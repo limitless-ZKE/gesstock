@@ -112,14 +112,21 @@ class JournalOperationsHttpTests {
         List<OperationJournal> duGestionnaire = operationsService.journal(LocalDate.now(), LocalDate.now(), "gestionnaire", Famille.COMPTES).operations();
         assertThat(duGestionnaire).anySatisfy(operation -> {
             assertThat(operation.operation()).isEqualTo("Connexion");
-            assertThat(operation.details()).isEqualTo("Connexion du compte gestionnaire, depuis le poste 127.0.0.1");
+            assertThat(operation.details()).as("une connexion faite sur le serveur lui-même est dite en clair")
+                .isEqualTo("Connexion du compte gestionnaire, depuis le PC serveur");
             assertThat(operation.poste()).isEqualTo("127.0.0.1");
         });
         assertThat(duGestionnaire).anySatisfy(operation -> {
             assertThat(operation.operation()).isEqualTo("Connexion refusée");
             assertThat(operation.details()).isEqualTo("Connexion refusée pour le compte gestionnaire (mot de passe incorrect ou compte inconnu), "
-                + "depuis le poste 127.0.0.1");
+                + "depuis le PC serveur");
         });
+        mockMvc.perform(avecJeton(post("/api/auth/login"), jeton).param("username", "caissier").param("password", "caissier123")
+                .with(requete -> { requete.setRemoteAddr("192.168.1.20"); return requete; }))
+            .andExpect(status().isNoContent());
+        assertThat(operationsService.journal(LocalDate.now(), LocalDate.now(), "caissier", Famille.COMPTES).operations())
+            .as("un autre poste du réseau garde son adresse")
+            .anySatisfy(operation -> assertThat(operation.details()).isEqualTo("Connexion du compte caissier, depuis le poste 192.168.1.20"));
         assertThat(operationsService.journal(LocalDate.now(), LocalDate.now(), null, Famille.COMPTES).operations())
             .anySatisfy(operation -> {
                 assertThat(operation.utilisateur()).isNull();

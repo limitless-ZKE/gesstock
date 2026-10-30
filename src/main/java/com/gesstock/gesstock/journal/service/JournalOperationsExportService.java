@@ -86,7 +86,7 @@ public class JournalOperationsExportService {
                         (plusieursJours ? ExportSupport.jour(jour) + " " : "") + ExportSupport.heure(operation.date()),
                         operation.utilisateur() == null ? "—" : operation.utilisateur(),
                         operation.operation(),
-                        operation.details() == null ? "" : operation.details());
+                        pourLePdf(operation.details()));
                 }
                 if (plusieursJours && jourCourant != null) sousTotal(tableau, jourCourant, nombreDuJour);
                 if (journal.operations().isEmpty()) {
@@ -167,6 +167,14 @@ public class JournalOperationsExportService {
             classeur.write(sortie);
             return sortie.toByteArray();
         }
+    }
+
+    /**
+     * La police des PDF ne connaît pas la flèche « → » des changements (« prix de vente 400 → 450 ») : elle y disparaîtrait. Elle
+     * devient « -> » dans le PDF ; l'écran et l'Excel gardent la flèche.
+     */
+    static String pourLePdf(String texte) {
+        return texte == null ? "" : texte.replace("→", "->");
     }
 
     /** Pour un document, les opérations se lisent dans l'ordre du temps. */
