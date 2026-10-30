@@ -10,3 +10,9 @@
 *.ps1 text eol=crlf
 scripts/kit-livraison/*.txt text eol=crlf
 scripts/livraison-simple/*.txt text eol=crlf
+scripts/android/*.txt text eol=crlf
+
+# Application Android : lanceur Gradle (sh pour Linux et la CI, bat pour Windows) et son archive.
+/android/gradlew text eol=lf
+*.bat text eol=crlf
+*.jar binary

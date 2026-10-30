@@ -85,6 +85,28 @@ jobs:
       # `npm run build` exécute `tsc -b` (vérification des types, tests compris) puis le build Vite.
       - run: npm run build
 
+  android:
+    name: Application Android (tests + APK)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: gradle
+          cache-dependency-path: |
+            android/*.gradle
+            android/app/build.gradle
+            android/gradle/wrapper/gradle-wrapper.properties
+      # Les machines de GitHub ont déjà les outils Android. L'APK sort non signé : la clé reste sur le PC qui livre
+      # (scripts/construire-apk.cmd) ; ce job vérifie seulement que l'application se construit et que ses tests passent.
+      - run: chmod +x gradlew && ./gradlew --no-daemon --console=plain test assembleRelease
+
   securite:
     name: Sécurité (dépendances, secrets, analyse du code)
     runs-on: ubuntu-latest

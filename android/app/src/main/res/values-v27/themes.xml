@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Android 8.1 et plus : la barre de navigation peut être claire, aux icônes foncées. -->
+    <style name="Theme.GesStock" parent="Base.Theme.GesStock">
+        <item name="android:navigationBarColor">@color/blanc</item>
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
+
+    <style name="Theme.GesStock.Reglage">
+        <item name="android:windowBackground">@color/fond</item>
+        <item name="android:statusBarColor">@color/fond</item>
+        <item name="android:navigationBarColor">@color/fond</item>
+    </style>
+</resources>

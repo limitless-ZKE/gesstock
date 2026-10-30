@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Appui long sur l'icône : « Serveur » ouvre le réglage de l'adresse (le PC serveur a changé d'adresse, autre magasin…). -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutId="adresse_serveur"
+        android:shortcutLongLabel="@string/raccourci_long"
+        android:shortcutShortLabel="@string/raccourci_court">
+        <intent
+            android:action="com.gesstock.mobile.CHANGER_ADRESSE"
+            android:targetClass="com.gesstock.mobile.MainActivity"
+            android:targetPackage="com.gesstock.mobile" />
+    </shortcut>
+</shortcuts>
