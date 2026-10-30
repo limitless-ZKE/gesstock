@@ -2,6 +2,7 @@ package com.gesstock.gesstock.referentiels.service;
 
 import com.gesstock.gesstock.entities.Role;
 import com.gesstock.gesstock.entities.Utilisateur;
+import com.gesstock.gesstock.journal.service.JournalActiviteService;
 import com.gesstock.gesstock.repositories.RoleRepository;
 import com.gesstock.gesstock.repositories.UtilisateurRepository;
 import com.gesstock.gesstock.referentiels.dto.CreateUtilisateurRequest;
@@ -14,6 +15,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -27,15 +29,18 @@ public class UtilisateurService {
     private final UtilisateurRepository utilisateurRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
+    private final JournalActiviteService journalService;
 
     public UtilisateurService(
         UtilisateurRepository utilisateurRepository,
         RoleRepository roleRepository,
-        PasswordEncoder passwordEncoder
+        PasswordEncoder passwordEncoder,
+        JournalActiviteService journalService
     ) {
         this.utilisateurRepository = utilisateurRepository;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
+        this.journalService = journalService;
     }
 
     @Transactional(readOnly = true)
@@ -55,7 +60,10 @@ public class UtilisateurService {
         utilisateur.setPassword(passwordEncoder.encode(request.password()));
         utilisateur.setActif(request.actif() == null || request.actif());
         attribuerRoles(utilisateur, request.roleIds());
-        return UtilisateurMapper.toResponse(utilisateurRepository.save(utilisateur));
+        Utilisateur enregistre = utilisateurRepository.save(utilisateur);
+        journalService.enregistrer("CREATION", "UTILISATEUR", enregistre.getId(), "Compte « " + enregistre.getUsername() + " » créé : "
+            + roles(enregistre) + (enregistre.isActif() ? "" : ", désactivé"), null);
+        return UtilisateurMapper.toResponse(enregistre);
     }
 
     public UtilisateurResponse modifier(Long id, UpdateUtilisateurRequest request, String utilisateurConnecte) {
@@ -73,6 +81,9 @@ public class UtilisateurService {
                 });
         }
 
+        String nom = utilisateur.getUsername();
+        String rolesAvant = roles(utilisateur);
+        boolean etaitActif = utilisateur.isActif();
         utilisateur.setUsername(request.username().trim());
         if (request.password() != null) {
             utilisateur.setPassword(passwordEncoder.encode(request.password()));
@@ -81,15 +92,39 @@ public class UtilisateurService {
             utilisateur.setActif(request.actif());
         }
         attribuerRoles(utilisateur, request.roleIds());
-        return UtilisateurMapper.toResponse(utilisateurRepository.save(utilisateur));
+        Utilisateur enregistre = utilisateurRepository.save(utilisateur);
+        List<String> changements = new ArrayList<>();
+        if (!nom.equals(enregistre.getUsername())) changements.add("renommé « " + enregistre.getUsername() + " »");
+        if (!rolesAvant.equals(roles(enregistre))) changements.add("rôles " + rolesAvant + " → " + roles(enregistre));
+        if (etaitActif != enregistre.isActif()) changements.add(enregistre.isActif() ? "réactivé" : "désactivé");
+        if (request.password() != null) changements.add("mot de passe changé");
+        if (!changements.isEmpty()) {
+            journalService.enregistrer("MODIFICATION", "UTILISATEUR", id, "Compte « " + nom + " » : " + String.join(", ", changements),
+                utilisateurConnecte);
+        }
+        return UtilisateurMapper.toResponse(enregistre);
     }
 
+    /**
+     * Un compte qui a laissé des traces (ventes, journal des opérations, connexions comprises) ne se supprime pas : la base le refuse
+     * et l'historique reste lisible. Il se désactive.
+     */
     public void supprimer(Long id, String utilisateurConnecte) {
         Utilisateur utilisateur = trouver(id);
         if (utilisateur.getUsername().equalsIgnoreCase(utilisateurConnecte)) {
             throw new ConflitRessourceException("Vous ne pouvez pas supprimer votre propre compte");
         }
         utilisateurRepository.delete(utilisateur);
+        journalService.enregistrer("SUPPRESSION", "UTILISATEUR", id, "Compte « " + utilisateur.getUsername() + " » supprimé", utilisateurConnecte);
+    }
+
+    /** « ADMIN, CAISSIER » : les rôles d'un compte, sans le préfixe technique, dans l'ordre alphabétique. */
+    private static String roles(Utilisateur utilisateur) {
+        List<String> noms = utilisateur.getRoles().stream()
+            .map(role -> role.getName().trim().toUpperCase(Locale.ROOT).replaceFirst("^ROLE_", ""))
+            .sorted()
+            .toList();
+        return noms.isEmpty() ? "aucun rôle" : String.join(", ", noms);
     }
 
     private void verifierModificationPropreCompte(Utilisateur utilisateur, Boolean actif, String utilisateurConnecte) {

@@ -1,9 +1,13 @@
 package com.gesstock.gesstock.config;
 
+import com.gesstock.gesstock.journal.service.JournalActiviteService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.AuthenticationEntryPoint;
@@ -22,10 +26,14 @@ import java.io.IOException;
 @Component
 public class ApiSecurityHandlers implements AuthenticationEntryPoint, AccessDeniedHandler {
 
-    private final LimiteurConnexions limiteur;
+    private static final Logger LOGGER = LoggerFactory.getLogger(ApiSecurityHandlers.class);
 
-    public ApiSecurityHandlers(LimiteurConnexions limiteur) {
+    private final LimiteurConnexions limiteur;
+    private final JournalActiviteService journalService;
+
+    public ApiSecurityHandlers(LimiteurConnexions limiteur, JournalActiviteService journalService) {
         this.limiteur = limiteur;
+        this.journalService = journalService;
     }
 
     @Override
@@ -56,14 +64,29 @@ public class ApiSecurityHandlers implements AuthenticationEntryPoint, AccessDeni
         if (jeton != null) {
             jeton.getToken();
         }
+        journaliser(authentication.getName(), request, null);
         response.setStatus(HttpStatus.NO_CONTENT.value());
     }
 
-    /** Même message pour un mot de passe faux, un compte inconnu ou désactivé : on ne révèle pas lequel. */
+    /**
+     * Même message pour un mot de passe faux, un compte inconnu ou désactivé : on ne révèle pas lequel. Le journal des opérations,
+     * lui, lu par les seuls responsables, dit lequel.
+     */
     public void loginEchoue(HttpServletRequest request, HttpServletResponse response,
                             AuthenticationException exception) throws IOException {
         limiteur.enregistrerEchec(LimiteurConnexions.cle(request.getParameter("username"), request.getRemoteAddr()));
+        journaliser(request.getParameter("username"), request,
+            exception instanceof DisabledException ? "compte désactivé" : "mot de passe incorrect ou compte inconnu");
         ecrire(response, HttpStatus.UNAUTHORIZED, "Identifiant ou mot de passe incorrect", "IDENTIFIANTS_INVALIDES");
+    }
+
+    /** Une panne du journal ne doit jamais empêcher quelqu'un de se connecter : elle est seulement signalée dans les journaux. */
+    private void journaliser(String identifiant, HttpServletRequest request, String raison) {
+        try {
+            journalService.enregistrerConnexion(identifiant, request.getRemoteAddr(), raison);
+        } catch (RuntimeException exception) {
+            LOGGER.warn("Connexion non enregistrée dans le journal des opérations : {}", exception.getMessage());
+        }
     }
 
     private void ecrire(HttpServletResponse response, HttpStatus status, String detail, String code) throws IOException {
