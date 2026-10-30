@@ -79,7 +79,8 @@ export default function VentesHistoriquePage() {
 
       <SelecteurPeriode periode={periode} onChange={setPeriode} chargement={chargement} />
 
-      <div role="tablist" aria-label="Historiques" className="flex w-fit max-w-full gap-1 overflow-x-auto rounded-xl bg-slate-100 p-1">
+      {/* Sur un téléphone, les onglets passent à la ligne plutôt que de défiler : les trois restent visibles. */}
+      <div role="tablist" aria-label="Historiques" className="flex flex-wrap gap-1 rounded-xl bg-slate-100 p-1 sm:w-fit">
         {ONGLETS.map(({ id, libelle }) => (
           <button key={id} type="button" role="tab" id={`onglet-${id}`} aria-selected={onglet === id} aria-controls="historique-panneau"
             onClick={() => setOnglet(id)}

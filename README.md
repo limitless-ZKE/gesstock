@@ -140,16 +140,25 @@ Seuls ces quatre rôles existent. Les anciens rôles `VENDEUR` et `USER` sont fu
 
 ## États à imprimer par période (historique des ventes, journal de caisse)
 
-Les deux écrans partagent le sélecteur de période de l'écran Statistiques (aujourd'hui, hier, ce mois, ou deux dates) et deux boutons :
+Les écrans partagent le sélecteur de période de l'écran Statistiques (aujourd'hui, hier, ce mois, ou deux dates) et deux boutons :
 **Excel** (pour retravailler les chiffres) et **PDF** (A4 paysage, avec le nom et le logo de l'entreprise, numéro de page, à imprimer).
-Tous les rôles lisent l'historique des ventes ; le **journal complet** de la journée (lignes de tous les caissiers) est réservé à `ADMIN`,
-`MANAGER` et `GESTIONNAIRE` (voir `SecurityConfig`) : un caissier lit et imprime **son propre journal** (voir plus bas). Une période va de 1 à 366 jours
-(`400 REQUETE_INVALIDE` si la fin précède le début ou si la période est trop longue) ; l'écran, lui, n'accepte aucune date future.
+Le **journal complet** de la journée (lignes de tous les caissiers) est réservé à `ADMIN`, `MANAGER` et `GESTIONNAIRE` (voir `SecurityConfig`) : un
+caissier lit et imprime **son propre journal** (voir plus bas). Une période va de 1 à 366 jours (`400 REQUETE_INVALIDE` si la fin précède le début ou si
+la période est trop longue) ; l'écran, lui, n'accepte aucune date future.
 
 | Écran | API (même contenu en JSON, `/excel` et `/pdf`) | Contenu |
 |---|---|---|
-| Historique des ventes | `GET /api/ventes/historique?debut=&fin=` | une ligne par vente (validées et annulées), résumé (nombre, chiffre d'affaires TTC, remises, annulées), sous-total par jour sur plusieurs jours ; Excel : feuille « Articles vendus » en plus |
+| Historique des ventes > « Toutes les ventes » | `GET /api/ventes/historique?debut=&fin=[&vendeur=]` | une ligne par vente (validées et annulées), résumé (nombre, chiffre d'affaires TTC, remises, annulées), sous-total par jour sur plusieurs jours ; Excel : feuille « Articles vendus » en plus |
+| Historique des ventes > « Ventes soldées » | `GET /api/ventes/historique/soldees?debut=&fin=[&vendeur=]` | les ventes de la période **entièrement payées** : au comptant, ou à crédit dont la dette est réglée jusqu'au dernier franc (« Crédit soldé le » : date du dernier règlement) ; une vente à crédit y figure à la **date de la vente**, dès que sa dette est soldée ; résumé : nombre, montant, dont comptant, dont crédits soldés |
+| Historique des ventes > « Règlements de dettes » | `GET /api/ventes/historique/reglements?debut=&fin=[&vendeur=]` | chaque paiement reçu sur une dette (date du paiement) : client, vente d'origine, montant, moyen, référence, **encaissé par**, **reste dû juste après** (tous les règlements de la dette comptent, même ceux d'avant la période ; « Soldée », « Dette annulée ») ; résumé : nombre, total, détail par moyen de paiement, dettes soldées |
 | Mouvements de caisse > onglet « Journal de caisse » | `GET /api/caisse/journal?debut=&fin=` | par journée de caisse : fond, ventes en espèces, règlements de dettes en espèces, sorties, solde théorique, espèces comptées, écart, et chaque écriture avec son solde ; PDF à signer (visas) |
+
+**Historiques par vendeur** (décisions de l'utilisateur, 2026-10-30). Les trois onglets de l'historique gardent la même période et le même vendeur. Un
+**responsable** voit tous les vendeurs, ou celui qu'il choisit (`vendeur=`, nom du compte, sans souci des majuscules ; la liste vient de
+`GET /api/caisse/journal/caissiers`) ; un **caissier** ne voit que les siens : le serveur impose son nom, en nommer un autre est refusé (`403`)
+(`PerimetreVendeur`). « Vendeur » est le vendeur de la vente pour les ventes, et **le compte qui a encaissé** pour les règlements de dettes (comme le
+journal de caisse par caissier). Les documents nomment le vendeur sous le titre (« vendeur : marie » ou « tous les vendeurs ») et dans le nom du fichier.
+Tests : `HistoriquesParVendeurTests`, `HistoriquesParVendeurHttpTests`, `VentesHistoriquePage.test.tsx`.
 
 **Journal de caisse par caissier.** `GET /api/caisse/journal/caissier?debut=&fin=[&caissier=]` (et `/excel`, `/pdf`) ne garde que ce qu'un compte a fait lui-même :
 ses ventes (le vendeur de la vente), les règlements de dettes qu'il a encaissés, ses sorties, journée par journée (les journées où il n'a rien fait

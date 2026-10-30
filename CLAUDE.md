@@ -61,6 +61,10 @@ Avant de toucher à une base réelle, rappeler la sauvegarde et tester sur une *
 - Vente à crédit possible (pas pour un client de passage). Journal d'un caissier : **ses lignes seulement**
   (ses ventes, ses encaissements, ses sorties) avec « espèces à remettre » ; ni fond de caisse, ni solde, ni écart.
   Le journal complet est réservé aux responsables ; un CAISSIER qui nomme un autre caissier reçoit 403.
+- Historique des ventes en trois onglets (toutes les ventes, ventes soldées, règlements de dettes), global ou par vendeur :
+  une vente soldée (comptant, ou crédit réglé jusqu'au dernier franc) reste à la **date de la vente** ; un règlement est
+  rattaché au compte **qui l'a encaissé** ; un caissier ne voit que les siens (403 s'il en nomme un autre), les
+  responsables voient tout ou choisissent le vendeur (`PerimetreVendeur`).
 - Page de connexion : l'ancienne « Bon retour » (panneau vert « Votre stock, en toute clarté. »), sans ticket de caisse.
 - Choix par défaut non confirmés : valider un retour fournisseur = ADMIN/MANAGER ; un paiement fournisseur ou un retour
   validé ne s'annule pas ; CI sur Node 24.

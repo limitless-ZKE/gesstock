@@ -255,8 +255,8 @@ public class HistoriqueVentesExportService {
                 document.add(TableauPdf.creer(new float[] {1f, 1.5f, 1.8f, 1.8f}, new boolean[] {true, true, true, true},
                         "Ventes soldées", "Montant TTC", "Dont au comptant", "Dont crédits soldés")
                     .ligne(Long.toString(resume.nombre()), ExportSupport.montant(resume.montant()),
-                        resume.nombreComptant() + " · " + ExportSupport.montant(resume.montantComptant()),
-                        resume.nombreCreditsSoldes() + " · " + ExportSupport.montant(resume.montantCreditsSoldes()))
+                        ventes(resume.nombreComptant()) + " · " + ExportSupport.montant(resume.montantComptant()),
+                        ventes(resume.nombreCreditsSoldes()) + " · " + ExportSupport.montant(resume.montantCreditsSoldes()))
                     .table());
 
                 boolean plusieursJours = !debut.equals(fin);
@@ -305,6 +305,10 @@ public class HistoriqueVentesExportService {
     private VentesSoldeesResponse soldees(LocalDate debut, LocalDate fin, String vendeur) {
         List<Vente> ventes = chronologique(historiqueService.chargerSoldees(debut, fin, vendeur, HistoriqueVentesService.VENTES_DOCUMENT_MAX, "l'imprimer"));
         return historiqueService.construireSoldees(debut, fin, ventes);
+    }
+
+    private static String ventes(long nombre) {
+        return nombre + (nombre > 1 ? " ventes" : " vente");
     }
 
     private static void sousTotalSoldees(TableauPdf tableau, LocalDate jour, long nombre, BigDecimal total) {
