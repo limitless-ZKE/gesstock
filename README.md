@@ -250,9 +250,9 @@ sur le Wi-Fi du magasin, et le serveur servir l'interface sur le réseau (sectio
 - **Testé** : 17 tests unitaires de l'application (adresse tapée, noms de fichiers, vérification du serveur contre un petit serveur local),
   analyse `lint` sans erreur, APK signée inspectée (`aapt2`, `apksigner`) ; l'interface dans Edge simulant un téléphone (écran de 390 px,
   identité de l'application, faux pont) contre un vrai serveur : connexion, menu, vente, ticket imprimé par le pont et jamais par
-  `window.print`, exports PDF et Excel confiés au pont avec des fichiers valides, aucun défilement horizontal. **Pas encore essayé sur un vrai
-  téléphone** : impression Android, enregistrement dans Téléchargements (surtout Android 8 et 9), choix du logo, fenêtres de confirmation,
-  écran « serveur injoignable », raccourci de l'icône. Sur un téléphone, le panier de la caisse est sous le catalogue (il faut défiler).
+  `window.print`, exports PDF et Excel confiés au pont avec des fichiers valides, aucun défilement horizontal. **Essayée par l'utilisateur sur
+  son téléphone le 2026-10-30 : « tout est bon »** (sans détail de ce qu'il a essayé ; jamais essayé ici : Android 8 et 9, imprimante de
+  tickets). Sur un téléphone, le panier de la caisse est sous le catalogue (il faut défiler).
 
 ## Livrer chez un client (kit de livraison)
 
