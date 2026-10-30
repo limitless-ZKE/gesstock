@@ -27,6 +27,8 @@ SPRING_PROFILES_ACTIVE=dev ./mvnw spring-boot:run     # API (profil dev obligato
 cd frontend && npm install && npm run dev             # http://localhost:5173
 ./mvnw -B clean test                                  # suite serveur complète (~4 min), H2
 cd frontend && npm run lint && npm test && npm run build
+scripts\construire-apk.cmd                            # APK signée + mode d'emploi sur le Bureau (1re fois : -InstallerOutils)
+cd android && gradlew.bat test assembleDebug          # tests et APK de l'application Android (ANDROID_HOME requis)
 ```
 
 Migrations : seule `MigrationsMysqlIT` (voir README) valide le SQL de Flyway sur un vrai MySQL ; H2 ne la remplace pas.
@@ -42,7 +44,12 @@ Avant de toucher à une base réelle, rappeler la sauvegarde et tester sur une *
   Caisse : `CaissePage`, `ChampClient` (recherche client), `QuantiteSaisie` (quantité saisie au clavier).
   Journaux : `JournalCaisse` choisit selon le rôle entre le journal complet et celui d'un caissier.
 - Scripts : `scripts/` — `kit-livraison/` (kit complet), `livraison-simple/` + `preparer-livraison-simple.cmd/.ps1`
-  (dossier simple), `construire-pour-le-reseau.cmd`, `lancer-gesstock-reseau.cmd`.
+  (dossier simple), `construire-pour-le-reseau.cmd`, `lancer-gesstock-reseau.cmd`, `construire-apk.cmd/.ps1` + `android/` (APK).
+- Application Android : `android/` (Java sans dépendance, Gradle 8.10, plugin Android 8.7, minSdk 26, targetSdk 35). Une vue web
+  sur l'adresse du serveur réglée au premier lancement ; aucune page embarquée. Le pont `window.GesStockAndroid`
+  (`frontend/src/lib/android.ts`, `PontAndroid.java`) fait passer l'impression (`imprimer`) et les fichiers (`telecharger`)
+  par le téléphone : tout nouvel export ou impression doit utiliser ces deux fonctions, jamais `window.print()` ni un lien
+  `download` directement. Clé de signature hors du dépôt : `%USERPROFILE%\.gesstock\android` (à ne jamais commiter ni perdre).
 
 ## Décisions métier de l'utilisateur (ne pas remettre en cause)
 

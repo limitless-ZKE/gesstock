@@ -205,6 +205,35 @@ les comptes de l'équipe dans l'écran Administration, puis renseigne l'écran E
 - Testé : profil `prod` sur une copie de la base, ouvert par l'adresse réseau du PC dans un vrai navigateur (connexion, tous les écrans,
   rechargement d'une page profonde, logo, tickets). Pas encore essayé avec un second PC physique ni avec le pare-feu activé.
 
+## Téléphones et tablettes Android (application GesStock)
+
+`android/` contient une petite application Android (Java, sans bibliothèque, Android 8.0 et plus) : une vue web plein écran qui affiche
+l'interface servie par le PC serveur, à l'adresse réglée au premier lancement (`192.168.1.75:8080` ; sans port, 8080). Elle n'embarque
+aucune page : une mise à jour de GesStock sur le serveur arrive sur les téléphones sans réinstaller l'application. Le téléphone doit être
+sur le Wi-Fi du magasin, et le serveur servir l'interface sur le réseau (section précédente, ou livraison simple), en HTTP.
+
+- **Construire** : `scripts\construire-apk.cmd` (la première fois sur un PC : `-InstallerOutils`, qui installe les outils Android, environ
+  300 Mo, dans `%LOCALAPPDATA%\Android\Sdk`). Au premier passage, il crée la **clé de signature** dans `%USERPROFILE%\.gesstock\android`
+  (hors du dépôt, avec son mot de passe aléatoire) : **à sauvegarder**, car une nouvelle version ne s'installe par-dessus l'ancienne que
+  signée avec la même clé. Il lance ensuite les tests, construit l'APK signée et dépose `GesStock.apk` et `LISEZ-MOI.txt` (modèle dans
+  `scripts\android\`) dans le dossier `GesStock-Android` du Bureau. Sous le capot : `android\gradlew.bat clean test assembleRelease` (Gradle 8.10,
+  plugin Android 8.7, SDK 35). La CI construit aussi l'application (non signée) et lance ses tests.
+- **Ce que l'application ajoute à la vue web** : le réglage de l'adresse avec vérification (la page d'accueil doit porter le nom GesStock ;
+  « Enregistrer quand même » si le serveur est éteint), un écran « serveur injoignable » (Réessayer, Changer l'adresse), le raccourci
+  « Serveur » de l'icône (appui long), une navigation limitée au serveur (les autres liens s'ouvrent dans le navigateur), les fenêtres
+  `confirm()` au nom de GesStock, le choix d'un fichier (logo), le bouton Retour, et le pont `window.GesStockAndroid`
+  (`frontend/src/lib/android.ts`). Une vue web Android n'imprime pas (`window.print()` n'y fait rien) et ne sait pas enregistrer un fichier
+  préparé dans la page : `imprimer()` et `telecharger()` passent donc par l'application, qui ouvre la fenêtre d'impression d'Android ou
+  enregistre le fichier dans `Téléchargements/GesStock` puis l'ouvre. Tout nouvel export ou impression doit passer par ces deux fonctions.
+- **Impression** : par le service d'impression d'Android (imprimante réseau, « Enregistrer au format PDF »). Une imprimante de tickets
+  demande l'application de service d'impression de son fabricant.
+- **Testé** : 17 tests unitaires de l'application (adresse tapée, noms de fichiers, vérification du serveur contre un petit serveur local),
+  analyse `lint` sans erreur, APK signée inspectée (`aapt2`, `apksigner`) ; l'interface dans Edge simulant un téléphone (écran de 390 px,
+  identité de l'application, faux pont) contre un vrai serveur : connexion, menu, vente, ticket imprimé par le pont et jamais par
+  `window.print`, exports PDF et Excel confiés au pont avec des fichiers valides, aucun défilement horizontal. **Pas encore essayé sur un vrai
+  téléphone** : impression Android, enregistrement dans Téléchargements (surtout Android 8 et 9), choix du logo, fenêtres de confirmation,
+  écran « serveur injoignable », raccourci de l'icône. Sur un téléphone, le panier de la caisse est sous le catalogue (il faut défiler).
+
 ## Livrer chez un client (kit de livraison)
 
 `scripts\preparer-livraison.cmd` construit l'interface et le programme puis assemble `livraison\GesStock-AAAA-MM-JJ.zip` (option `rapide` : sans
