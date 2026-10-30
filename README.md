@@ -152,6 +152,17 @@ la période est trop longue) ; l'écran, lui, n'accepte aucune date future.
 | Historique des ventes > « Ventes soldées » | `GET /api/ventes/historique/soldees?debut=&fin=[&vendeur=]` | les ventes de la période **entièrement payées** : au comptant, ou à crédit dont la dette est réglée jusqu'au dernier franc (« Crédit soldé le » : date du dernier règlement) ; une vente à crédit y figure à la **date de la vente**, dès que sa dette est soldée ; résumé : nombre, montant, dont comptant, dont crédits soldés |
 | Historique des ventes > « Règlements de dettes » | `GET /api/ventes/historique/reglements?debut=&fin=[&vendeur=]` | chaque paiement reçu sur une dette (date du paiement) : client, vente d'origine, montant, moyen, référence, **encaissé par**, **reste dû juste après** (tous les règlements de la dette comptent, même ceux d'avant la période ; « Soldée », « Dette annulée ») ; résumé : nombre, total, détail par moyen de paiement, dettes soldées |
 | Mouvements de caisse > onglet « Journal de caisse » | `GET /api/caisse/journal?debut=&fin=` | par journée de caisse : fond, ventes en espèces, règlements de dettes en espèces, sorties, solde théorique, espèces comptées, écart, et chaque écriture avec son solde ; PDF à signer (visas) |
+| Gestion > Journal des opérations | `GET /api/journal-activites/operations?debut=&fin=[&utilisateur=][&famille=]` | qui a fait quoi, quand : chaque opération en clair (« Vente annulée », « Clôture de la caisse », « Article modifié »…) avec son détail, sa famille et son auteur ; résumé par utilisateur et par type d'opération ; réservé à `ADMIN`, `MANAGER`, `GESTIONNAIRE` |
+
+**Journal des opérations** (décisions de l'utilisateur, 2026-10-30). Réservé aux responsables (`/api/journal-activites/**`) ; pour tous les utilisateurs ou un
+seul (`utilisateur=`), toutes les opérations ou une famille (`famille=` : `VENTES`, `CAISSE`, `CLIENTS`, `STOCK`, `FOURNISSEURS`, `CATALOGUE`, `COMPTES`,
+`ENTREPRISE`, `AUTRES`). Les libellés et familles viennent de `OperationsConnues` (une opération inconnue garde ses mots d'origine, dans « Autres »).
+Depuis cette version, le journal enregistre aussi : chaque **connexion** réussie ou refusée, avec le poste (`adresse_ip`) et la raison du refus (mot de passe
+ou compte inconnu, compte désactivé ; rattachée au compte visé s'il existe) ; chaque **article** créé, modifié (seuls les champs changés, dont l'ancien et le
+nouveau prix) ou supprimé ; les **catégories**, les **unités de vente** (prix), les **clients** et les **comptes d'utilisateurs** (rôles, désactivation,
+changement de mot de passe, jamais le mot de passe lui-même). L'auteur est le compte connecté (`JournalActiviteService.enregistrer` avec un nom nul).
+Conséquence voulue : un compte qui s'est connecté une fois ne peut plus être supprimé (clé étrangère du journal) ; il se désactive. Tests :
+`JournalOperationsTests`, `JournalOperationsHttpTests`, `JournalOperationsPage.test.tsx`.
 
 **Historiques par vendeur** (décisions de l'utilisateur, 2026-10-30). Les trois onglets de l'historique gardent la même période et le même vendeur. Un
 **responsable** voit tous les vendeurs, ou celui qu'il choisit (`vendeur=`, nom du compte, sans souci des majuscules ; la liste vient de

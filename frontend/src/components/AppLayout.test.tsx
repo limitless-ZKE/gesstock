@@ -12,7 +12,8 @@ vi.mock("../services/api", () => ({ api: { get: vi.fn() } }));
 
 const TOUS_LES_LIENS = [
   "Tableau de bord", "Caisse & ventes", "Historique des ventes", "Mouvements de caisse", "Articles", "Inventaires",
-  "Approvisionnements", "Fournisseurs", "Retours fournisseurs", "Clients & dettes", "Statistiques", "Entreprise", "Administration",
+  "Approvisionnements", "Fournisseurs", "Retours fournisseurs", "Clients & dettes", "Statistiques", "Journal des opérations", "Entreprise",
+  "Administration",
 ];
 
 function afficher(roles: string[]) {

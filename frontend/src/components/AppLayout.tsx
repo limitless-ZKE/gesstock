@@ -12,6 +12,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   ReceiptText,
+  ScrollText,
   ShoppingCart,
   ShieldCheck,
   SlidersHorizontal,
@@ -58,6 +59,7 @@ const groupes: { titre: string | null; liens: Lien[] }[] = [
     titre: "Gestion",
     liens: [
       { to: "/statistiques", label: "Statistiques", icon: ChartNoAxesCombined },
+      { to: "/journal-operations", label: "Journal des opérations", icon: ScrollText },
       { to: "/entreprise", label: "Entreprise", icon: Store },
       { to: "/admin/utilisateurs", label: "Administration", icon: ShieldCheck },
     ],
@@ -112,7 +114,7 @@ export default function AppLayout() {
   const permis = (to: string): boolean => {
     if (to === "/admin/utilisateurs") return aUnDesRoles("ADMIN");
     if (to === "/entreprise") return aUnDesRoles("ADMIN", "MANAGER");
-    if (["/approvisionnements", "/fournisseurs", "/retours-fournisseurs", "/inventaires", "/statistiques"].includes(to)) {
+    if (["/approvisionnements", "/fournisseurs", "/retours-fournisseurs", "/inventaires", "/statistiques", "/journal-operations"].includes(to)) {
       return aUnDesRoles("ADMIN", "MANAGER", "GESTIONNAIRE");
     }
     if (to === "/caisse/mouvements") return aUnDesRoles("ADMIN", "MANAGER", "GESTIONNAIRE", "CAISSIER");

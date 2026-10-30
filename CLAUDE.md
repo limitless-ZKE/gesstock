@@ -65,6 +65,10 @@ Avant de toucher à une base réelle, rappeler la sauvegarde et tester sur une *
   une vente soldée (comptant, ou crédit réglé jusqu'au dernier franc) reste à la **date de la vente** ; un règlement est
   rattaché au compte **qui l'a encaissé** ; un caissier ne voit que les siens (403 s'il en nomme un autre), les
   responsables voient tout ou choisissent le vendeur (`PerimetreVendeur`).
+- Journal des opérations (Gestion) : **réservé aux responsables** ; global ou par utilisateur, et par famille. Il enregistre
+  aussi les connexions (réussies, refusées, avec le poste), les articles (ancien et nouveau prix), catégories, unités de
+  vente, clients et comptes. Toute nouvelle opération sensible doit passer par `JournalActiviteService.enregistrer` et
+  recevoir un libellé dans `OperationsConnues`.
 - Page de connexion : l'ancienne « Bon retour » (panneau vert « Votre stock, en toute clarté. »), sans ticket de caisse.
 - Choix par défaut non confirmés : valider un retour fournisseur = ADMIN/MANAGER ; un paiement fournisseur ou un retour
   validé ne s'annule pas ; CI sur Node 24.
