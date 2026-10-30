@@ -167,3 +167,118 @@ describe("historique des ventes par période", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("La période ne peut pas dépasser 366 jours.");
   });
 });
+
+const VENTES_SOLDEES = {
+  debut: "2026-10-09", fin: "2026-10-09",
+  resume: { nombre: 2, montant: 258000, nombreComptant: 1, montantComptant: 245000, nombreCreditsSoldes: 1, montantCreditsSoldes: 13000 },
+  ventes: [
+    { id: 7, code: "VTE-7", dateVente: "2026-10-09T09:00:00", client: null, vendeur: "marie", aCredit: false, modeReglement: "ESPECES", montantTotal: 245000, soldeeLe: "2026-10-09T09:00:00" },
+    { id: 8, code: "VTE-8", dateVente: "2026-10-09T10:00:00", client: "Boutique Aminata", vendeur: "marie", aCredit: true, modeReglement: null, montantTotal: 13000, soldeeLe: "2026-10-09T11:30:00" },
+  ],
+};
+
+const REGLEMENTS = {
+  debut: "2026-10-09", fin: "2026-10-09",
+  resume: { nombre: 3, total: 16000, dettesSoldees: 1, parMode: [{ mode: "ESPECES", nombre: 2, montant: 7000 }, { mode: "MOBILE_MONEY", nombre: 1, montant: 9000 }] },
+  reglements: [
+    { id: 3, dateReglement: "2026-10-09T11:00:00", client: "Boutique Aminata", vente: "VTE-8", montant: 9000, modeReglement: "MOBILE_MONEY", reference: "MM-77", recuPar: "admin", resteApres: 0, detteAnnulee: false },
+    { id: 2, dateReglement: "2026-10-09T10:30:00", client: "Boutique Aminata", vente: "VTE-8", montant: 4000, modeReglement: "ESPECES", reference: null, recuPar: "marie", resteApres: 9000, detteAnnulee: false },
+    { id: 1, dateReglement: "2026-10-09T08:00:00", client: "Moussa Diop", vente: "VTE-5", montant: 3000, modeReglement: "ESPECES", reference: "R1", recuPar: "marie", resteApres: null, detteAnnulee: true },
+  ],
+};
+
+describe("historiques par vendeur : toutes les ventes, ventes soldées, règlements de dettes", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 9, 9, 12, 0));
+    vi.mocked(telecharger).mockReset();
+    vi.mocked(api.get).mockImplementation(async (url: string) => {
+      if (url === "/caisse/journal/caissiers") return { data: [{ username: "admin", actif: true }, { username: "marie", actif: true }, { username: "ancien", actif: false }] };
+      if (url === "/ventes/historique") return { data: historique([vente(1)]) };
+      if (url === "/ventes/historique/soldees") return { data: VENTES_SOLDEES };
+      if (url === "/ventes/historique/reglements") return { data: REGLEMENTS };
+      if (url.endsWith("/pdf") || url.endsWith("/excel")) return { data: new Blob(["fichier"]) };
+      throw new Error(`appel inattendu : ${url}`);
+    });
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it("un responsable choisit le vendeur : ses chiffres à l'écran, et son nom sur le document imprimé", async () => {
+    const utilisateur = afficher(["MANAGER"]);
+    await screen.findByText("VTE-1");
+    expect(screen.getByRole("option", { name: "ancien (désactivé)" })).toBeInTheDocument();
+
+    await utilisateur.selectOptions(screen.getByLabelText("Vendeur"), "marie");
+
+    await waitFor(() => expect(api.get).toHaveBeenLastCalledWith("/ventes/historique", { params: { debut: "2026-10-09", fin: "2026-10-09", vendeur: "marie" } }));
+    expect(screen.getByText("Vendeur : marie")).toBeInTheDocument();
+    await screen.findByText("VTE-1");
+    await utilisateur.click(screen.getByRole("button", { name: /PDF/ }));
+    await waitFor(() => expect(telecharger).toHaveBeenCalledWith(expect.any(Blob), "gesstock-historique-ventes-marie-2026-10-09-2026-10-09.pdf"));
+    expect(api.get).toHaveBeenCalledWith("/ventes/historique/pdf", { params: { debut: "2026-10-09", fin: "2026-10-09", vendeur: "marie" }, responseType: "blob" });
+  });
+
+  it("un caissier ne choisit pas : il voit les siens (le serveur les lui impose) et son nom est sur ce qu'il imprime", async () => {
+    const utilisateur = afficher(["CAISSIER"]);
+    await screen.findByText("VTE-1");
+
+    expect(screen.queryByLabelText("Vendeur")).not.toBeInTheDocument();
+    expect(api.get).not.toHaveBeenCalledWith("/caisse/journal/caissiers");
+    expect(screen.getByText("Vos ventes et les règlements que vous avez encaissés")).toBeInTheDocument();
+    expect(api.get).toHaveBeenCalledWith("/ventes/historique", { params: { debut: "2026-10-09", fin: "2026-10-09" } });
+    await utilisateur.click(screen.getByRole("button", { name: /PDF/ }));
+    await waitFor(() => expect(telecharger).toHaveBeenCalledWith(expect.any(Blob), "gesstock-historique-ventes-u-2026-10-09-2026-10-09.pdf"));
+  });
+
+  it("l'onglet « Ventes soldées » : au comptant, ou crédit soldé avec la date du dernier règlement", async () => {
+    const utilisateur = afficher();
+    await screen.findByText("VTE-1");
+
+    await utilisateur.click(screen.getByRole("tab", { name: "Ventes soldées" }));
+
+    expect(await screen.findByText("VTE-8")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Ventes soldées" })).toHaveAttribute("aria-selected", "true");
+    expect(api.get).toHaveBeenCalledWith("/ventes/historique/soldees", { params: { debut: "2026-10-09", fin: "2026-10-09" } });
+    expect(within(screen.getByText("VTE-8").closest("tr") as HTMLElement).getByText("Crédit soldé le 09/10/2026")).toBeInTheDocument();
+    expect(within(screen.getByText("VTE-7").closest("tr") as HTMLElement).getByText("Espèces")).toBeInTheDocument();
+    expect(normaliser(screen.getByText("Au comptant").parentElement?.textContent ?? "")).toContain("245 000");
+    expect(screen.getByText("Au comptant").parentElement).toHaveTextContent("1 vente");
+
+    await utilisateur.click(screen.getByRole("button", { name: /Excel/ }));
+    await waitFor(() => expect(telecharger).toHaveBeenCalledWith(expect.any(Blob), "gesstock-ventes-soldees-2026-10-09-2026-10-09.xlsx"));
+  });
+
+  it("l'onglet « Règlements de dettes » : qui a encaissé, par quel moyen, et ce qui restait dû", async () => {
+    const utilisateur = afficher();
+    await screen.findByText("VTE-1");
+
+    await utilisateur.click(screen.getByRole("tab", { name: "Règlements de dettes" }));
+
+    expect(await screen.findByText("MM-77")).toBeInTheDocument();
+    expect(api.get).toHaveBeenCalledWith("/ventes/historique/reglements", { params: { debut: "2026-10-09", fin: "2026-10-09" } });
+    expect(within(screen.getByText("MM-77").closest("tr") as HTMLElement).getByText("Soldée")).toBeInTheDocument();
+    expect(within(screen.getByText("MM-77").closest("tr") as HTMLElement).getByText("Mobile Money")).toBeInTheDocument();
+    expect(within(screen.getByText("R1").closest("tr") as HTMLElement).getByText("Dette annulée")).toBeInTheDocument();
+    const quatreMille = screen.getAllByRole("row").find((ligne) => ligne.textContent?.includes("Espèces") && !ligne.textContent?.includes("R1"));
+    expect(normaliser(quatreMille?.textContent ?? "")).toContain("9 000");
+    const parMode = normaliser(screen.getByText("Par moyen de paiement :").parentElement?.textContent ?? "");
+    expect(parMode).toContain("Espèces 7 000");
+    expect(parMode).toContain("Mobile Money 9 000");
+
+    await utilisateur.type(screen.getByLabelText("Rechercher un règlement"), "diop");
+    expect(screen.getByText("R1")).toBeInTheDocument();
+    expect(screen.queryByText("MM-77")).not.toBeInTheDocument();
+  });
+
+  it("garde la période et le vendeur d'un onglet à l'autre", async () => {
+    const utilisateur = afficher(["ADMIN"]);
+    await screen.findByText("VTE-1");
+    await utilisateur.click(screen.getByRole("button", { name: "Ce mois" }));
+    await utilisateur.selectOptions(screen.getByLabelText("Vendeur"), "marie");
+
+    await utilisateur.click(screen.getByRole("tab", { name: "Règlements de dettes" }));
+
+    await waitFor(() => expect(api.get).toHaveBeenLastCalledWith("/ventes/historique/reglements",
+      { params: { debut: "2026-10-01", fin: "2026-10-09", vendeur: "marie" } }));
+  });
+});

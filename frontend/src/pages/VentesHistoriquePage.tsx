@@ -1,275 +1,99 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Ban, ChevronLeft, ChevronRight, CircleAlert, LoaderCircle, Printer, ReceiptText, Search } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useAuth } from "../auth/AuthContext";
-import BoutonsExport from "../components/BoutonsExport";
-import Indicateur from "../components/Indicateur";
-import ReceiptModal, { type Sale } from "../components/ReceiptModal";
+import HistoriqueReglementsDettes from "../components/HistoriqueReglementsDettes";
+import HistoriqueToutesVentes from "../components/HistoriqueToutesVentes";
+import HistoriqueVentesSoldees from "../components/HistoriqueVentesSoldees";
 import SelecteurPeriode, { type Periode } from "../components/SelecteurPeriode";
-import { aujourdhui, libellePeriode, versJourIso } from "../lib/dates";
-import { moneyPrecise as money } from "../lib/format";
+import { aujourdhui, libellePeriode } from "../lib/dates";
+import type { ProprietesHistorique } from "../lib/historique";
+import { normaliserRole } from "../lib/routes";
 import { api } from "../services/api";
-import { apiErrorMessage as errorMessage } from "../services/apiError";
 
-const paymentLabels: Record<string, string> = {
-  ESPECES: "Espèces",
-  MOBILE_MONEY: "Mobile Money",
-  CARTE: "Carte",
-  VIREMENT: "Virement",
-  CHEQUE: "Chèque",
-  AUTRE: "Autre",
-};
+type Compte = { username: string; actif: boolean };
+type Onglet = "ventes" | "soldees" | "reglements";
 
-type LigneHistorique = {
-  id: number;
-  code: string;
-  dateVente: string;
-  statut: "VALIDEE" | "ANNULEE";
-  client: string | null;
-  vendeur: string | null;
-  aCredit: boolean;
-  modeReglement: string | null;
-  nombreArticles: number;
-  remises: number;
-  montantTotal: number;
-};
-type Historique = {
-  debut: string;
-  fin: string;
-  resume: { nombreValidees: number; chiffreAffaires: number; remises: number; nombreAnnulees: number; montantAnnule: number };
-  ventes: LigneHistorique[];
-};
-type StatusFilter = "all" | "VALIDEE" | "ANNULEE";
+const ONGLETS: { id: Onglet; libelle: string }[] = [
+  { id: "ventes", libelle: "Toutes les ventes" },
+  { id: "soldees", libelle: "Ventes soldées" },
+  { id: "reglements", libelle: "Règlements de dettes" },
+];
 
-const PAR_PAGE = 50;
+/** Ceux qui voient les ventes et les règlements de tous et choisissent un vendeur (le serveur l'impose de toute façon). */
+const ROLES_RESPONSABLES = ["ADMIN", "MANAGER", "GESTIONNAIRE"];
 
-/** Montants des tableaux : sans l'unité, dite une fois sous le tableau (sinon la ligne dépasse l'écran). */
-const nombre = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 });
-
-const heureFormat = new Intl.DateTimeFormat("fr-FR", { timeStyle: "short" });
-const jourHeureFormat = new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
-
+/**
+ * Trois historiques d'une période : toutes les ventes, les ventes soldées (payées jusqu'au dernier franc) et les règlements de
+ * dettes. Un responsable les voit pour tous les vendeurs ou pour celui qu'il choisit ; un caissier ne voit que les siens. La période
+ * et le vendeur restent les mêmes d'un onglet à l'autre ; chaque onglet s'imprime (PDF) ou s'exporte (Excel) tel qu'il est affiché.
+ */
 export default function VentesHistoriquePage() {
-  const [periode, setPeriode] = useState<Periode>(() => ({ debut: aujourdhui(), fin: aujourdhui() }));
-  const [historique, setHistorique] = useState<Historique | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [exportError, setExportError] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
-  const [status, setStatus] = useState<StatusFilter>("all");
-  const [page, setPage] = useState(0);
-  const [receipt, setReceipt] = useState<Sale | null>(null);
-  const [receiptLoadingId, setReceiptLoadingId] = useState<number | null>(null);
   const { user } = useAuth();
-  const [cancellingId, setCancellingId] = useState<number | null>(null);
-  const [notice, setNotice] = useState<{ text: string; isError: boolean } | null>(null);
-  // Une réponse tardive d'une ancienne période ne doit pas écraser celle qu'on vient de choisir.
-  const derniereDemande = useRef(0);
-  // Annuler une vente (stock remis, client remboursé) est réservé aux responsables : voir SecurityConfig.
-  const canCancel = (user?.roles ?? []).some((role) => ["ADMIN", "MANAGER"].includes(role.toUpperCase().replace(/^ROLE_/, "")));
+  const responsable = (user?.roles ?? []).map(normaliserRole).some((role) => ROLES_RESPONSABLES.includes(role));
+  const [periode, setPeriode] = useState<Periode>(() => ({ debut: aujourdhui(), fin: aujourdhui() }));
+  const [onglet, setOnglet] = useState<Onglet>("ventes");
+  const [vendeur, setVendeur] = useState("");
+  const [comptes, setComptes] = useState<Compte[]>([]);
+  const [listeIndisponible, setListeIndisponible] = useState(false);
+  const [chargement, setChargement] = useState(false);
 
-  const load = useCallback(async (choisie: Periode) => {
-    const demande = ++derniereDemande.current;
-    setLoading(true);
-    setError("");
-    try {
-      const { data } = await api.get<Historique>("/ventes/historique", { params: { debut: choisie.debut, fin: choisie.fin } });
-      if (demande !== derniereDemande.current) return;
-      setHistorique(data);
-    } catch (reason) {
-      if (demande !== derniereDemande.current) return;
-      setHistorique(null);
-      setError(errorMessage(reason, "Impossible de charger l’historique des ventes."));
-    } finally {
-      if (demande === derniereDemande.current) setLoading(false);
-    }
-  }, []);
+  useEffect(() => {
+    if (!responsable) return;
+    let actif = true;
+    api.get<Compte[]>("/caisse/journal/caissiers")
+      .then(({ data }) => { if (actif) setComptes(Array.isArray(data) ? data : []); })
+      .catch(() => { if (actif) setListeIndisponible(true); });
+    return () => { actif = false; };
+  }, [responsable]);
 
-  useEffect(() => { void load(periode); }, [periode, load]);
-
-  function changerPeriode(choisie: Periode) {
-    setPage(0);
-    setExportError(null);
-    setPeriode(choisie);
-  }
-
-  /** Le ticket complet (avec ses lignes) se relit à la demande : la liste, elle, reste légère. */
-  async function showReceipt(ligne: LigneHistorique) {
-    setReceiptLoadingId(ligne.id);
-    try {
-      const { data } = await api.get<Sale>(`/ventes/${ligne.id}`);
-      setReceipt(data);
-    } catch (reason) {
-      setNotice({ text: errorMessage(reason, "Impossible de charger le reçu de cette vente."), isError: true });
-    } finally {
-      setReceiptLoadingId(null);
-    }
-  }
-
-  /** Annulation d'une vente au comptant, le jour même : le client rapporte les articles et est remboursé. */
-  async function cancelCashSale(sale: LigneHistorique) {
-    const motif = window.prompt(
-      `Annuler la vente au comptant ${sale.code} (${money.format(sale.montantTotal)}) ?\n`
-        + "Le stock sera remis en rayon et le client remboursé.\n\nMotif de l’annulation :",
-    )?.trim();
-    if (!motif) return;
-    const especes = sale.modeReglement === "ESPECES";
-    if (!window.confirm(
-      `Le client rapporte-t-il les articles de la vente ${sale.code} en l’état ?\n\n`
-        + `OK : vente annulée et ${money.format(sale.montantTotal)} remboursés${especes ? " (sortis de la caisse du jour)" : " (par le même moyen de paiement)"}.\n`
-        + "Annuler : rien n’est modifié.",
-    )) return;
-    setCancellingId(sale.id);
-    try {
-      await api.post(`/ventes/${sale.id}/annulation`, { motif, articlesRetournesEnEtat: true });
-      setNotice({ text: `La vente ${sale.code} est annulée : stock remis en rayon, ${money.format(sale.montantTotal)} remboursés.`, isError: false });
-      await load(periode);
-    } catch (reason) {
-      setNotice({ text: errorMessage(reason, "L’annulation de la vente a échoué."), isError: true });
-    } finally {
-      setCancellingId(null);
-    }
-  }
-
-  const sales = useMemo(() => historique?.ventes ?? [], [historique]);
-  const filtered = useMemo(() => {
-    const query = search.trim().toLocaleLowerCase("fr");
-    return sales.filter((sale) =>
-      (status === "all" || sale.statut === status)
-      && (!query || [sale.code, sale.client, sale.vendeur].some((value) => value?.toLocaleLowerCase("fr").includes(query))));
-  }, [sales, search, status]);
-  const pages = Math.max(1, Math.ceil(filtered.length / PAR_PAGE));
-  const pageCourante = Math.min(page, pages - 1);
-  const affichees = filtered.slice(pageCourante * PAR_PAGE, (pageCourante + 1) * PAR_PAGE);
-  const plusieursJours = periode.debut !== periode.fin;
-  const resume = historique?.resume;
+  const proprietes: ProprietesHistorique = {
+    periode,
+    vendeur: responsable ? vendeur : "",
+    nomVendeur: responsable ? vendeur : user?.username ?? "",
+    onChargement: setChargement,
+  };
+  // Changer de période, de vendeur ou d'onglet repart d'un onglet neuf (page 1, recherche vide) qui recharge ses chiffres.
+  const cle = `${onglet}|${periode.debut}|${periode.fin}|${vendeur}`;
 
   return (
     <div className="space-y-5">
-      <header className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Historique des ventes</h1>
-          <p className="mt-1.5 text-sm text-slate-500 first-letter:uppercase">{libellePeriode(periode.debut, periode.fin)}</p>
-        </div>
-        <BoutonsExport chemin="/ventes/historique" periode={periode} nomDuFichier="gesstock-historique-ventes" desactive={loading || !historique} onErreur={setExportError} />
+      <header>
+        <h1 className="text-2xl font-bold text-slate-900">Historique des ventes</h1>
+        <p className="mt-1.5 text-sm text-slate-500 first-letter:uppercase">{libellePeriode(periode.debut, periode.fin)}</p>
+        <p className="text-sm font-medium text-slate-700">
+          {responsable ? (vendeur ? `Vendeur : ${vendeur}` : "Tous les vendeurs") : "Vos ventes et les règlements que vous avez encaissés"}
+        </p>
       </header>
 
-      <SelecteurPeriode periode={periode} onChange={changerPeriode} chargement={loading} />
-
-      {error && (
-        <div role="alert" className="flex items-center gap-2 border-l-4 border-rose-600 bg-rose-50 px-3 py-3 text-sm font-medium text-rose-800">
-          <CircleAlert size={16} /> {error}
-        </div>
-      )}
-      {exportError && (
-        <div role="alert" className="flex items-center gap-2 border-l-4 border-amber-600 bg-amber-50 px-3 py-3 text-sm font-medium text-amber-900">
-          <CircleAlert size={16} /> {exportError}
-          <button className="ml-auto font-semibold underline" onClick={() => setExportError(null)}>Fermer</button>
-        </div>
-      )}
-      {notice && (
-        <div role={notice.isError ? "alert" : "status"} className={`flex items-center gap-2 border-l-4 px-3 py-3 text-sm font-medium ${notice.isError ? "border-rose-600 bg-rose-50 text-rose-800" : "border-emerald-600 bg-emerald-50 text-emerald-900"}`}>
-          <CircleAlert size={16} /> {notice.text}
-          <button className="ml-auto opacity-60 hover:opacity-100" onClick={() => setNotice(null)} aria-label="Fermer">×</button>
-        </div>
-      )}
-
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Indicateur libelle="Ventes validées" valeur={resume ? String(resume.nombreValidees) : "—"} />
-        <Indicateur libelle="Chiffre d’affaires TTC" valeur={resume ? money.format(resume.chiffreAffaires) : "—"} />
-        <Indicateur libelle="Remises accordées" valeur={resume ? money.format(resume.remises) : "—"} />
-        <Indicateur libelle="Ventes annulées" valeur={resume ? String(resume.nombreAnnulees) : "—"} />
-      </section>
-
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-        <div className="flex flex-col gap-3 border-b border-slate-100 p-4 md:flex-row md:items-center">
-          <label className="relative min-w-0 flex-1">
-            <Search size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
-            <input value={search} onChange={(event) => { setSearch(event.target.value); setPage(0); }} className="input-field pl-10" placeholder="N° de vente, client ou caissier…" aria-label="Rechercher une vente" />
-          </label>
-          <select value={status} onChange={(event) => { setStatus(event.target.value as StatusFilter); setPage(0); }} className="input-field md:w-48" aria-label="Filtrer par statut">
-            <option value="all">Tous les statuts</option>
-            <option value="VALIDEE">Validées</option>
-            <option value="ANNULEE">Annulées</option>
+      {responsable && (
+        <label className="block max-w-sm">
+          <span className="mb-1.5 block text-sm font-semibold text-slate-800">Vendeur</span>
+          <select value={vendeur} onChange={(evenement) => setVendeur(evenement.target.value)} className="input-field">
+            <option value="">Tous les vendeurs</option>
+            {comptes.map((compte) => (
+              <option key={compte.username} value={compte.username}>{compte.username}{compte.actif ? "" : " (désactivé)"}</option>
+            ))}
           </select>
-        </div>
+          {listeIndisponible && <span role="status" className="mt-1.5 block text-xs text-amber-800">La liste des vendeurs n’a pas pu être chargée.</span>}
+        </label>
+      )}
 
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[860px] text-left">
-            <thead className="bg-slate-50 text-sm font-semibold text-slate-600">
-              <tr>
-                <th className="px-5 py-3">{plusieursJours ? "Date" : "Heure"}</th>
-                <th className="px-3 py-3">Vente</th>
-                <th className="px-3 py-3">Client</th>
-                <th className="px-3 py-3">Caissier</th>
-                <th className="px-3 py-3">Paiement</th>
-                <th className="px-3 py-3 text-right">Remises</th>
-                <th className="px-3 py-3 text-right">Total TTC</th>
-                <th className="px-3 py-3">Statut</th>
-                <th className="px-4 py-3 text-right">Reçu</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {loading ? (
-                <tr><td colSpan={9} className="h-32 text-center text-sm text-slate-500"><LoaderCircle className="mr-2 inline animate-spin" size={16} />Chargement…</td></tr>
-              ) : affichees.length ? affichees.map((sale) => {
-                const cancelled = sale.statut === "ANNULEE";
-                const date = new Date(sale.dateVente);
-                const duJour = versJourIso(date) === aujourdhui();
-                return (
-                  <tr key={sale.id} className="hover:bg-slate-50">
-                    <td className="whitespace-nowrap px-5 py-3 text-sm text-slate-600">{plusieursJours ? jourHeureFormat.format(date) : heureFormat.format(date)}</td>
-                    <td className="px-3 py-3">
-                      <p className="whitespace-nowrap text-sm font-semibold text-slate-900">{sale.code}</p>
-                      <p className="mt-0.5 text-xs text-slate-500">{sale.nombreArticles} article(s)</p>
-                    </td>
-                    <td className="px-3 py-3 text-sm text-slate-700">{sale.client ?? "Client de passage"}</td>
-                    <td className="px-3 py-3 text-sm text-slate-700">{sale.vendeur ?? "—"}</td>
-                    <td className="px-3 py-3 text-sm text-slate-700">
-                      {sale.aCredit ? "À crédit" : sale.modeReglement ? paymentLabels[sale.modeReglement] ?? sale.modeReglement : "—"}
-                    </td>
-                    <td className="px-3 py-3 text-right text-sm text-emerald-800">{sale.remises > 0 ? `−${nombre.format(sale.remises)}` : "—"}</td>
-                    <td className={`px-3 py-3 text-right text-sm font-bold ${cancelled ? "text-slate-500 line-through" : "text-slate-900"}`}>{nombre.format(sale.montantTotal)}</td>
-                    <td className="px-3 py-3">
-                      <span className={`rounded-full px-2 py-1 text-xs font-semibold ${cancelled ? "bg-rose-50 text-rose-800" : "bg-emerald-50 text-emerald-800"}`}>
-                        {cancelled ? "Annulée" : "Validée"}
-                      </span>
-                    </td>
-                    <td className="space-x-2 whitespace-nowrap px-4 py-3 text-right">
-                      {canCancel && !cancelled && !sale.aCredit && duJour && (
-                        <button disabled={cancellingId === sale.id} onClick={() => void cancelCashSale(sale)} className="button-secondary h-9 border-rose-300 px-3 text-rose-800 hover:bg-rose-50" title="Annuler cette vente : le client rapporte les articles et est remboursé">
-                          {cancellingId === sale.id ? <LoaderCircle size={14} className="animate-spin" /> : <Ban size={14} />} Annuler
-                        </button>
-                      )}
-                      <button disabled={receiptLoadingId === sale.id} onClick={() => void showReceipt(sale)} className="button-secondary h-9 px-3" title="Réimprimer le reçu">
-                        {receiptLoadingId === sale.id ? <LoaderCircle size={14} className="animate-spin" /> : <Printer size={14} />} Reçu
-                      </button>
-                    </td>
-                  </tr>
-                );
-              }) : (
-                <tr>
-                  <td colSpan={9} className="h-36 text-center text-sm text-slate-500">
-                    <ReceiptText className="mx-auto mb-2" size={22} />
-                    {sales.length ? "Aucune vente ne correspond à votre recherche." : plusieursJours ? "Aucune vente enregistrée sur cette période." : "Aucune vente enregistrée pour cette journée."}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-        <div className="flex flex-col gap-2 border-t border-slate-100 px-5 py-3 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
-          <p>{filtered.length} vente(s), montants en francs CFA. Le bouton « Reçu » imprime un duplicata du ticket remis au client.</p>
-          {pages > 1 && (
-            <div className="flex items-center gap-2" role="navigation" aria-label="Pages de l’historique">
-              <button className="icon-button disabled:opacity-40" disabled={pageCourante === 0} onClick={() => setPage(pageCourante - 1)} aria-label="Page précédente"><ChevronLeft size={17} /></button>
-              <span>Page {pageCourante + 1} sur {pages}</span>
-              <button className="icon-button disabled:opacity-40" disabled={pageCourante >= pages - 1} onClick={() => setPage(pageCourante + 1)} aria-label="Page suivante"><ChevronRight size={17} /></button>
-            </div>
-          )}
-        </div>
-      </section>
+      <SelecteurPeriode periode={periode} onChange={setPeriode} chargement={chargement} />
 
-      {receipt && <ReceiptModal sale={receipt} duplicata onClose={() => setReceipt(null)} />}
+      <div role="tablist" aria-label="Historiques" className="flex w-fit max-w-full gap-1 overflow-x-auto rounded-xl bg-slate-100 p-1">
+        {ONGLETS.map(({ id, libelle }) => (
+          <button key={id} type="button" role="tab" id={`onglet-${id}`} aria-selected={onglet === id} aria-controls="historique-panneau"
+            onClick={() => setOnglet(id)}
+            className={`whitespace-nowrap rounded-lg px-3 py-2 text-sm font-semibold transition ${onglet === id ? "bg-white text-emerald-700 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}>
+            {libelle}
+          </button>
+        ))}
+      </div>
+
+      <div role="tabpanel" id="historique-panneau" aria-labelledby={`onglet-${onglet}`} className="space-y-5">
+        {onglet === "ventes" && <HistoriqueToutesVentes key={cle} {...proprietes} />}
+        {onglet === "soldees" && <HistoriqueVentesSoldees key={cle} {...proprietes} />}
+        {onglet === "reglements" && <HistoriqueReglementsDettes key={cle} {...proprietes} />}
+      </div>
     </div>
   );
 }
