@@ -5,8 +5,8 @@ rem  double-cliquer + mode d'emploi. Le programme doit etre construit avant (scr
 rem  Options : voir scripts\preparer-livraison-simple.ps1 (par exemple  -Destination D:\Livraison  -Admin patron).
 rem ============================================================================================================
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0preparer-livraison-simple.ps1" %*
-if errorlevel 1 (
-  echo.
-  echo ECHEC de la preparation (voir le message ci-dessus).
-  exit /b 1
-)
+rem Pas de bloc ( ) ici : une parenthese dans un message fermerait le bloc et casserait le script (". etait inattendu").
+if not errorlevel 1 exit /b 0
+echo.
+echo ECHEC de la preparation : voir le message ci-dessus.
+exit /b 1

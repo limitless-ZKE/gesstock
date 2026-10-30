@@ -1,0 +1,77 @@
+﻿GESSTOCK SUR TÉLÉPHONE ET TABLETTE ANDROID
+==========================================
+
+L'application GesStock affiche GesStock tel que le sert le PC serveur du magasin. Elle ne contient aucune donnée :
+ventes, stock et comptes restent sur le serveur. Une mise à jour de GesStock sur le serveur arrive donc toute
+seule sur les téléphones.
+
+
+CE QU'IL FAUT
+-------------
+- Un téléphone ou une tablette Android 8.0 ou plus récent.
+- Le téléphone connecté au même Wi-Fi que le PC serveur, celui du magasin.
+- GesStock démarré sur le PC serveur.
+- L'adresse du PC serveur sur le réseau, par exemple 192.168.1.75:8080. Pour la trouver, sur le PC serveur :
+  lancez demarrer.cmd et lisez la ligne « Depuis les autres postes du reseau, ouvrez l'une de ces adresses ».
+  Ou tapez ipconfig dans une invite de commandes et lisez « Adresse IPv4 », puis ajoutez :8080.
+
+
+1. INSTALLER L'APPLICATION
+--------------------------
+1. Copiez GesStock.apk sur le téléphone : câble USB, clé, Bluetooth, ou envoyez-le-vous par WhatsApp ou par e-mail.
+2. Sur le téléphone, ouvrez le fichier (dans l'application Fichiers, ou touchez-le dans WhatsApp).
+3. Android demande d'autoriser l'installation depuis cette source : touchez « Paramètres », activez
+   « Autoriser cette source », puis revenez en arrière.
+4. Touchez « Installer ». Si Play Protect affiche « Application inconnue », touchez « Plus de détails » puis
+   « Installer quand même » : l'application ne vient pas du Play Store, c'est normal.
+
+
+2. RELIER L'APPLICATION AU SERVEUR (UNE SEULE FOIS)
+---------------------------------------------------
+1. Ouvrez GesStock sur le téléphone.
+2. Tapez l'adresse du serveur, par exemple 192.168.1.75:8080, puis touchez « Se connecter ».
+   Sans numéro après les deux-points, l'application ajoute :8080, le port de GesStock.
+3. La page de connexion de GesStock s'affiche : connectez-vous avec votre compte habituel.
+
+L'application vérifie l'adresse avant de la retenir :
+- « Aucune réponse » : le téléphone n'est pas sur le Wi-Fi du magasin, GesStock n'est pas démarré, ou l'adresse
+  est fausse. Si le PC serveur est seulement éteint pour l'instant, « Enregistrer quand même » garde l'adresse.
+- « Un serveur répond, mais ce n'est pas GesStock » : le numéro après les deux-points est faux (en général 8080).
+
+
+3. AU QUOTIDIEN
+---------------
+- Imprimer un ticket ou un reçu : le bouton « Imprimer » ouvre la fenêtre d'impression d'Android. Choisissez une
+  imprimante, ou « Enregistrer au format PDF ». Pour une imprimante de tickets (58 ou 80 mm), installez d'abord
+  l'application de son fabricant (ou une application de service d'impression) depuis le Play Store.
+- Exports PDF et Excel (journal de caisse, historique des ventes, inventaire) : le fichier est enregistré dans
+  Téléchargements/GesStock, puis il s'ouvre. Il faut un lecteur de PDF ou un tableur sur le téléphone.
+- Bouton Retour : revient à l'écran précédent de GesStock. Sur le premier écran, il met l'application de côté sans
+  la fermer : la session et la vente en cours restent ouvertes.
+- Changer l'adresse du serveur : appui long sur l'icône GesStock, puis « Serveur ». L'écran « Le serveur GesStock
+  ne répond pas » propose aussi « Changer l'adresse du serveur ».
+
+
+4. SI LE TÉLÉPHONE N'ARRIVE PAS À JOINDRE LE SERVEUR
+-----------------------------------------------------
+- Le téléphone est-il sur le Wi-Fi du magasin, et pas sur les données mobiles ?
+- Sur un autre PC du magasin, l'adresse http://192.168.1.75:8080 (avec la vraie adresse) s'ouvre-t-elle dans le
+  navigateur ? Si non, le problème vient du serveur, pas du téléphone.
+- Le pare-feu de Windows du PC serveur doit laisser passer GesStock : installer-demarrage-automatique.cmd ajoute
+  cette autorisation (règle « GesStock (reseau local) »).
+- L'adresse du PC serveur peut changer quand la box redémarre. Pour l'éviter, réservez-lui son adresse dans les
+  réglages de la box (« réservation d'adresse » ou « bail DHCP statique »).
+
+
+5. METTRE L'APPLICATION À JOUR
+------------------------------
+Installez le nouveau GesStock.apk par-dessus l'ancien, de la même façon. L'adresse du serveur est conservée.
+Si le téléphone refuse (« conflit avec un package existant »), la nouvelle version n'a pas été signée avec la même
+clé : désinstallez l'ancienne application, puis installez la nouvelle (aucune donnée n'est perdue, tout est sur le
+serveur).
+
+
+SÉCURITÉ
+--------
+L'application parle au serveur sans chiffrement (HTTP), comme les navigateurs des PC du magasin : le Wi-Fi du
+magasin doit être protégé par un mot de passe. Chaque personne se connecte avec son propre compte.
