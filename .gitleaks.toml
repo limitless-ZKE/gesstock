@@ -1,0 +1,15 @@
+# Recherche de secrets (gitleaks, job « Sécurité » de la CI, sur tout l'historique) : règles par défaut, sauf les valeurs
+# d'essai connues des tests automatiques. Tout autre secret fait échouer la CI.
+title = "GesStock"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Valeurs d'essai : comptes de démonstration des profils dev et test (DataSeeder) et faux jeton CSRF des tests"
+stopwords = [
+  '''admin123''',
+  '''caissier123''',
+  '''gestionnaire123''',
+  '''jeton-de-test''',
+]

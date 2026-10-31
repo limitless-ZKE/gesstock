@@ -34,6 +34,10 @@ cd android && gradlew.bat test assembleDebug          # tests et APK de l'applic
 Migrations : seule `MigrationsMysqlIT` (voir README) valide le SQL de Flyway sur un vrai MySQL ; H2 ne la remplace pas.
 Avant de toucher à une base réelle, rappeler la sauvegarde et tester sur une **copie jetable**.
 
+CI GitHub (`.github/workflows/ci.yml`, à chaque envoi sur `main`) : serveur, migrations sur MySQL, interface, Android, sécurité
+(Trivy ; gitleaks sur **tout l'historique**, valeurs d'essai connues dans `.gitleaks.toml`, tout autre secret la fait échouer)
+et image Docker. Les actions d'autres éditeurs que GitHub sont épinglées sur un commit.
+
 ## Carte du code
 
 - Backend : `src/main/java/com/gesstock/gesstock/` — un paquet par domaine : `articles`, `ventes`, `caisse`, `clients`,
@@ -94,9 +98,10 @@ un dossier avec `gesstock.jar`, une base de lancement toute prête (tables + uti
 
 ## Limites connues
 
-La CI n'a jamais été vue sur GitHub ; Docker non testé ; pas d'import d'articles CSV/Excel ; pas de HTTPS ; pas de
-conformité « logiciel de caisse certifié » (à vérifier pays par pays) ; MySQL 8.4 seul testé ; listes non paginées
-(proformas, dettes, approvisionnements, clients, retours) ; pas de sauvegarde planifiée dans la livraison simple.
+Image Docker construite par la CI mais jamais démarrée ; pas d'analyse CodeQL (refusée sur un dépôt privé de compte
+personnel) ; pas d'import d'articles CSV/Excel ; pas de HTTPS ; pas de conformité « logiciel de caisse certifié » (à
+vérifier pays par pays) ; MySQL 8.4 seul testé ; listes non paginées (proformas, dettes, approvisionnements, clients,
+retours) ; pas de sauvegarde planifiée dans la livraison simple.
 
 ## Pièges d'outillage (Windows, PowerShell / Git Bash)
 
@@ -113,3 +118,5 @@ conformité « logiciel de caisse certifié » (à vérifier pays par pays) ; My
 - Mémoire 8 Go : si les tests refusent de démarrer (« insufficient memory »), faire fermer VS Code ou lancer les classes
   une par une avec `-DargLine="-Xmx480m"` et `vitest --no-file-parallelism`.
 - Ne pas lancer l'application de dev (port 8080) en même temps qu'une installation de test sur le même port.
+- `gh` n'est pas installé : lire les résultats de la CI par l'API GitHub avec le jeton que renvoie `git credential fill`
+  (script Node écrit avec Write), sans jamais afficher ni enregistrer ce jeton.
