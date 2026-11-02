@@ -108,15 +108,14 @@ class ApprovisionnementServiceTests {
     }
 
     @Test
-    void bonRecuNePeutPlusEtreValideModifieNiSupprime() {
+    void bonRecuNePeutPlusEtreValideNiSupprime() {
         FournisseurResponse f = fournisseur("Fournisseur figé");
         ApprovisionnementResponse bon = entreeService.creer(bon("BR-002", f.id(), telephone().getId(), 1, "100"));
         entreeService.valider(bon.id(), ADMIN);
 
         assertThatThrownBy(() -> entreeService.valider(bon.id(), ADMIN)).isInstanceOf(ConflitRessourceException.class);
         assertThatThrownBy(() -> entreeService.supprimer(bon.id())).isInstanceOf(ConflitRessourceException.class);
-        assertThatThrownBy(() -> entreeService.modifier(bon.id(),
-            bon("BR-002", f.id(), telephone().getId(), 2, "100"))).isInstanceOf(ConflitRessourceException.class);
+        // il se corrige en revanche (demande du client) : voir CorrectionBonRecuTests
     }
 
     @Test

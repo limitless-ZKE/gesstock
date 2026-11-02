@@ -21,6 +21,9 @@ public interface RetourFournisseurRepository extends JpaRepository<RetourFournis
     /** Numéro d'ordre dans la journée : RF-AAAAMMJJ-001, 002… (un retour annulé garde son numéro). */
     long countByNumeroStartingWith(String prefixe);
 
+    /** Un retour (même annulé : il garde ses lignes) porte-t-il sur ce bon ? Alors le bon ne se corrige plus. */
+    boolean existsByApprovisionnementId(Long approvisionnementId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select r from RetourFournisseur r where r.id = :id")
     Optional<RetourFournisseur> findByIdForUpdate(@Param("id") Long id);

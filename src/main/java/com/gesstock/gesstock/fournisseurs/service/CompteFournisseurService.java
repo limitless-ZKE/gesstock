@@ -41,6 +41,7 @@ import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
@@ -131,11 +132,7 @@ public class CompteFournisseurService {
      * nulle (échantillons gratuits) ne crée aucune dette.
      */
     public void enregistrerDette(Approvisionnement bon, String username) {
-        BigDecimal total = BigDecimal.ZERO;
-        for (LigneApprovisionnement ligne : bon.getLignes()) {
-            total = total.add(Quantites.montant(ligne.getPrixUnitaire(), ligne.getQuantite()));
-        }
-        total = total.setScale(ECHELLE_MONETAIRE, RoundingMode.UNNECESSARY);
+        BigDecimal total = totalDuBon(bon);
         if (total.signum() <= 0) {
             return;
         }
@@ -149,6 +146,60 @@ public class CompteFournisseurService {
         journalActiviteService.enregistrer("CREATION", "DETTE_FOURNISSEUR", dette.getId(),
             "Dette de " + total.toPlainString() + " pour le bon " + bon.getNumero(), username);
         imputerAvoirs(fournisseur, utilisateur(username));
+    }
+
+    /**
+     * Appelée quand un bon déjà reçu est corrigé : sa dette suit le nouveau total (et le nouveau fournisseur). Elle ne descend
+     * jamais sous ce qui a déjà été réglé (paiements et avoirs) ; un bon ramené à zéro sans rien de réglé n'a plus de dette.
+     */
+    public void corrigerDette(Approvisionnement bon, Long ancienFournisseurId, String username) {
+        BigDecimal total = totalDuBon(bon);
+        Long nouveauFournisseurId = bon.getFournisseur().getId();
+        // verrous des comptes dans l'ordre des identifiants : deux opérations concurrentes ne peuvent pas s'interbloquer
+        Map<Long, Fournisseur> comptes = new LinkedHashMap<>();
+        java.util.stream.Stream.of(ancienFournisseurId, nouveauFournisseurId).distinct().sorted()
+            .forEach(id -> comptes.put(id, verrouiller(id)));
+        Optional<DetteFournisseur> existante = detteRepository.findByApprovisionnementIdForUpdate(bon.getId());
+        if (existante.isEmpty()) {
+            if (total.signum() > 0) {
+                enregistrerDette(bon, username);
+            }
+            return;
+        }
+        DetteFournisseur dette = existante.get();
+        BigDecimal ancienMontant = dette.getMontantInitial();
+        if (!dette.getFournisseur().getId().equals(nouveauFournisseurId) && dette.getMontantRegle().signum() > 0) {
+            throw new ConflitRessourceException("Le bon " + bon.getNumero() + " a déjà été réglé en partie à "
+                + dette.getFournisseur().getNom() + " : il ne peut plus changer de fournisseur");
+        }
+        if (total.compareTo(dette.getMontantRegle()) < 0) {
+            throw new ConflitRessourceException("Le fournisseur a déjà reçu " + dette.getMontantRegle().toPlainString()
+                + " pour le bon " + bon.getNumero() + " (paiements et avoirs) : le nouveau total du bon ("
+                + total.toPlainString() + ") ne peut pas être inférieur");
+        }
+        if (total.signum() == 0) {
+            detteRepository.delete(dette);
+            journalActiviteService.enregistrer("MODIFICATION", "DETTE_FOURNISSEUR", dette.getId(),
+                "Dette du bon " + bon.getNumero() + " supprimée : le bon corrigé ne vaut plus rien", username);
+            return;
+        }
+        Fournisseur fournisseur = comptes.get(nouveauFournisseurId);
+        dette.setFournisseur(fournisseur);
+        dette.corrigerMontant(total);
+        detteRepository.saveAndFlush(dette);
+        journalActiviteService.enregistrer("MODIFICATION", "DETTE_FOURNISSEUR", dette.getId(),
+            "Dette du bon " + bon.getNumero() + " corrigée : " + ancienMontant.toPlainString() + " → " + total.toPlainString()
+                + (ancienFournisseurId.equals(nouveauFournisseurId) ? "" : ", désormais due à " + fournisseur.getNom()), username);
+        imputerAvoirs(fournisseur, utilisateur(username));
+    }
+
+    /** Total d'un bon : somme des lignes (prix d'achat × quantité), à l'échelle monétaire. */
+    private static BigDecimal totalDuBon(Approvisionnement bon) {
+        BigDecimal total = BigDecimal.ZERO;
+        for (LigneApprovisionnement ligne : bon.getLignes()) {
+            total = total.add(Quantites.montant(ligne.getPrixUnitaire(), ligne.getQuantite()));
+        }
+        return total.setScale(ECHELLE_MONETAIRE, RoundingMode.UNNECESSARY);
     }
 
     public ReglementFournisseurResponse payer(Long detteId, ReglementFournisseurRequest request, String username) {

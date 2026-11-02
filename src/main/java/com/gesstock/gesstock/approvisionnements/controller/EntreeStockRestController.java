@@ -46,9 +46,10 @@ public class EntreeStockRestController {
     @PutMapping("/{id}")
     public ApprovisionnementResponse modifier(
         @PathVariable Long id,
-        @Valid @RequestBody ApprovisionnementRequest request
+        @Valid @RequestBody ApprovisionnementRequest request,
+        @AuthenticationPrincipal UserDetails principal
     ) {
-        return entreeStockService.modifier(id, request);
+        return entreeStockService.modifier(id, request, principal.getUsername());
     }
 
     @DeleteMapping("/{id}")

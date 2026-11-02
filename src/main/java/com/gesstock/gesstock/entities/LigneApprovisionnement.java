@@ -28,6 +28,11 @@ public class LigneApprovisionnement {
     @Column(nullable = false, precision = 19, scale = 4)
     private java.math.BigDecimal prixUnitaire = java.math.BigDecimal.ZERO;
 
+    /** Prix de revente saisi sur le bon : il devient le prix de vente de l'article à la réception. Null = inchangé. */
+    @PositiveOrZero
+    @Column(precision = 19, scale = 4)
+    private java.math.BigDecimal prixVente;
+
     /**
      * Unités déjà rendues au fournisseur. Jamais modifié par l'entité : seul l'UPDATE conditionnel du dépôt le fait, ce qui
      * rend « jamais plus rendu que reçu » vrai même avec deux validations simultanées (la base le garantit aussi par un CHECK).

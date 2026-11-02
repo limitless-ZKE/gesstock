@@ -53,6 +53,7 @@ public final class OperationsConnues {
         connue("SUPPRESSION", "CLIENT", "Client supprimé", Famille.CLIENTS),
 
         connue("VALIDATION", "APPROVISIONNEMENT", "Approvisionnement réceptionné", Famille.STOCK),
+        connue("MODIFICATION", "APPROVISIONNEMENT", "Approvisionnement corrigé après réception", Famille.STOCK),
         connue("AJUSTEMENT_STOCK", "ARTICLE", "Ajustement de stock", Famille.STOCK),
         connue("OUVERTURE", "INVENTAIRE", "Inventaire ouvert", Famille.STOCK),
         connue("SOUMISSION", "INVENTAIRE", "Inventaire soumis à validation", Famille.STOCK),
@@ -62,6 +63,7 @@ public final class OperationsConnues {
 
         connue("CREATION", "DETTE_FOURNISSEUR", "Dette fournisseur enregistrée", Famille.FOURNISSEURS),
         connue("REGLEMENT", "DETTE_FOURNISSEUR", "Paiement d'un fournisseur", Famille.FOURNISSEURS),
+        connue("MODIFICATION", "DETTE_FOURNISSEUR", "Dette fournisseur corrigée (bon modifié)", Famille.FOURNISSEURS),
         connue("CREATION", "AVOIR_FOURNISSEUR", "Avoir fournisseur", Famille.FOURNISSEURS),
         connue("CREATION", "RETOUR_FOURNISSEUR", "Retour fournisseur préparé", Famille.FOURNISSEURS),
         connue("VALIDATION", "RETOUR_FOURNISSEUR", "Retour fournisseur validé", Famille.FOURNISSEURS),

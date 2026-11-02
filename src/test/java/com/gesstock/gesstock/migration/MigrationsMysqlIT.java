@@ -65,7 +65,7 @@ class MigrationsMysqlIT {
 
         try (ConfigurableApplicationContext contexte = demarrer(base, "--spring.flyway.baseline-on-migrate=false")) {
             JdbcTemplate jdbc = contexte.getBean(JdbcTemplate.class);
-            assertThat(versionsAppliquees(jdbc)).containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15");
+            assertThat(versionsAppliquees(jdbc)).containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16");
             assertThat(migrationsEnEchec(jdbc)).isZero();
             assertThat(derives(contexte, base)).as("enum Java absents de la base").isEmpty();
 
@@ -169,7 +169,7 @@ class MigrationsMysqlIT {
         try (ConfigurableApplicationContext contexte = demarrer(base,
             "--spring.flyway.baseline-on-migrate=true", "--spring.flyway.baseline-version=3")) {
             JdbcTemplate jdbc = contexte.getBean(JdbcTemplate.class);
-            assertThat(versionsAppliquees(jdbc)).containsExactly("3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15");
+            assertThat(versionsAppliquees(jdbc)).containsExactly("3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16");
             assertThat(migrationsEnEchec(jdbc)).isZero();
         }
     }
@@ -258,6 +258,8 @@ class MigrationsMysqlIT {
     /** V15 : quantités à 3 décimales, toujours positives (les anciens CHECK sans nom de V1 ont été remplacés, pas oubliés). */
     private void quantitesDecimalesGarantiesParLaBase(JdbcTemplate jdbc) {
         jdbc.update("INSERT INTO article (prix, prix_achat, cmp, quantite, seuil_alerte, reference, nom) VALUES (1000, 600, 600, 2.5, 0, 'A-DEC', 'Vrac')");
+        assertThat(colonnesDe(jdbc, jdbc.queryForObject("SELECT DATABASE()", String.class), "ligne_approvisionnements"))
+            .as("V16 : prix de revente saisi sur le bon").contains("prix_vente");
         assertThat(jdbc.queryForObject("SELECT quantite FROM article WHERE reference = 'A-DEC'", java.math.BigDecimal.class))
             .isEqualByComparingTo("2.5");
         jdbc.update("UPDATE article SET quantite = 0.125 WHERE reference = 'A-DEC'");

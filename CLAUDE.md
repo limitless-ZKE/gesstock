@@ -42,10 +42,12 @@ et image Docker. Les actions d'autres éditeurs que GitHub sont épinglées sur 
 
 - Backend : `src/main/java/com/gesstock/gesstock/` — un paquet par domaine : `articles`, `ventes`, `caisse`, `clients`,
   `fournisseurs`, `approvisionnements`, `inventaires`, `stock`, `statistiques`, `entreprise`, `promotions`, `journal`,
-  `security`, `config`, `interfaceweb` (sert l'interface embarquée). Migrations Flyway `V1` à `V14` dans
+  `security`, `config`, `interfaceweb` (sert l'interface embarquée). Migrations Flyway `V1` à `V16` dans
   `src/main/resources/db/migration` ; Hibernate ne fait que valider le schéma (entité modifiée = migration obligatoire).
 - Frontend : `frontend/src/pages` (un écran par route, tests à côté), `components`, `services` (appels API), `auth`, `entreprise`.
-  Caisse : `CaissePage`, `ChampClient` (recherche client), `QuantiteSaisie` (quantité saisie au clavier).
+  Caisse : `CaissePage`, `ChampClient` (recherche client), `QuantiteSaisie` (quantité saisie au clavier, virgule acceptée).
+  Quantités : `lib/quantite.ts` (lecture « 2,5 », affichage) et `stock/Quantites.java` côté serveur ; `ChampArticle` (recherche
+  d'article par nom, bons d'approvisionnement).
   Journaux : `JournalCaisse` choisit selon le rôle entre le journal complet et celui d'un caissier.
 - Scripts : `scripts/` — `kit-livraison/` (kit complet), `livraison-simple/` + `preparer-livraison-simple.cmd/.ps1`
   (dossier simple), `construire-pour-le-reseau.cmd`, `lancer-gesstock-reseau.cmd`, `construire-apk.cmd/.ps1` + `android/` (APK).
@@ -59,7 +61,13 @@ et image Docker. Les actions d'autres éditeurs que GitHub sont épinglées sur 
 
 - 4 rôles : ADMIN, MANAGER, GESTIONNAIRE, CAISSIER. Annulation de vente : ADMIN/MANAGER seulement ; au comptant, le jour même.
 - Fuseau UTC+0 (Africa/Dakar). Aucune TVA pour l'instant (décidée par le serveur).
-- Remises plafonnées par rôle (5 / 10 / 25 / 100 %) ; au-delà, mot de passe d'un responsable au comptoir.
+- Remises LIBRES (décision du client, novembre 2026, remplace les plafonds par rôle) : le caissier fixe le prix négocié sans
+  responsable, quel que soit le taux, par unité ou sur le total de la ligne. Sous le prix d'achat : la vente passe, avec un
+  avertissement à la caisse et une ligne « Vente sous le prix d'achat » au journal des opérations.
+- Quantités à 3 décimales (stock, ventes, bons, retours, inventaires). Montant de chaque ligne de vente stocké (`montant_ligne`).
+- Approvisionnement : article cherché par son nom ; prix d'achat et de revente pré-remplis (derniers prix connus) ; le prix de
+  revente devient le prix de vente à la RÉCEPTION ; un bon se corrige aussi après réception (stock, coût moyen, prix et dette
+  fournisseur suivent ; refusé si déjà vendu, si déjà payé au-delà du nouveau total, ou s'il y a un retour fournisseur).
 - Coût moyen pondéré. Compte fournisseur complet (dettes, paiements, avoirs imputés d'office).
 - Inventaire sans seuil : MANAGER/ADMIN valident, le validateur n'est pas l'ouvreur ; tout le stock ou une catégorie.
 - Vente à crédit possible (pas pour un client de passage). Journal d'un caissier : **ses lignes seulement**
