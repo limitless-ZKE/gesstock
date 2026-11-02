@@ -36,7 +36,7 @@ $modeles = Join-Path $PSScriptRoot 'livraison-simple'
 $racine = Split-Path -Parent $PSScriptRoot
 # Les fichiers du dossier livre, relativement au dossier : modeles dans scripts\livraison-simple\ (memes chemins).
 $fichiersLivres = @(
-    'demarrer.cmd', 'importer-la-base.cmd', 'installer-demarrage-automatique.cmd', 'LISEZ-MOI.txt',
+    'demarrer.cmd', 'importer-la-base.cmd', 'sauvegarder-la-base.cmd', 'installer-demarrage-automatique.cmd', 'LISEZ-MOI.txt',
     'outils\arreter.cmd', 'outils\arreter.ps1', 'outils\demarrage-automatique.ps1', 'outils\desactiver-demarrage-automatique.cmd',
     'outils\ouvrir-navigateur.vbs'
 )

@@ -6,6 +6,7 @@ Ce dossier contient :
   base-de-lancement.sql     la base de données prête à l'emploi : toutes les tables et le compte administrateur
   importer-la-base.cmd      met la base dans MySQL (une seule fois)
   demarrer.cmd              lance GesStock
+  sauvegarder-la-base.cmd   sauvegarde la base (avant chaque mise à jour, et chaque semaine)
 
 Ce qu'il faut déjà avoir sur le serveur : Java 17 et WampServer (icône verte, MySQL 8.4).
 
@@ -44,11 +45,26 @@ connexion quand GesStock est prêt.
    si personne ne se connecte à Windows : les autres postes du réseau y accèdent dès qu'il est prêt.
    Chez un client, un disque SSD est le meilleur investissement : le même GesStock y démarre en moins de 30 secondes.
 
+SAUVEGARDER LA BASE
+-------------------
+Double-cliquez sur  sauvegarder-la-base.cmd  (WampServer démarré, icône verte ; GesStock peut rester allumé).
+Un fichier daté est créé dans le sous-dossier "sauvegardes", par exemple  sauvegardes\{{NOM_BASE}}-2026-11-05_18-30.sql .
+Faites-le au moins une fois par semaine, et TOUJOURS avant une mise à jour. Copiez de temps en temps ce dossier sur une
+clé USB : une sauvegarde restée sur le même PC est perdue avec lui.
+
+
+METTRE À JOUR GESSTOCK (nouvelle version du programme)
+------------------------------------------------------
+1. Double-cliquez sur  sauvegarder-la-base.cmd  et attendez "Sauvegarde terminée". Si elle échoue, n'allez pas plus loin.
+2. Double-cliquez sur  outils\arreter.cmd  (GesStock s'arrête).
+3. Remplacez gesstock.jar par le nouveau (et les autres fichiers fournis avec lui, le cas échéant).
+4. Relancez GesStock : installer-demarrage-automatique.cmd si le démarrage automatique est installé, sinon demarrer.cmd.
+   Le premier démarrage après une mise à jour peut être plus long : GesStock met la base à jour toute seule.
+5. Connectez-vous et vérifiez le stock de quelques articles et la dernière vente.
+
 Le sous-dossier "outils" contient le reste :
   arreter.cmd                        arrête GesStock (avant une mise à jour du programme ou une restauration de la base)
   desactiver-demarrage-automatique.cmd   retire le démarrage automatique (la base et les fichiers ne sont pas touchés)
-Mise à jour de gesstock.jar : arreter.cmd, remplacer gesstock.jar par le nouveau, puis relancer
-installer-demarrage-automatique.cmd (il relance GesStock tout de suite).
 
 
 APRÈS LA PREMIÈRE CONNEXION
@@ -70,8 +86,7 @@ installer-demarrage-automatique.cmd si le démarrage automatique est installé).
 
 À SAVOIR
 --------
-- Ce dossier ne contient pas de sauvegarde automatique. Les données sont dans MySQL (C:\wamp64\bin\mysql) : faites une
-  copie régulière de la base (icône Wamp > phpMyAdmin > base "{{NOM_BASE}}" > Exporter).
+- Il n'y a pas de sauvegarde automatique : pensez à sauvegarder-la-base.cmd (voir plus haut).
 - Sans le démarrage automatique, après un redémarrage du PC il faut double-cliquer à nouveau sur demarrer.cmd.
 - Les messages de GesStock sont dans le sous-dossier "journaux" (créé au premier démarrage).
 - En cas de problème, envoyez une photo de l'écran et le fichier journaux\gesstock.log.
