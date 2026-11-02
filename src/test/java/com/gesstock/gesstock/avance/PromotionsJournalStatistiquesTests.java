@@ -66,7 +66,7 @@ class PromotionsJournalStatistiquesTests {
     private VenteResponse venteValidee(int quantite) {
         VenteResponse brouillon = ventesService.creerVenteDirecte(new VenteDirecteRequest(
             null, false,
-            List.of(new LigneDocumentRequest(telephone().getId(), null, quantite, null, null)),
+            List.of(new LigneDocumentRequest(telephone().getId(), null, BigDecimal.valueOf(quantite), null, null)),
             BigDecimal.ZERO, com.gesstock.gesstock.entities.ModeReglement.ESPECES, new BigDecimal("10000000")), ADMIN);
         return ventesService.validerVente(brouillon.id(), ADMIN);
     }
@@ -146,7 +146,7 @@ class PromotionsJournalStatistiquesTests {
         SyntheseStatistiquesResponse synthese = statistiquesService.synthese(LocalDate.now());
         assertThat(synthese.articleLePlusVendu()).isNotNull();
         assertThat(synthese.articleLePlusVendu().reference()).isEqualTo("ELEC-001");
-        assertThat(synthese.articleLePlusVendu().quantiteVendue()).isEqualTo(3);
+        assertThat(synthese.articleLePlusVendu().quantiteVendue()).isEqualByComparingTo("3");
         assertThat(synthese.chiffreAffairesJour()).isEqualByComparingTo("735000");
         assertThat(synthese.chiffreAffairesMois()).isGreaterThanOrEqualTo(synthese.chiffreAffairesJour());
         assertThat(synthese.valeurStock()).isLessThan(valeurStockAvant); // 3 téléphones sont sortis du stock

@@ -45,7 +45,7 @@ class ProformaServiceTests {
 
     private ProformaRequest proforma(String numero, int quantite) {
         return new ProformaRequest(numero, LocalDate.now(), LocalDate.now().plusDays(7), null,
-            List.of(new LigneDocumentRequest(telephone().getId(), null, quantite, null, null)));
+            List.of(new LigneDocumentRequest(telephone().getId(), null, BigDecimal.valueOf(quantite), null, null)));
     }
 
     private ProformaResponse proformaAcceptee(String numero, int quantite) {
@@ -56,13 +56,13 @@ class ProformaServiceTests {
 
     @Test
     void proformaCalculeSonTotalSansToucherAuStock() {
-        int stockAvant = telephone().getQuantiteStock();
+        BigDecimal stockAvant = telephone().getQuantiteStock();
 
         ProformaResponse cree = ventesService.creerProforma(proforma("PF-001", 3), ADMIN);
 
         assertThat(cree.statut()).isEqualTo(StatutProforma.BROUILLON);
         assertThat(cree.montantTotal()).isEqualByComparingTo("735000");
-        assertThat(telephone().getQuantiteStock()).isEqualTo(stockAvant);
+        assertThat(telephone().getQuantiteStock()).isEqualByComparingTo(stockAvant);
     }
 
     @Test
@@ -87,30 +87,30 @@ class ProformaServiceTests {
     @Test
     void conversionExigeUneJourneeOuverteEtLeStockResteIntactSansElle() {
         ProformaResponse acceptee = proformaAcceptee("PF-004", 2);
-        int stockAvant = telephone().getQuantiteStock();
+        BigDecimal stockAvant = telephone().getQuantiteStock();
 
         assertThatThrownBy(() -> ventesService.convertirProformaEnVente(acceptee.id(), false, ModeReglement.ESPECES, new BigDecimal("1000000"), ADMIN))
             .isInstanceOf(ConflitRessourceException.class)
             .hasMessageContaining("journée de caisse");
-        assertThat(telephone().getQuantiteStock()).isEqualTo(stockAvant);
+        assertThat(telephone().getQuantiteStock()).isEqualByComparingTo(stockAvant);
     }
 
     @Test
     void conversionCreeUneVenteValideeDestockeEtMarqueLeProformaConverti() {
         sessionService.ouvrir(new OuvertureSessionRequest(LocalDate.now(), new BigDecimal("1000")), ADMIN);
         ProformaResponse acceptee = proformaAcceptee("PF-005", 2);
-        int stockAvant = telephone().getQuantiteStock();
+        BigDecimal stockAvant = telephone().getQuantiteStock();
 
         VenteResponse vente = ventesService.convertirProformaEnVente(acceptee.id(), false, ModeReglement.ESPECES, new BigDecimal("1000000"), ADMIN);
 
         assertThat(vente.statut()).isEqualTo(StatutVente.VALIDEE);
         assertThat(vente.proformaId()).isEqualTo(acceptee.id());
-        assertThat(telephone().getQuantiteStock()).isEqualTo(stockAvant - 2);
+        assertThat(telephone().getQuantiteStock()).isEqualByComparingTo(stockAvant.subtract(BigDecimal.valueOf(2)));
         assertThat(ventesService.obtenirProforma(acceptee.id()).statut()).isEqualTo(StatutProforma.CONVERTIE);
 
         // un proforma déjà converti ne peut pas l'être une seconde fois (pas de double déstockage)
         assertThatThrownBy(() -> ventesService.convertirProformaEnVente(acceptee.id(), false, ModeReglement.ESPECES, new BigDecimal("1000000"), ADMIN))
             .isInstanceOf(ConflitRessourceException.class);
-        assertThat(telephone().getQuantiteStock()).isEqualTo(stockAvant - 2);
+        assertThat(telephone().getQuantiteStock()).isEqualByComparingTo(stockAvant.subtract(BigDecimal.valueOf(2)));
     }
 }

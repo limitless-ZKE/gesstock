@@ -84,13 +84,14 @@ Seuls ces quatre rôles existent. Les anciens rôles `VENDEUR` et `USER` sont fu
 - Une vente au comptant, y compris issue d'un proforma, exige un mode de règlement et un montant reçu : c'est ce qui
   alimente le solde théorique de la caisse. Le « montant encaissé » est le total de la vente, pas la somme remise.
 
-- **Remises** : un prix négocié plus bas que le prix catalogue est plafonné selon le rôle du vendeur (CAISSIER 5 %,
-  GESTIONNAIRE 10 %, MANAGER 25 %, ADMIN 100 %, réglables par `APP_REMISES_PLAFOND_<RÔLE>`). Au-delà, ou sous le coût de
-  revient (`APP_REMISES_MARGE_PLANCHER`, 0 % par défaut), le serveur répond `409 APPROBATION_REQUISE` : un AUTRE responsable
-  (MANAGER ou ADMIN) saisit son identifiant et son mot de passe au comptoir, la même demande est renvoyée avec
-  `approbation: { username, motDePasse }`. Le serveur vérifie le mot de passe sans ouvrir de session (mêmes limites d'essais
-  que la connexion), garde le nom du responsable sur la ligne de vente ou de proforma et écrit une ligne au journal. Les
-  promotions ne comptent pas dans le plafond.
+- **Remises** (décision du client, novembre 2026) : le vendeur fixe librement le prix négocié, quel que soit le taux et quel
+  que soit son rôle ; aucun accord de responsable n'est demandé. Deux façons : un prix par unité (`prixUnitaire`, la promotion
+  s'applique encore dessus) ou un prix pour la ligne entière (`montantNegocie`, facturé exactement, sans promotion). Aucun
+  des deux ne dépasse le prix catalogue. Une vente sous le prix d'achat (coût moyen au moment de la vente) passe : la réponse
+  de validation la signale (`avertissements`, affichés en orange à la caisse) et le journal des opérations la note
+  (« Vente sous le prix d'achat »). Le montant net de chaque ligne est calculé une fois et stocké (`montant_ligne`).
+- **Quantités à virgule** : stock et quantités (vente, proforma, réception, retour, inventaire, ajustement) ont 3 décimales au
+  plus (`DECIMAL(15,3)`) ; on les tape avec une virgule ou un point.
 - **Annulation d'une vente** (ADMIN et MANAGER seulement, `POST /api/ventes/{id}/annulation`) : à crédit, la dette est
   annulée et les versements éventuels remboursés. Au comptant, seulement le jour même et tant que la journée de caisse de la
   vente est ouverte, avec les articles rapportés en l'état (`articlesRetournesEnEtat`) : le stock rentre au coût de la vente et
@@ -105,6 +106,13 @@ Seuls ces quatre rôles existent. Les anciens rôles `VENDEUR` et `USER` sont fu
   si un écart ferait passer un stock sous zéro (article à recompter). Tout écart exige un motif à la soumission. Les articles non
   comptés ne sont pas touchés. `GET /api/inventaires/{id}/export.xlsx` donne la feuille de comptage. Un stock de départ saisi
   à la création d'un article laisse un mouvement `STOCK_INITIAL`.
+- **Approvisionnements** : l'article d'une ligne se cherche en tapant une partie de son nom ; le prix d'achat et le prix de
+  revente sont pré-remplis avec les derniers prix connus de l'article et modifiables. Le prix de revente saisi (`prixVente` de la
+  ligne) devient le prix de vente de l'article à la RÉCEPTION (noté au journal). Un bon se modifie en brouillon, et aussi APRÈS sa
+  réception (`PUT /api/approvisionnements/{id}`) : le stock, le coût moyen (l'ancien apport est retiré à son coût, le nouveau
+  ajouté), les prix et la dette du fournisseur suivent, avec mouvements de stock et journal. C'est refusé si la marchandise à
+  retirer a déjà été vendue, si le nouveau total est inférieur à ce qui a déjà été payé au fournisseur, ou si un retour au
+  fournisseur a été préparé sur le bon.
 - **Compte fournisseur** (`/api/fournisseurs/comptes`, `/{id}/compte`) : recevoir un bon crée une dette égale à son total (quantité
   × prix) ; un bon de valeur nulle n'en crée pas, et les bons reçus avant `V11` n'en ont pas non plus (on ignore ce qui a déjà été
   payé). `POST /api/fournisseurs/dettes/{id}/reglements` enregistre un paiement : jamais au-delà du solde ; en espèces il exige une
@@ -349,7 +357,8 @@ Le contrôle de santé de Docker interroge `http://127.0.0.1:8081/actuator/healt
   disparaît après avoir été reportée dans `utilisateur_roles` (rôle créé au besoin s'il fait partie des quatre connus).
 - `V8__cout_moyen_pondere.sql` : coût moyen pondéré des articles, coût mémorisé sur les lignes de vente (estimé pour les
   ventes déjà enregistrées) et sur les mouvements de stock, historique des prix d'achat.
-- `V9__approbation_remises.sql` : responsable ayant approuvé une remise, sur les lignes de vente et de proforma.
+- `V9__approbation_remises.sql` : responsable ayant approuvé une remise, sur les lignes de vente et de proforma (plus rempli
+  depuis que la remise est libre, novembre 2026 : la colonne garde l'historique).
 - `V10__inventaire_physique.sql` : inventaires et leurs lignes (un seul inventaire en cours à la fois, garanti par un index
   unique sur une colonne générée), type de mouvement `STOCK_INITIAL`, lien mouvement de stock → inventaire.
 - `V11__compte_fournisseur.sql` : dettes fournisseurs (une par bon reçu), règlements (paiement ou avoir imputé) et avoirs, avec
@@ -360,6 +369,10 @@ Le contrôle de santé de Docker interroge `http://127.0.0.1:8081/actuator/healt
   neuve, seul ADMIN existait, et il fallait créer les trois autres à la main avant de donner un compte à un caissier.
 - `V13__parametres_entreprise.sql` : informations de l'entreprise et logo (une seule ligne chacune, garantie par la base ; le
   logo dans une table à part pour ne pas être chargé avec les textes).
+- `V15__quantites_decimales.sql` : quantités et stocks en `DECIMAL(15,3)` ; les CHECK sans nom de `V1` (« quantité >= 1 ») sont
+  retrouvés dans `information_schema` et reposés avec un nom (« > 0 ») ; colonne `lignes_vente.montant_ligne`, remplie pour les
+  lignes existantes avec leur montant d'avant.
+- `V16__prix_de_revente_approvisionnement.sql` : prix de revente facultatif sur les lignes de bon.
 - Une migration déjà appliquée ne se modifie jamais : toute évolution du schéma est un nouveau fichier
   `V<n>__description.sql`.
 - Une base créée à la main par `ddl-auto=update` n'est **pas** reprise automatiquement (`V3` échouerait : colonne

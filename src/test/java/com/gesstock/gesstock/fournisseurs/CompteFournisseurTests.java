@@ -73,7 +73,7 @@ class CompteFournisseurTests {
     private ApprovisionnementResponse bonRecu(String numero, FournisseurResponse fournisseur, int quantite, String prix) {
         Long articleId = articleRepository.findByReferenceIgnoreCase("ELEC-001").orElseThrow().getId();
         ApprovisionnementResponse brouillon = entreeService.creer(new ApprovisionnementRequest(numero, LocalDate.now(),
-            fournisseur.id(), List.of(new LigneApprovisionnementRequest(articleId, quantite, new BigDecimal(prix)))));
+            fournisseur.id(), List.of(new LigneApprovisionnementRequest(articleId, BigDecimal.valueOf(quantite), new BigDecimal(prix)))));
         return entreeService.valider(brouillon.id(), ADMIN);
     }
 
@@ -117,7 +117,7 @@ class CompteFournisseurTests {
         FournisseurResponse f = fournisseur("Grossiste B");
         Long articleId = articleRepository.findByReferenceIgnoreCase("ELEC-001").orElseThrow().getId();
         entreeService.creer(new ApprovisionnementRequest("BR-CPT-2", LocalDate.now(), f.id(),
-            List.of(new LigneApprovisionnementRequest(articleId, 1, new BigDecimal("500")))));
+            List.of(new LigneApprovisionnementRequest(articleId, BigDecimal.valueOf(1), new BigDecimal("500")))));
         assertThat(compte(f).dettes()).as("un brouillon n'est pas une dette").isEmpty();
 
         bonRecu("BR-CPT-3", f, 2, "0");   // échantillons gratuits

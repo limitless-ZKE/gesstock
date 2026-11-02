@@ -77,7 +77,7 @@ public class StatistiquesExportService {
                 Row row = articles.createRow(rowNumber++);
                 row.createCell(0).setCellValue(marge.reference());
                 row.createCell(1).setCellValue(marge.designation());
-                row.createCell(2).setCellValue(marge.quantiteVendue());
+                row.createCell(2).setCellValue(marge.quantiteVendue().doubleValue());
                 row.createCell(3).setCellValue(marge.chiffreAffaires().doubleValue());
                 row.createCell(4).setCellValue(marge.coutAchat().doubleValue());
                 row.createCell(5).setCellValue(marge.margeBrute().doubleValue());
@@ -192,7 +192,7 @@ public class StatistiquesExportService {
         for (MargeArticleResponse marge : rapport.margesParArticle()) {
             articles.addCell(marge.reference());
             articles.addCell(marge.designation());
-            articles.addCell(Long.toString(marge.quantiteVendue()));
+            articles.addCell(com.gesstock.gesstock.stock.Quantites.texte(marge.quantiteVendue()));
             articles.addCell(marge.chiffreAffaires().toPlainString());
             articles.addCell(marge.margeBrute().toPlainString());
         }

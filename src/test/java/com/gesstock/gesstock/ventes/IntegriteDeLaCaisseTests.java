@@ -59,7 +59,7 @@ class IntegriteDeLaCaisseTests {
     private ProformaResponse proformaAccepte(String numero) {
         ProformaResponse proforma = ventesService.creerProforma(new ProformaRequest(numero, LocalDate.now(),
             LocalDate.now().plusDays(3), null,
-            List.of(new LigneDocumentRequest(telephone().getId(), null, 1, null, null))), ADMIN);
+            List.of(new LigneDocumentRequest(telephone().getId(), null, BigDecimal.valueOf(1), null, null))), ADMIN);
         ventesService.modifierStatutProforma(proforma.id(), StatutProforma.ENVOYEE, ADMIN);
         return ventesService.modifierStatutProforma(proforma.id(), StatutProforma.ACCEPTEE, ADMIN);
     }
@@ -82,7 +82,7 @@ class IntegriteDeLaCaisseTests {
     void uneConversionAuComptantSansReglementEstRefuseeEtRienNeChange() {
         SessionCaisseResponse session = ouvrirSession();
         ProformaResponse proforma = proformaAccepte("PF-CASH-2");
-        int stockAvant = telephone().getQuantiteStock();
+        BigDecimal stockAvant = telephone().getQuantiteStock();
 
         assertThatThrownBy(() -> ventesService.convertirProformaEnVente(proforma.id(), false, null, null, ADMIN))
             .isInstanceOf(ConflitRessourceException.class)
@@ -92,7 +92,7 @@ class IntegriteDeLaCaisseTests {
             .isInstanceOf(ConflitRessourceException.class)
             .hasMessageContaining("couvrir");
 
-        assertThat(telephone().getQuantiteStock()).isEqualTo(stockAvant);
+        assertThat(telephone().getQuantiteStock()).isEqualByComparingTo(stockAvant);
         assertThat(sessionService.obtenir(session.id()).soldeTheorique()).isEqualByComparingTo("1000");
     }
 
@@ -101,7 +101,7 @@ class IntegriteDeLaCaisseTests {
         ouvrirSession();
 
         assertThatThrownBy(() -> ventesService.creerVenteDirecte(new VenteDirecteRequest(null, false,
-            List.of(new LigneDocumentRequest(telephone().getId(), null, 1, null, null)),
+            List.of(new LigneDocumentRequest(telephone().getId(), null, BigDecimal.valueOf(1), null, null)),
             BigDecimal.ZERO, null, null), ADMIN))
             .isInstanceOf(ConflitRessourceException.class)
             .hasMessageContaining("exige un mode de règlement");
@@ -111,7 +111,7 @@ class IntegriteDeLaCaisseTests {
     void leMontantEncaisseDuRapportEstLeTotalDeLaVentePasLaSommeRemiseParLeClient() {
         SessionCaisseResponse session = ouvrirSession();
         VenteResponse brouillon = ventesService.creerVenteDirecte(new VenteDirecteRequest(null, false,
-            List.of(new LigneDocumentRequest(telephone().getId(), null, 1, null, null)),
+            List.of(new LigneDocumentRequest(telephone().getId(), null, BigDecimal.valueOf(1), null, null)),
             BigDecimal.ZERO, ModeReglement.ESPECES, new BigDecimal("1000000")), ADMIN); // il donne un billet de 1 000 000
         ventesService.validerVente(brouillon.id(), ADMIN);
 

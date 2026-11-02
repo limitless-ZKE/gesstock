@@ -52,8 +52,8 @@ class HistoriquePagineTests {
         Article huile = articleRepository.findByReferenceIgnoreCase("ALIM-002").orElseThrow();
         for (int i = 0; i < nombre; i++) {
             VenteResponse brouillon = ventesService.creerVenteDirecte(new VenteDirecteRequest(clientId, false,
-                List.of(new LigneDocumentRequest(riz.getId(), null, 1, null, null),
-                        new LigneDocumentRequest(huile.getId(), null, 1, null, null)),
+                List.of(new LigneDocumentRequest(riz.getId(), null, BigDecimal.valueOf(1), null, null),
+                        new LigneDocumentRequest(huile.getId(), null, BigDecimal.valueOf(1), null, null)),
                 BigDecimal.ZERO, ModeReglement.ESPECES, new BigDecimal("10000")), ADMIN);
             ventesService.validerVente(brouillon.id(), ADMIN);
         }
@@ -102,7 +102,7 @@ class HistoriquePagineTests {
         ClientResponse client = clientService.creer(new ClientRequest("Client brouillon", null, null, null));
         Article riz = articleRepository.findByReferenceIgnoreCase("ALIM-001").orElseThrow();
         ventesService.creerVenteDirecte(new VenteDirecteRequest(client.id(), false,
-            List.of(new LigneDocumentRequest(riz.getId(), null, 1, null, null)),
+            List.of(new LigneDocumentRequest(riz.getId(), null, BigDecimal.valueOf(1), null, null)),
             BigDecimal.ZERO, ModeReglement.ESPECES, new BigDecimal("10000")), ADMIN); // reste en brouillon
 
         assertThat(clientService.obtenir(client.id()).nombreAchats()).isZero();

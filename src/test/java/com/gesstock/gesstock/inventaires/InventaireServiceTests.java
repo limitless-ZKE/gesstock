@@ -74,7 +74,7 @@ class InventaireServiceTests {
 
     private void compter(InventaireResponse inventaire, String reference, int compte, MotifAjustementStock motif, String commentaire) {
         inventaireService.saisir(inventaire.id(), article(reference).getId(),
-            new LigneInventaireRequest(compte, motif, commentaire), OUVREUR);
+            new LigneInventaireRequest(BigDecimal.valueOf(compte), motif, commentaire), OUVREUR);
     }
 
     @Test
@@ -97,28 +97,28 @@ class InventaireServiceTests {
 
         assertThat(valide.statut()).isEqualTo(StatutInventaire.VALIDE);
         assertThat(valide.validePar()).isEqualTo(VALIDATEUR);
-        assertThat(article("ELEC-001").getQuantiteStock()).isEqualTo(10);
-        assertThat(article("ALIM-001").getQuantiteStock()).isEqualTo(185);
-        assertThat(article("MOB-001").getQuantiteStock()).as("compté sans écart : inchangé").isEqualTo(18);
-        assertThat(article("ELEC-002").getQuantiteStock()).as("non compté : jamais touché").isEqualTo(5);
+        assertThat(article("ELEC-001").getQuantiteStock()).isEqualByComparingTo("10");
+        assertThat(article("ALIM-001").getQuantiteStock()).isEqualByComparingTo("185");
+        assertThat(article("MOB-001").getQuantiteStock()).as("compté sans écart : inchangé").isEqualByComparingTo("18");
+        assertThat(article("ELEC-002").getQuantiteStock()).as("non compté : jamais touché").isEqualByComparingTo("5");
 
         List<MouvementStock> mouvements = mouvementRepository.findAll().stream()
             .filter(mouvement -> mouvement.getInventaire() != null && mouvement.getInventaire().getId().equals(inventaire.id())).toList();
         assertThat(mouvements).hasSize(2);
         assertThat(mouvements).filteredOn(m -> m.getType() == TypeMouvementStock.AJUSTEMENT_NEGATIF).singleElement().satisfies(m -> {
-            assertThat(m.getQuantite()).isEqualTo(2);
-            assertThat(m.getStockAvant()).isEqualTo(12);
-            assertThat(m.getStockApres()).isEqualTo(10);
+            assertThat(m.getQuantite()).isEqualByComparingTo("2");
+            assertThat(m.getStockAvant()).isEqualByComparingTo("12");
+            assertThat(m.getStockApres()).isEqualByComparingTo("10");
             assertThat(m.getCoutUnitaire()).isEqualByComparingTo("189000");
             assertThat(m.getCommentaire()).contains("Casse").contains("Deux écrans fissurés");
             assertThat(m.getEffectuePar().getUsername()).isEqualTo(VALIDATEUR);
         });
         assertThat(mouvements).filteredOn(m -> m.getType() == TypeMouvementStock.AJUSTEMENT_POSITIF).singleElement()
-            .satisfies(m -> assertThat(m.getQuantite()).isEqualTo(5));
+            .satisfies(m -> assertThat(m.getQuantite()).isEqualByComparingTo("5"));
         assertThat(journalRepository.findAll()).filteredOn(entree -> "VALIDATION".equals(entree.getAction()) && "INVENTAIRE".equals(entree.getEntite()))
             .singleElement().extracting(JournalActivite::getDetails).asString().contains("2 article(s) ajusté(s)").contains(OUVREUR);
         assertThat(inventaireService.lignes(inventaire.id(), true, 0, 50).lignes()).as("écarts appliqués")
-            .extracting(LigneInventaireResponse::ecartApplique).containsExactlyInAnyOrder(-2, 5);
+            .extracting(ligne -> ligne.ecartApplique().intValueExact()).containsExactlyInAnyOrder(-2, 5);
     }
 
     @Test
@@ -130,15 +130,15 @@ class InventaireServiceTests {
         // pendant ce temps, on vend 2 téléphones : le stock réel passe à 10
         sessionService.ouvrir(new OuvertureSessionRequest(null, new BigDecimal("1000")), "admin");
         VenteResponse brouillon = ventesService.creerVenteDirecte(new VenteDirecteRequest(null, false,
-            List.of(new LigneDocumentRequest(article("ELEC-001").getId(), null, 2, null, null)),
+            List.of(new LigneDocumentRequest(article("ELEC-001").getId(), null, BigDecimal.valueOf(2), null, null)),
             BigDecimal.ZERO, ModeReglement.ESPECES, new BigDecimal("10000000")), "admin");
         ventesService.validerVente(brouillon.id(), "admin");
-        assertThat(article("ELEC-001").getQuantiteStock()).isEqualTo(10);
+        assertThat(article("ELEC-001").getQuantiteStock()).isEqualByComparingTo("10");
 
         inventaireService.valider(inventaire.id(), VALIDATEUR);
 
         assertThat(article("ELEC-001").getQuantiteStock())
-            .as("10 (stock du moment) + écart de -1, et non 11 (la valeur comptée qui aurait effacé la vente)").isEqualTo(9);
+            .as("10 (stock du moment) + écart de -1, et non 11 (la valeur comptée qui aurait effacé la vente)").isEqualByComparingTo("9");
     }
 
     @Test
@@ -149,7 +149,7 @@ class InventaireServiceTests {
         inventaireService.soumettre(inventaire.id(), OUVREUR);
         sessionService.ouvrir(new OuvertureSessionRequest(null, new BigDecimal("1000")), "admin");
         VenteResponse brouillon = ventesService.creerVenteDirecte(new VenteDirecteRequest(null, false,
-            List.of(new LigneDocumentRequest(article("ELEC-001").getId(), null, 5, null, null)),
+            List.of(new LigneDocumentRequest(article("ELEC-001").getId(), null, BigDecimal.valueOf(5), null, null)),
             BigDecimal.ZERO, ModeReglement.ESPECES, new BigDecimal("10000000")), "admin");
         ventesService.validerVente(brouillon.id(), "admin");                                   // stock réel : 7
 
@@ -157,8 +157,8 @@ class InventaireServiceTests {
             .isInstanceOf(ConflitRessourceException.class)
             .hasMessageContaining("Recomptez l'article ELEC-001");
 
-        assertThat(article("ALIM-001").getQuantiteStock()).as("rien n'a été appliqué").isEqualTo(180);
-        assertThat(article("ELEC-001").getQuantiteStock()).isEqualTo(7);
+        assertThat(article("ALIM-001").getQuantiteStock()).as("rien n'a été appliqué").isEqualByComparingTo("180");
+        assertThat(article("ELEC-001").getQuantiteStock()).isEqualByComparingTo("7");
         assertThat(inventaireService.obtenir(inventaire.id()).statut()).isEqualTo(StatutInventaire.SOUMIS);
     }
 
@@ -171,7 +171,7 @@ class InventaireServiceTests {
         assertThatThrownBy(() -> inventaireService.valider(inventaire.id(), OUVREUR))
             .isInstanceOf(ConflitRessourceException.class)
             .hasMessageContaining("autre personne");
-        assertThat(article("ELEC-001").getQuantiteStock()).isEqualTo(12);
+        assertThat(article("ELEC-001").getQuantiteStock()).isEqualByComparingTo("12");
     }
 
     @Test
@@ -185,7 +185,7 @@ class InventaireServiceTests {
         inventaireService.annuler(premier.id(), VALIDATEUR);
         assertThat(inventaireService.obtenir(premier.id()).statut()).isEqualTo(StatutInventaire.ANNULE);
         assertThat(ouvrirTout().id()).as("la voie est libre après l'annulation").isNotEqualTo(premier.id());
-        assertThat(article("ELEC-001").getQuantiteStock()).as("annuler ne touche pas au stock").isEqualTo(12);
+        assertThat(article("ELEC-001").getQuantiteStock()).as("annuler ne touche pas au stock").isEqualByComparingTo("12");
     }
 
     @Test
@@ -218,7 +218,7 @@ class InventaireServiceTests {
         compter(inventaire, "ELEC-001", 11, MotifAjustementStock.VOL, null);
         assertThat(inventaireService.lignes(inventaire.id(), false, 0, 50).lignes())
             .filteredOn(ligne -> ligne.reference().equals("ELEC-001")).singleElement()
-            .satisfies(ligne -> assertThat(ligne.stockCompte()).isEqualTo(11));
+            .satisfies(ligne -> assertThat(ligne.stockCompte()).isEqualByComparingTo("11"));
     }
 
     @Test

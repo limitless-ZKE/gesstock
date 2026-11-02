@@ -11,6 +11,7 @@ import com.gesstock.gesstock.entreprise.service.EnteteExcel;
 import com.gesstock.gesstock.entreprise.service.EntetePdf;
 import com.gesstock.gesstock.entreprise.service.EntrepriseService;
 import com.gesstock.gesstock.entreprise.service.TailleLogo;
+import com.gesstock.gesstock.stock.Quantites;
 import com.gesstock.gesstock.ventes.dto.HistoriqueVentesResponse;
 import com.gesstock.gesstock.ventes.dto.LigneHistoriqueVente;
 import com.gesstock.gesstock.ventes.dto.LigneReglementDette;
@@ -97,7 +98,7 @@ public class HistoriqueVentesExportService {
                 row.createCell(3).setCellValue(vente.client() == null ? "Client de passage" : vente.client());
                 row.createCell(4).setCellValue(vente.vendeur() == null ? "" : vente.vendeur());
                 row.createCell(5).setCellValue(vente.aCredit() ? "À crédit" : ExportSupport.libelleMode(vente.modeReglement()));
-                row.createCell(6).setCellValue(vente.nombreArticles());
+                row.createCell(6).setCellValue(vente.nombreArticles().doubleValue());
                 nombre(row, 7, vente.remises(), styles);
                 nombre(row, 8, vente.montantTotal(), styles);
                 row.createCell(9).setCellValue(vente.statut() == StatutVente.ANNULEE ? "Annulée" : "Validée");
@@ -115,13 +116,13 @@ public class HistoriqueVentesExportService {
                     row.createCell(2).setCellValue(vente.getStatut() == StatutVente.ANNULEE ? "Annulée" : "Validée");
                     row.createCell(3).setCellValue(ligneVente.getArticle().getReference());
                     row.createCell(4).setCellValue(ligneVente.getArticle().getDesignation());
-                    row.createCell(5).setCellValue(ligneVente.getQuantite());
+                    row.createCell(5).setCellValue(ligneVente.getQuantite().doubleValue());
                     BigDecimal catalogue = ligneVente.getPrixCatalogue() == null ? ligneVente.getPrixUnitaire() : ligneVente.getPrixCatalogue();
                     nombre(row, 6, catalogue, styles);
                     nombre(row, 7, ligneVente.getPrixUnitaire(), styles);
                     BigDecimal promotion = ligneVente.getRemiseUnitaire() == null ? BigDecimal.ZERO : ligneVente.getRemiseUnitaire();
                     nombre(row, 8, promotion, styles);
-                    nombre(row, 9, ligneVente.getPrixUnitaire().subtract(promotion).multiply(BigDecimal.valueOf(ligneVente.getQuantite())), styles);
+                    nombre(row, 9, ligneVente.getMontantLigne(), styles);
                 }
             }
             largeurs(articles, 10);
@@ -180,7 +181,7 @@ public class HistoriqueVentesExportService {
                         vente.client() == null ? "Client de passage" : vente.client(),
                         vente.vendeur() == null ? "" : vente.vendeur(),
                         vente.aCredit() ? "À crédit" : ExportSupport.libelleMode(vente.modeReglement()),
-                        Integer.toString(vente.nombreArticles()),
+                        Quantites.texte(vente.nombreArticles()),
                         vente.remises().signum() == 0 ? "—" : ExportSupport.montant(vente.remises()),
                         ExportSupport.montant(vente.montantTotal()),
                         vente.statut() == StatutVente.ANNULEE ? "Annulée" : "Validée");

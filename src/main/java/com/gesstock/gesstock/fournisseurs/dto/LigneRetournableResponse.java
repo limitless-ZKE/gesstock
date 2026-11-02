@@ -11,9 +11,9 @@ public record LigneRetournableResponse(
     Long articleId,
     String reference,
     String designation,
-    int quantiteRecue,
-    int quantiteDejaRetournee,
-    int quantiteRetournable,
+    BigDecimal quantiteRecue,
+    BigDecimal quantiteDejaRetournee,
+    BigDecimal quantiteRetournable,
     BigDecimal coutUnitaire,
-    int stockActuel
+    BigDecimal stockActuel
 ) {}

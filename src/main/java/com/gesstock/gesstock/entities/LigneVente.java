@@ -1,8 +1,8 @@
 package com.gesstock.gesstock.entities;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
 
 @Entity
@@ -13,8 +13,19 @@ public class LigneVente {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Min(1)
-    private int quantite;
+    /** Quantité vendue dans l'unité de la ligne, à 3 décimales au plus. */
+    @NotNull
+    @Positive
+    @Column(nullable = false, precision = 15, scale = 3)
+    private java.math.BigDecimal quantite;
+
+    /**
+     * Montant net de la ligne (après remise), calculé une fois par le serveur : c'est lui que totalisent la vente, les
+     * historiques et les dettes. Il vaut exactement le total négocié quand le vendeur a fixé le prix de la ligne entière.
+     */
+    @NotNull
+    @Column(nullable = false, precision = 19, scale = 4)
+    private java.math.BigDecimal montantLigne = java.math.BigDecimal.ZERO;
 
     @PositiveOrZero
     @Column(precision = 19, scale = 4)
@@ -69,8 +80,10 @@ public class LigneVente {
     public void setCoutEstime(boolean coutEstime) { this.coutEstime = coutEstime; }
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
-    public int getQuantite() { return quantite; }
-    public void setQuantite(int quantite) { this.quantite = quantite; }
+    public java.math.BigDecimal getQuantite() { return quantite; }
+    public void setQuantite(java.math.BigDecimal quantite) { this.quantite = quantite; }
+    public java.math.BigDecimal getMontantLigne() { return montantLigne; }
+    public void setMontantLigne(java.math.BigDecimal montantLigne) { this.montantLigne = montantLigne; }
     public java.math.BigDecimal getPrixUnitaire() { return prixUnitaire; }
     public void setPrixUnitaire(java.math.BigDecimal prixUnitaire) { this.prixUnitaire = prixUnitaire; }
     public Article getArticle() { return article; }

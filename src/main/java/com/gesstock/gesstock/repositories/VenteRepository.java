@@ -115,17 +115,17 @@ public interface VenteRepository extends JpaRepository<Vente, Long> {
 
     // Le coût vient de la ligne de vente (mémorisé à la vente) : une réception postérieure ne réécrit pas les marges passées.
     @Query("select a.id, a.reference, a.nom, sum(l.quantite), " +
-        "sum((l.prixUnitaire - coalesce(l.remiseUnitaire, 0)) * l.quantite), " +
+        "sum(l.montantLigne), " +
         "sum(coalesce(l.coutUnitaire, a.cmp * coalesce(u.facteurConversion, 1)) * l.quantite) " +
         "from LigneVente l join l.vente v join l.article a left join l.uniteVente u " +
         "where v.statut = :statut and v.dateVente >= :debut and v.dateVente < :fin " +
-        "group by a.id, a.reference, a.nom order by sum((l.prixUnitaire - coalesce(l.remiseUnitaire, 0)) * l.quantite) desc")
+        "group by a.id, a.reference, a.nom order by sum(l.montantLigne) desc")
     List<Object[]> margeParArticle(@Param("statut") StatutVente statut,
                                    @Param("debut") LocalDateTime debut,
                                    @Param("fin") LocalDateTime fin);
 
     @Query("select c.id, c.nom, " +
-        "sum((l.prixUnitaire - coalesce(l.remiseUnitaire, 0)) * l.quantite), " +
+        "sum(l.montantLigne), " +
     "sum(coalesce(l.coutUnitaire, a.cmp * coalesce(u.facteurConversion, 1)) * l.quantite) " +
     "from LigneVente l join l.vente v join l.article a left join l.uniteVente u left join a.categorie c " +
         "where v.statut = :statut and v.dateVente >= :debut and v.dateVente < :fin " +

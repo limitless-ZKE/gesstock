@@ -190,7 +190,7 @@ public class DataSeeder implements CommandLineRunner {
         article.setCmp(new BigDecimal(prixAchat));
         article.setPrix(new BigDecimal(prixVente));
         article.setSeuilAlerte(seuilAlerte);
-        article.setQuantite(quantite);
+        article.setQuantite(BigDecimal.valueOf(quantite));
         article.setCategorie(categorie);
         article.setUniteMesure(unite);
         return articleRepository.save(article);

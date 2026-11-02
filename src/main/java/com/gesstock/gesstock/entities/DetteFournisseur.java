@@ -56,6 +56,13 @@ public class DetteFournisseur {
         return montantInitial.subtract(montantRegle);
     }
 
+    /** Nouveau montant après correction du bon ; jamais sous ce qui est déjà réglé (l'appelant le vérifie). */
+    public void corrigerMontant(BigDecimal nouveauMontant) {
+        montantInitial = nouveauMontant;
+        statut = montantRegle.signum() == 0 ? StatutDette.EN_COURS
+            : montantRegle.compareTo(montantInitial) == 0 ? StatutDette.REGLEE : StatutDette.PARTIELLEMENT_REGLEE;
+    }
+
     /** Impute un règlement : la dette passe à « partiellement réglée », puis à « réglée » quand le solde est nul. */
     public void imputer(BigDecimal montant) {
         montantRegle = montantRegle.add(montant);

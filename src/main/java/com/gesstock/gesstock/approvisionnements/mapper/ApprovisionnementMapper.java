@@ -4,6 +4,7 @@ import com.gesstock.gesstock.approvisionnements.dto.*;
 import com.gesstock.gesstock.entities.Approvisionnement;
 import com.gesstock.gesstock.entities.Fournisseur;
 import com.gesstock.gesstock.entities.LigneApprovisionnement;
+import com.gesstock.gesstock.stock.Quantites;
 
 import java.math.BigDecimal;
 
@@ -34,7 +35,8 @@ public final class ApprovisionnementMapper {
                 ligne.getArticle() == null ? null : ligne.getArticle().getDesignation(),
                 ligne.getQuantite(),
                 prix,
-                prix.multiply(BigDecimal.valueOf(ligne.getQuantite()))
+                Quantites.montant(prix, ligne.getQuantite()),
+                ligne.getPrixVente()
             );
         }).toList();
         BigDecimal total = lignes.stream()
@@ -78,6 +80,7 @@ public final class ApprovisionnementMapper {
             ligne.setApprovisionnement(approvisionnement);
             ligne.setQuantite(ligneRequest.quantite());
             ligne.setPrixUnitaire(ligneRequest.prixUnitaire());
+            ligne.setPrixVente(ligneRequest.prixVente());
             approvisionnement.getLignes().add(ligne);
         });
     }

@@ -24,5 +24,7 @@ public record VenteResponse(
     BigDecimal tauxTva,
     com.gesstock.gesstock.entities.ModeReglement modeReglement,
     BigDecimal montantRecu,
-    List<LigneDocumentResponse> lignes
+    List<LigneDocumentResponse> lignes,
+    /** Avertissements pour le vendeur à la validation (vente sous le prix d'achat) ; vide sinon. */
+    List<String> avertissements
 ) {}

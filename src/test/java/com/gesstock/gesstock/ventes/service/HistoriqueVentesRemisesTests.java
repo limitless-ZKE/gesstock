@@ -13,10 +13,13 @@ class HistoriqueVentesRemisesTests {
 
     private static LigneVente ligne(int quantite, String prixUnitaire, String prixCatalogue, String remisePromotion) {
         LigneVente ligne = new LigneVente();
-        ligne.setQuantite(quantite);
+        ligne.setQuantite(BigDecimal.valueOf(quantite));
         ligne.setPrixUnitaire(new BigDecimal(prixUnitaire));
         ligne.setPrixCatalogue(prixCatalogue == null ? null : new BigDecimal(prixCatalogue));
         ligne.setRemiseUnitaire(remisePromotion == null ? null : new BigDecimal(remisePromotion));
+        // montant calculé par le serveur : (prix appliqué − promotion) × quantité
+        ligne.setMontantLigne(ligne.getPrixUnitaire().subtract(remisePromotion == null ? BigDecimal.ZERO : ligne.getRemiseUnitaire())
+            .multiply(ligne.getQuantite()));
         return ligne;
     }
 
@@ -48,5 +51,14 @@ class HistoriqueVentesRemisesTests {
     void lesRemisesDeToutesLesLignesSAdditionnent() {
         Vente vente = vente(ligne(1, "900", "1000", "0"), ligne(2, "500", "500", "25"));
         assertThat(HistoriqueVentesService.remisesDe(vente)).isEqualByComparingTo("150");   // 100 + 2 × 25
+    }
+
+    @Test
+    void uneRemiseFaiteSurLeTotalDeLaLigneEtUneQuantiteAVirguleComptent() {
+        // 2,5 caisses à 6 000 (15 000 au catalogue) cédées 14 000 pour la ligne entière : 1 000 de remise
+        LigneVente ligne = ligne(1, "5600", "6000", null);
+        ligne.setQuantite(new BigDecimal("2.5"));
+        ligne.setMontantLigne(new BigDecimal("14000"));
+        assertThat(HistoriqueVentesService.remisesDe(vente(ligne))).isEqualByComparingTo("1000");
     }
 }

@@ -7,7 +7,7 @@ public record LigneRetourFournisseurResponse(
     Long articleId,
     String reference,
     String designation,
-    int quantite,
+    BigDecimal quantite,
     BigDecimal coutUnitaire,
     BigDecimal montant
 ) {}

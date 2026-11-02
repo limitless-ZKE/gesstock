@@ -36,6 +36,11 @@ public interface DetteFournisseurRepository extends JpaRepository<DetteFournisse
     @Query("select d from DetteFournisseur d where d.id = :id")
     Optional<DetteFournisseur> findByIdForUpdate(@Param("id") Long id);
 
+    /** La dette créée à la réception d'un bon (une au plus), verrouillée. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select d from DetteFournisseur d where d.approvisionnement.id = :approvisionnementId")
+    Optional<DetteFournisseur> findByApprovisionnementIdForUpdate(@Param("approvisionnementId") Long approvisionnementId);
+
     /** Solde dû par fournisseur : lignes {fournisseurId, solde}. */
     @Query("select d.fournisseur.id, sum(d.montantInitial - d.montantRegle) from DetteFournisseur d "
         + "where d.statut in (com.gesstock.gesstock.entities.StatutDette.EN_COURS, "

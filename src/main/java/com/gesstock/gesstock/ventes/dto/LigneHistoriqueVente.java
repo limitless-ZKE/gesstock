@@ -21,7 +21,7 @@ public record LigneHistoriqueVente(
     String vendeur,
     boolean aCredit,
     ModeReglement modeReglement,
-    int nombreArticles,
+    BigDecimal nombreArticles,
     BigDecimal remises,
     BigDecimal montantTotal
 ) {}

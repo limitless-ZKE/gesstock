@@ -79,7 +79,7 @@ class JournalCaisseServiceTests {
         // en espèces on remet un gros billet ; un autre moyen de paiement doit correspondre exactement au total
         BigDecimal recu = mode == ModeReglement.ESPECES ? new BigDecimal("1000000") : article.getPrix().multiply(BigDecimal.valueOf(quantite));
         VenteResponse brouillon = ventesService.creerVenteDirecte(new VenteDirecteRequest(clientId, aCredit,
-            List.of(new LigneDocumentRequest(article.getId(), null, quantite, null, null)), BigDecimal.ZERO,
+            List.of(new LigneDocumentRequest(article.getId(), null, BigDecimal.valueOf(quantite), null, null)), BigDecimal.ZERO,
             aCredit ? null : mode, aCredit ? null : recu), ADMIN);
         return ventesService.validerVente(brouillon.id(), ADMIN);
     }

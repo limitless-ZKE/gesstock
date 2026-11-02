@@ -46,7 +46,7 @@ class HistoriqueVentesPeriodeTests {
         // en espèces on remet un gros billet ; un autre moyen de paiement doit correspondre exactement au total
         BigDecimal recu = mode == ModeReglement.ESPECES ? new BigDecimal("1000000") : article.getPrix().multiply(BigDecimal.valueOf(quantite));
         VenteResponse brouillon = ventesService.creerVenteDirecte(new VenteDirecteRequest(null, false,
-            List.of(new LigneDocumentRequest(article.getId(), null, quantite, null, null)), BigDecimal.ZERO, mode, recu), ADMIN);
+            List.of(new LigneDocumentRequest(article.getId(), null, BigDecimal.valueOf(quantite), null, null)), BigDecimal.ZERO, mode, recu), ADMIN);
         return ventesService.validerVente(brouillon.id(), ADMIN);
     }
 
@@ -67,7 +67,7 @@ class HistoriqueVentesPeriodeTests {
         assertThat(historique.resume().remises()).isZero();
         assertThat(historique.ventes()).hasSize(3);
         LigneHistoriqueVente riz = historique.ventes().stream().filter(v -> v.montantTotal().compareTo(new BigDecimal("5200")) == 0).findFirst().orElseThrow();
-        assertThat(riz.nombreArticles()).isEqualTo(4);
+        assertThat(riz.nombreArticles()).isEqualByComparingTo("4");
         assertThat(riz.modeReglement()).isEqualTo(ModeReglement.CARTE);
         assertThat(riz.vendeur()).isEqualTo(ADMIN);
         assertThat(riz.client()).as("vente au comptant sans client").isNull();
@@ -94,7 +94,7 @@ class HistoriqueVentesPeriodeTests {
         sessionService.ouvrir(new OuvertureSessionRequest(null, new BigDecimal("1000")), ADMIN);
         Long article = articleRepository.findByReferenceIgnoreCase("ELEC-001").orElseThrow().getId();
         ventesService.creerVenteDirecte(new VenteDirecteRequest(null, false,
-            List.of(new LigneDocumentRequest(article, null, 1, null, null)), BigDecimal.ZERO, ModeReglement.ESPECES, new BigDecimal("250000")), ADMIN);
+            List.of(new LigneDocumentRequest(article, null, BigDecimal.valueOf(1), null, null)), BigDecimal.ZERO, ModeReglement.ESPECES, new BigDecimal("250000")), ADMIN);
 
         assertThat(historiqueService.historique(LocalDate.now(), LocalDate.now()).ventes()).isEmpty();
     }

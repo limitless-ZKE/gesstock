@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Repository
@@ -21,5 +22,5 @@ public interface LigneApprovisionnementRepository extends JpaRepository<LigneApp
     @Modifying(flushAutomatically = true)
     @Query("update LigneApprovisionnement l set l.quantiteRetournee = l.quantiteRetournee + :quantite "
         + "where l.id = :id and l.quantiteRetournee + :quantite <= l.quantite")
-    int retournerQuantite(@Param("id") Long id, @Param("quantite") int quantite);
+    int retournerQuantite(@Param("id") Long id, @Param("quantite") BigDecimal quantite);
 }

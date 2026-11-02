@@ -75,7 +75,7 @@ class AnnulationVenteAuComptantTests {
     private VenteResponse vendre(ModeReglement mode) {
         BigDecimal recu = mode == ModeReglement.ESPECES ? new BigDecimal("250000") : new BigDecimal("245000");
         VenteResponse brouillon = ventesService.creerVenteDirecte(new VenteDirecteRequest(null, false,
-            List.of(new LigneDocumentRequest(telephone().getId(), null, 1, null, null)), BigDecimal.ZERO, mode, recu), ADMIN);
+            List.of(new LigneDocumentRequest(telephone().getId(), null, BigDecimal.valueOf(1), null, null)), BigDecimal.ZERO, mode, recu), ADMIN);
         return ventesService.validerVente(brouillon.id(), ADMIN);
     }
 
@@ -86,7 +86,7 @@ class AnnulationVenteAuComptantTests {
     @Test
     void uneVenteEnEspecesAnnuleeRemetLeStockEtRendLArgentSansDoubleDeduction() {
         SessionCaisseResponse session = ouvrirSession();
-        int stockAvantVente = telephone().getQuantiteStock();
+        BigDecimal stockAvantVente = telephone().getQuantiteStock();
         VenteResponse vente = vendre(ModeReglement.ESPECES);
         assertThat(soldeTheorique(session)).isEqualByComparingTo("246000"); // 1 000 de fond + 245 000
 
@@ -96,7 +96,7 @@ class AnnulationVenteAuComptantTests {
         assertThat(reponse.montantRembourse()).isEqualByComparingTo("245000");
         assertThat(reponse.remboursementEspeces()).isEqualByComparingTo("245000");
         assertThat(reponse.remboursementAutresModes()).isZero();
-        assertThat(telephone().getQuantiteStock()).as("stock remis en rayon").isEqualTo(stockAvantVente);
+        assertThat(telephone().getQuantiteStock()).as("stock remis en rayon").isEqualByComparingTo(stockAvantVente);
         assertThat(soldeTheorique(session)).as("la caisse est revenue au fond, le remboursement n'est déduit qu'une fois")
             .isEqualByComparingTo("1000");
         assertThat(venteRepository.chiffreAffairesSession(session.id(), StatutVente.VALIDEE)).isZero();
@@ -117,14 +117,14 @@ class AnnulationVenteAuComptantTests {
     void sansArticlesRapportesEnEtatRienNeChange() {
         SessionCaisseResponse session = ouvrirSession();
         VenteResponse vente = vendre(ModeReglement.ESPECES);
-        int stockApresVente = telephone().getQuantiteStock();
+        BigDecimal stockApresVente = telephone().getQuantiteStock();
 
         assertThatThrownBy(() -> ventesService.annulerVente(vente.id(), "Test", false, ADMIN))
             .isInstanceOf(ConflitRessourceException.class)
             .hasMessageContaining("rapporte les articles en l'état");
 
         assertThat(venteRepository.findById(vente.id()).orElseThrow().getStatut()).isEqualTo(StatutVente.VALIDEE);
-        assertThat(telephone().getQuantiteStock()).isEqualTo(stockApresVente);
+        assertThat(telephone().getQuantiteStock()).isEqualByComparingTo(stockApresVente);
         assertThat(soldeTheorique(session)).isEqualByComparingTo("246000");
     }
 
@@ -183,7 +183,7 @@ class AnnulationVenteAuComptantTests {
         ouvrirSession();
         ClientResponse client = clientService.creer(new ClientRequest("Client crédit", null, null, null));
         VenteResponse brouillon = ventesService.creerVenteDirecte(new VenteDirecteRequest(client.id(), true,
-            List.of(new LigneDocumentRequest(telephone().getId(), null, 1, null, null)), BigDecimal.ZERO, null, null), ADMIN);
+            List.of(new LigneDocumentRequest(telephone().getId(), null, BigDecimal.valueOf(1), null, null)), BigDecimal.ZERO, null, null), ADMIN);
         VenteResponse vente = ventesService.validerVente(brouillon.id(), ADMIN);
 
         AnnulationVenteResponse reponse = ventesService.annulerVente(vente.id(), "Erreur", false, ADMIN);

@@ -65,7 +65,7 @@ class MigrationsMysqlIT {
 
         try (ConfigurableApplicationContext contexte = demarrer(base, "--spring.flyway.baseline-on-migrate=false")) {
             JdbcTemplate jdbc = contexte.getBean(JdbcTemplate.class);
-            assertThat(versionsAppliquees(jdbc)).containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14");
+            assertThat(versionsAppliquees(jdbc)).containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16");
             assertThat(migrationsEnEchec(jdbc)).isZero();
             assertThat(derives(contexte, base)).as("enum Java absents de la base").isEmpty();
 
@@ -85,6 +85,7 @@ class MigrationsMysqlIT {
                 .as("installation neuve : les quatre rôles connus existent dès la première connexion (V14)")
                 .containsExactly("ADMIN", "CAISSIER", "GESTIONNAIRE", "MANAGER");
             compteFournisseurGarantiParLaBase(jdbc, utilisateurId);
+            quantitesDecimalesGarantiesParLaBase(jdbc);
         }
     }
 
@@ -135,6 +136,11 @@ class MigrationsMysqlIT {
         assertThat(colonnesDe(jdbc, base, "lignes_vente")).contains("remise_approuvee_par_id");
         assertThat(colonnesDe(jdbc, base, "lignes_proforma")).contains("remise_approuvee_par_id");
         assertThat(colonnesDe(jdbc, base, "vente")).doesNotContain("article_id", "promotion_id", "quantite", "prix_unit", "prix_total");
+        // V15 : les quantités deviennent décimales sans rien perdre, et chaque ligne garde exactement son ancien montant
+        assertThat(jdbc.queryForObject("SELECT quantite FROM article WHERE id = ?", java.math.BigDecimal.class, articleId))
+            .isEqualByComparingTo("10");
+        assertThat(jdbc.queryForObject("SELECT montant_ligne FROM lignes_vente WHERE article_id = ?", java.math.BigDecimal.class, articleId))
+            .as("(prix appliqué - promotion) × quantité").isEqualByComparingTo("3000");
         assertThat(tableExiste(jdbc, base, "statistiques_journalieres")).isFalse();
         assertThat(indexDe(jdbc, base, "vente")).contains("idx_vente_statut_date", "idx_vente_session_statut");
 
@@ -163,7 +169,7 @@ class MigrationsMysqlIT {
         try (ConfigurableApplicationContext contexte = demarrer(base,
             "--spring.flyway.baseline-on-migrate=true", "--spring.flyway.baseline-version=3")) {
             JdbcTemplate jdbc = contexte.getBean(JdbcTemplate.class);
-            assertThat(versionsAppliquees(jdbc)).containsExactly("3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14");
+            assertThat(versionsAppliquees(jdbc)).containsExactly("3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16");
             assertThat(migrationsEnEchec(jdbc)).isZero();
         }
     }
@@ -247,6 +253,22 @@ class MigrationsMysqlIT {
 
         retoursGarantisParLaBase(jdbc, fournisseurId, bon1, utilisateurId);
         entrepriseGarantieParLaBase(jdbc);
+    }
+
+    /** V15 : quantités à 3 décimales, toujours positives (les anciens CHECK sans nom de V1 ont été remplacés, pas oubliés). */
+    private void quantitesDecimalesGarantiesParLaBase(JdbcTemplate jdbc) {
+        jdbc.update("INSERT INTO article (prix, prix_achat, cmp, quantite, seuil_alerte, reference, nom) VALUES (1000, 600, 600, 2.5, 0, 'A-DEC', 'Vrac')");
+        assertThat(colonnesDe(jdbc, jdbc.queryForObject("SELECT DATABASE()", String.class), "ligne_approvisionnements"))
+            .as("V16 : prix de revente saisi sur le bon").contains("prix_vente");
+        assertThat(jdbc.queryForObject("SELECT quantite FROM article WHERE reference = 'A-DEC'", java.math.BigDecimal.class))
+            .isEqualByComparingTo("2.5");
+        jdbc.update("UPDATE article SET quantite = 0.125 WHERE reference = 'A-DEC'");
+        assertThatThrownBy(() -> jdbc.update("UPDATE article SET quantite = -0.5 WHERE reference = 'A-DEC'"))
+            .as("un stock négatif reste refusé par la base").hasMessageContaining("ck_article_quantite");
+        assertThat(jdbc.queryForList("SELECT cc.CHECK_CLAUSE FROM information_schema.TABLE_CONSTRAINTS tc JOIN information_schema.CHECK_CONSTRAINTS cc "
+            + "ON cc.CONSTRAINT_SCHEMA = tc.CONSTRAINT_SCHEMA AND cc.CONSTRAINT_NAME = tc.CONSTRAINT_NAME WHERE tc.TABLE_SCHEMA = DATABASE() "
+            + "AND tc.CONSTRAINT_TYPE = 'CHECK' AND cc.CHECK_CLAUSE LIKE '%>= 1%'", String.class))
+            .as("plus aucune contrainte « quantité au moins 1 » qui interdirait 0,5").isEmpty();
     }
 
     /** V13 : une seule entreprise, un nom non vide et un logo cohérent sont tenus par la BASE. */

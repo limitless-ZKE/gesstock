@@ -61,7 +61,7 @@ class AnnulationVenteHttpTests {
         Article telephone = articleRepository.findByReferenceIgnoreCase("ELEC-001").orElseThrow();
         VenteResponse brouillon = ventesService.creerVenteDirecte(new VenteDirecteRequest(
             client.id(), true,
-            List.of(new LigneDocumentRequest(telephone.getId(), null, 1, null, null)),
+            List.of(new LigneDocumentRequest(telephone.getId(), null, BigDecimal.valueOf(1), null, null)),
             BigDecimal.ZERO, null, null), ADMIN);
         return ventesService.validerVente(brouillon.id(), ADMIN);
     }

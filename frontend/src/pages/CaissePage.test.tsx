@@ -157,13 +157,30 @@ describe("quantité saisie directement dans le panier", () => {
     expect(boutonEncaisser()).toContain("7 000");
   });
 
-  it("ignore tout ce qui n'est pas un chiffre", async () => {
+  it("accepte une virgule (3 décimales au plus) et ignore les lettres", async () => {
     const utilisateur = await remplirLePanier();
 
     await utilisateur.clear(champ());
     await utilisateur.type(champ(), "2,5abc");
 
-    expect(champ()).toHaveValue("25");
+    expect(champ()).toHaveValue("2,5");
+    expect(boutonEncaisser()).toContain("2 500");
+
+    await utilisateur.type(champ(), "1234");
+    expect(champ()).toHaveValue("2,512");
+  });
+
+  it("envoie la quantité à virgule au serveur", async () => {
+    const utilisateur = await remplirLePanier();
+    await utilisateur.clear(champ());
+    await utilisateur.type(champ(), "0.5");
+    await utilisateur.click(screen.getByRole("button", { name: /^Encaisser/ }));
+
+    await utilisateur.click(screen.getByRole("button", { name: "Valider et encaisser" }));
+
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith("/ventes", expect.objectContaining({
+      montantRecu: 500, lignes: [expect.objectContaining({ articleId: 1, quantite: 0.5 })],
+    })));
   });
 
   it("garde les boutons plus et moins", async () => {
@@ -174,5 +191,69 @@ describe("quantité saisie directement dans le panier", () => {
     await utilisateur.click(screen.getByRole("button", { name: "Diminuer quantité" }));
 
     expect(champ()).toHaveValue("2");
+  });
+});
+
+describe("prix négocié librement par le caissier", () => {
+  const boutonEncaisser = () => normaliser(screen.getByRole("button", { name: /^Encaisser/ }).textContent);
+  const quantite = () => screen.getByRole("textbox", { name: "Quantité de Riz 25 kg" });
+
+  it("une forte remise par unité part sans demander de responsable", async () => {
+    const utilisateur = await remplirLePanier();
+    await utilisateur.type(screen.getByLabelText("Prix négocié pour Riz 25 kg"), "400");
+    await utilisateur.click(screen.getByRole("button", { name: /^Encaisser/ }));
+
+    await utilisateur.click(screen.getByRole("button", { name: "Valider et encaisser" }));
+
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith("/ventes/77/validation"));
+    expect(api.post).toHaveBeenCalledWith("/ventes", expect.objectContaining({
+      lignes: [expect.objectContaining({ prixUnitaire: 400 })],
+    }));
+    expect(screen.queryByRole("dialog", { name: /accord/i })).not.toBeInTheDocument();
+  });
+
+  it("la remise peut porter sur le total de la ligne : ce total est envoyé tel quel", async () => {
+    const utilisateur = await remplirLePanier();
+    await utilisateur.clear(quantite());
+    await utilisateur.type(quantite(), "3");
+    await utilisateur.type(screen.getByLabelText("Total négocié pour Riz 25 kg"), "2500");
+
+    expect(boutonEncaisser()).toContain("2 500");
+    expect(screen.getByText(/Remise sur la ligne/)).toBeInTheDocument();
+    await utilisateur.click(screen.getByRole("button", { name: /^Encaisser/ }));
+    await utilisateur.click(screen.getByRole("button", { name: "Valider et encaisser" }));
+
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith("/ventes", expect.objectContaining({
+      montantRecu: 2500,
+      lignes: [{ articleId: 1, quantite: 3, promotionId: null, prixUnitaire: null, montantNegocie: 2500 }],
+    })));
+  });
+
+  it("un total négocié au-dessus du prix catalogue est signalé et rien n'est envoyé", async () => {
+    const utilisateur = await remplirLePanier();
+    await utilisateur.type(screen.getByLabelText("Total négocié pour Riz 25 kg"), "1500");
+
+    expect(screen.getByRole("alert")).toHaveTextContent(/Ne peut pas dépasser le total au prix catalogue/);
+    await utilisateur.click(screen.getByRole("button", { name: /^Encaisser/ }));
+    await utilisateur.click(screen.getByRole("button", { name: "Valider et encaisser" }));
+    expect(api.post).not.toHaveBeenCalled();
+  });
+
+  it("une vente sous le prix d'achat passe, et le caissier en est averti", async () => {
+    vi.mocked(api.post).mockImplementation(async (url: string) => {
+      if (url === "/ventes") return { data: { id: 77, code: "VTE-77", statut: "BROUILLON" } };
+      if (url === "/ventes/77/validation") {
+        return { data: { id: 77, code: "VTE-77", statut: "VALIDEE",
+          avertissements: ["Vendu sous le prix d'achat — RIZ-25 « Riz 25 kg » : 1 vendu(s) 400, prix d'achat 900"] } };
+      }
+      throw new Error(`appel inattendu : ${url}`);
+    });
+    const utilisateur = await remplirLePanier();
+    await utilisateur.type(screen.getByLabelText("Prix négocié pour Riz 25 kg"), "400");
+    await utilisateur.click(screen.getByRole("button", { name: /^Encaisser/ }));
+    await utilisateur.click(screen.getByRole("button", { name: "Valider et encaisser" }));
+
+    const avertissement = await screen.findByText("Vente enregistrée sous le prix d’achat");
+    expect(avertissement.closest("[role=alert]")).toHaveTextContent("RIZ-25 « Riz 25 kg » : 1 vendu(s) 400, prix d'achat 900");
   });
 });

@@ -30,11 +30,12 @@ public class LigneInventaire {
     @JoinColumn(name = "article_id", nullable = false)
     private Article article;
 
-    @Column(nullable = false)
-    private int stockTheorique;
+    @Column(nullable = false, precision = 15, scale = 3)
+    private BigDecimal stockTheorique;
 
     /** Null tant que l'article n'a pas été compté : il n'est alors pas touché à la validation. */
-    private Integer stockCompte;
+    @Column(precision = 15, scale = 3)
+    private BigDecimal stockCompte;
 
     @Column(nullable = false, precision = 19, scale = 4)
     private BigDecimal coutUnitaire = BigDecimal.ZERO;
@@ -46,9 +47,10 @@ public class LigneInventaire {
     private String commentaire;
 
     /** Écart réellement appliqué au stock à la validation ; null avant. */
-    private Integer ecartApplique;
+    @Column(precision = 15, scale = 3)
+    private BigDecimal ecartApplique;
 
-    public Integer ecart() {
-        return stockCompte == null ? null : stockCompte - stockTheorique;
+    public BigDecimal ecart() {
+        return stockCompte == null ? null : stockCompte.subtract(stockTheorique);
     }
 }

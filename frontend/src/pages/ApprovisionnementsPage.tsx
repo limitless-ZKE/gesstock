@@ -11,6 +11,7 @@ import {
   FileText,
   LoaderCircle,
   PackagePlus,
+  Pencil,
   Plus,
   Search,
   Trash2,
@@ -20,7 +21,9 @@ import {
 import { api } from "../services/api";
 import { apiErrorMessage as errorMessage } from "../services/apiError";
 import { money } from "../lib/format";
+import ChampArticle from "../components/ChampArticle";
 import Indicateur from "../components/Indicateur";
+import { formatQuantite } from "../lib/quantite";
 
 type Article = {
   id: number;
@@ -40,6 +43,8 @@ type PurchaseLine = {
   quantite: number;
   prixUnitaire: number;
   montantLigne: number;
+  /** Prix de revente saisi sur le bon (appliqué à la réception), null s'il n'a pas été saisi. */
+  prixVente: number | null;
 };
 type Supply = {
   id: number;
@@ -51,10 +56,11 @@ type Supply = {
   montantTotal: number;
   lignes: PurchaseLine[];
 };
-type DraftLine = { articleId: string; quantite: string; prixUnitaire: string };
+// prixUnitaire : prix d'achat ; prixVente : prix de revente. Tous deux pré-remplis avec les derniers prix connus de l'article.
+type DraftLine = { articleId: string; quantite: string; prixUnitaire: string; prixVente: string };
 
 const today = new Date().toISOString().slice(0, 10);
-const blankLine = (): DraftLine => ({ articleId: "", quantite: "1", prixUnitaire: "" });
+const blankLine = (): DraftLine => ({ articleId: "", quantite: "1", prixUnitaire: "", prixVente: "" });
 
 function dateLabel(date: string) {
   return new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium" }).format(new Date(`${date}T00:00:00`));
@@ -71,6 +77,8 @@ export default function ApprovisionnementsPage() {
   const [supplierFilter, setSupplierFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [createOpen, setCreateOpen] = useState(false);
+  // Bon en cours de modification (brouillon ou déjà réceptionné) ; null pour un nouveau bon.
+  const [editing, setEditing] = useState<Supply | null>(null);
   const [supplierId, setSupplierId] = useState("");
   const [supplierModalOpen, setSupplierModalOpen] = useState(false);
   const [supplierForm, setSupplierForm] = useState({ nom: "", telephone: "", email: "", adresse: "" });
@@ -132,43 +140,67 @@ export default function ApprovisionnementsPage() {
       if (lineIndex !== index) return line;
       const updated = { ...line, ...patch };
       if (patch.articleId) {
+        // derniers prix connus de l'article : le dernier prix d'achat et le prix de vente actuel, modifiables
         const article = articles.find((item) => String(item.id) === patch.articleId);
-        if (article) updated.prixUnitaire = String(article.prixAchat);
+        if (article) {
+          updated.prixUnitaire = String(article.prixAchat);
+          updated.prixVente = String(article.prixVente);
+        }
       }
       return updated;
     }));
   }
 
-  async function createSupply(event: FormEvent<HTMLFormElement>) {
+  /** Prix de revente à envoyer : seulement s'il diffère du prix de vente actuel (sinon il ne doit rien changer à la réception). */
+  function prixVenteAEnvoyer(line: DraftLine): number | null {
+    if (line.prixVente.trim() === "") return null;
+    const article = articles.find((item) => String(item.id) === line.articleId);
+    const prix = Number(line.prixVente);
+    return article && prix === article.prixVente ? null : prix;
+  }
+
+  async function saveSupply(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const validLines = draftLines.filter((line) => line.articleId && Number(line.quantite) > 0 && Number(line.prixUnitaire) >= 0);
+    const validLines = draftLines.filter((line) => line.articleId && Number(line.quantite) > 0 && Number(line.prixUnitaire) >= 0
+      && (line.prixVente.trim() === "" || Number(line.prixVente) >= 0));
     if (!supplierId || !validLines.length) {
       setActionError("Sélectionnez un fournisseur et au moins une ligne complète.");
       return;
     }
+    if (editing?.statut === "RECU" && !window.confirm(`Le bon ${editing.numero} est déjà réceptionné. Le stock, le coût moyen des articles et la dette envers le fournisseur vont être corrigés. Continuer ?`)) {
+      return;
+    }
     setSaving(true);
     setActionError("");
+    const request = {
+      numero: reference.trim(),
+      dateApprovisionnement: orderDate,
+      fournisseurId: Number(supplierId),
+      lignes: validLines.map((line) => ({
+        articleId: Number(line.articleId),
+        quantite: Number(line.quantite),
+        prixUnitaire: Number(line.prixUnitaire),
+        prixVente: prixVenteAEnvoyer(line),
+      })),
+    };
     try {
-      await api.post("/approvisionnements", {
-        numero: reference.trim(),
-        dateApprovisionnement: orderDate,
-        fournisseurId: Number(supplierId),
-        lignes: validLines.map((line) => ({
-          articleId: Number(line.articleId),
-          quantite: Number(line.quantite),
-          prixUnitaire: Number(line.prixUnitaire),
-        })),
-      });
+      if (editing) await api.put(`/approvisionnements/${editing.id}`, request);
+      else await api.post("/approvisionnements", request);
       setCreateOpen(false);
       setDraftLines([blankLine()]);
       setSupplierId("");
       setReference(makeOrderReference());
       setOrderDate(today);
-      setNotice("Bon d’approvisionnement enregistré en brouillon. Le stock sera mis à jour uniquement après réception.");
+      setNotice(!editing
+        ? "Bon d’approvisionnement enregistré en brouillon. Le stock sera mis à jour uniquement après réception."
+        : editing.statut === "RECU"
+          ? `Le bon ${request.numero} a été corrigé : le stock, le coût moyen, les prix et la dette du fournisseur ont été mis à jour.`
+          : `Le brouillon ${request.numero} a été modifié.`);
       setNoticeError(false);
+      setEditing(null);
       await loadData();
     } catch (error) {
-      setActionError(errorMessage(error, "La création du bon a échoué."));
+      setActionError(errorMessage(error, editing ? "La modification du bon a échoué." : "La création du bon a échoué."));
     } finally {
       setSaving(false);
     }
@@ -225,10 +257,27 @@ export default function ApprovisionnementsPage() {
 
   function openCreate() {
     setActionError("");
+    setEditing(null);
     setReference(makeOrderReference());
     setOrderDate(today);
     setSupplierId("");
     setDraftLines([blankLine()]);
+    setCreateOpen(true);
+  }
+
+  /** Ouvre le bon dans le même formulaire, avec ses lignes (le prix de revente saisi, sinon le prix de vente actuel). */
+  function openEdit(supply: Supply) {
+    setActionError("");
+    setEditing(supply);
+    setReference(supply.numero);
+    setOrderDate(supply.dateApprovisionnement);
+    setSupplierId(String(supply.fournisseurId));
+    setDraftLines(supply.lignes.map((line) => ({
+      articleId: String(line.articleId),
+      quantite: String(line.quantite),
+      prixUnitaire: String(line.prixUnitaire),
+      prixVente: String(line.prixVente ?? articles.find((item) => item.id === line.articleId)?.prixVente ?? ""),
+    })));
     setCreateOpen(true);
   }
 
@@ -272,6 +321,7 @@ export default function ApprovisionnementsPage() {
                       onToggle={() => setExpandedId((current) => current === supply.id ? null : supply.id)}
                       onReceive={() => void receiveSupply(supply)}
                       onDelete={() => void deleteDraft(supply)}
+                      onEdit={() => openEdit(supply)}
                     />
                   ))}
             </tbody>
@@ -282,11 +332,12 @@ export default function ApprovisionnementsPage() {
 
       {createOpen && (
         <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-slate-950/50 p-4" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) setCreateOpen(false); }}>
-          <section role="dialog" aria-modal="true" aria-label="Nouveau bon d’approvisionnement" className="my-auto w-full max-w-4xl rounded-2xl bg-white p-5 shadow-2xl md:p-6">
-            <div className="mb-5 flex items-start justify-between gap-4"><div><h2 className="mt-1 text-xl font-bold text-slate-900">Nouveau bon d’approvisionnement</h2><p className="mt-1 text-xs text-slate-500">Le stock ne sera modifié qu’après validation de la réception.</p></div><button disabled={saving} onClick={() => setCreateOpen(false)} className="icon-button" aria-label="Fermer"><X size={17} /></button></div>
+          <section role="dialog" aria-modal="true" aria-label={editing ? `Modifier le bon ${editing.numero}` : "Nouveau bon d’approvisionnement"} className="my-auto w-full max-w-5xl rounded-2xl bg-white p-5 shadow-2xl md:p-6">
+            <div className="mb-5 flex items-start justify-between gap-4"><div><h2 className="mt-1 text-xl font-bold text-slate-900">{editing ? `Modifier le bon ${editing.numero}` : "Nouveau bon d’approvisionnement"}</h2><p className="mt-1 text-xs text-slate-500">{editing?.statut === "RECU" ? "Bon déjà réceptionné : en enregistrant, GesStock corrige le stock, le coût moyen, les prix et la dette envers le fournisseur." : "Le stock ne sera modifié qu’après validation de la réception. Le prix de revente devient le prix de vente à la réception."}</p></div><button disabled={saving} onClick={() => setCreateOpen(false)} className="icon-button" aria-label="Fermer"><X size={17} /></button></div>
             {actionError && <div role="alert" className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-800">{actionError}</div>}
             {suppliers.length === 0 && <div className="mb-4 flex gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800"><AlertTriangle size={15} className="shrink-0" />Aucun fournisseur n’est enregistré. Ajoutez-en un avant de créer le bon.</div>}
-            <form onSubmit={createSupply} className="space-y-5">
+            {editing?.statut === "RECU" && <div className="mb-4 flex gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800"><AlertTriangle size={15} className="shrink-0" />Une quantité ne peut pas descendre sous ce qui a déjà été vendu, ni le total sous ce qui a déjà été payé au fournisseur.</div>}
+            <form onSubmit={saveSupply} className="space-y-5">
               <div className="grid gap-3 sm:grid-cols-3">
                 <label className="block"><span className="mb-1.5 block text-xs font-bold text-slate-600">Numéro du bon</span><input required maxLength={60} className="input-field" value={reference} onChange={(event) => setReference(event.target.value)} /></label>
                 <label className="block"><span className="mb-1.5 flex items-center justify-between text-xs font-bold text-slate-600"><span>Fournisseur</span><button type="button" onClick={() => { setActionError(""); setSupplierModalOpen(true); }} className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-900"><Plus size={12} />Créer rapidement</button></span><span className="relative block"><select required className="input-field appearance-none pr-9" value={supplierId} onChange={(event) => setSupplierId(event.target.value)}><option value="">Sélectionner un fournisseur</option>{suppliers.map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.nom}</option>)}</select><ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} /></span></label>
@@ -299,10 +350,12 @@ export default function ApprovisionnementsPage() {
                   {draftLines.map((line, index) => {
                     const article = articles.find((item) => String(item.id) === line.articleId);
                     const rowTotal = (Number(line.quantite) || 0) * (Number(line.prixUnitaire) || 0);
-                    return <div key={index} className="grid gap-3 p-3 sm:grid-cols-[minmax(0,1fr)_105px_150px_120px_38px] sm:items-end">
-                      <label className="block min-w-0"><span className="mb-1 block text-xs font-bold text-slate-500">Article</span><select required className="input-field h-10" value={line.articleId} onChange={(event) => updateDraftLine(index, { articleId: event.target.value })}><option value="">Sélectionner un article</option>{articles.map((item) => <option key={item.id} value={item.id}>{item.reference} · {item.designation} (stock {item.quantiteStock})</option>)}</select>{article && <span className="mt-1 block text-xs text-slate-400">Stock actuel : {article.quantiteStock} {article.uniteMesure ?? ""}</span>}</label>
-                      <label className="block"><span className="mb-1 block text-xs font-bold text-slate-500">Quantité</span><input required min="1" step="1" type="number" className="input-field h-10" value={line.quantite} onChange={(event) => updateDraftLine(index, { quantite: event.target.value })} /></label>
-                      <label className="block"><span className="mb-1 block text-xs font-bold text-slate-500">Prix unitaire</span><input required min="0" step="any" type="number" className="input-field h-10" value={line.prixUnitaire} onChange={(event) => updateDraftLine(index, { prixUnitaire: event.target.value })} /></label>
+                    const nouveauPrixVente = article && line.prixVente.trim() !== "" && Number(line.prixVente) !== article.prixVente;
+                    return <div key={index} className="grid gap-3 p-3 sm:grid-cols-[minmax(0,1fr)_100px_125px_125px_110px_38px] sm:items-start">
+                      <div className="min-w-0"><span className="mb-1 block text-xs font-bold text-slate-500">Article</span><ChampArticle articles={articles} valeur={line.articleId} libelle={`Article de la ligne ${index + 1}`} onChange={(articleId) => updateDraftLine(index, { articleId })} />{article && <span className="mt-1 block text-xs text-slate-400">Stock actuel : {formatQuantite(article.quantiteStock)} {article.uniteMesure ?? ""}</span>}</div>
+                      <label className="block"><span className="mb-1 block text-xs font-bold text-slate-500">Quantité</span><input required min="0.001" step="0.001" type="number" inputMode="decimal" className="input-field h-10" value={line.quantite} onChange={(event) => updateDraftLine(index, { quantite: event.target.value })} /></label>
+                      <label className="block"><span className="mb-1 block text-xs font-bold text-slate-500">Prix d’achat</span><input required min="0" step="any" type="number" inputMode="decimal" aria-label={`Prix d’achat de la ligne ${index + 1}`} className="input-field h-10" value={line.prixUnitaire} onChange={(event) => updateDraftLine(index, { prixUnitaire: event.target.value })} />{article && <span className="mt-1 block text-xs text-slate-400">Dernier : {money.format(article.prixAchat)}</span>}</label>
+                      <label className="block"><span className="mb-1 block text-xs font-bold text-slate-500">Prix de revente</span><input min="0" step="any" type="number" inputMode="decimal" aria-label={`Prix de revente de la ligne ${index + 1}`} className="input-field h-10" value={line.prixVente} onChange={(event) => updateDraftLine(index, { prixVente: event.target.value })} />{article && <span className={`mt-1 block text-xs ${nouveauPrixVente ? "font-semibold text-amber-700" : "text-slate-400"}`}>{nouveauPrixVente ? `Actuel : ${money.format(article.prixVente)} (changera)` : `Actuel : ${money.format(article.prixVente)}`}</span>}</label>
                       <div><span className="mb-1 block text-xs font-bold text-slate-500">Montant</span><p className="flex h-10 items-center text-xs font-bold text-slate-800">{money.format(rowTotal)}</p></div>
                       <button type="button" title="Retirer la ligne" disabled={draftLines.length === 1} onClick={() => setDraftLines((current) => current.filter((_, lineIndex) => lineIndex !== index))} className="icon-button mb-0.5 disabled:opacity-30"><Trash2 size={15} /></button>
                     </div>;
@@ -310,7 +363,7 @@ export default function ApprovisionnementsPage() {
                 </div>
                 <div className="flex justify-between border-t border-slate-100 bg-slate-50 px-4 py-3"><span className="text-xs font-bold text-slate-600">Total estimé</span><span className="text-sm font-extrabold text-slate-900">{money.format(orderTotal)}</span></div>
               </div>
-              <div className="flex justify-end gap-2 border-t border-slate-100 pt-4"><button type="button" disabled={saving} onClick={() => setCreateOpen(false)} className="button-secondary">Annuler</button><button disabled={saving || suppliers.length === 0 || articles.length === 0} className="button-primary min-w-52">{saving ? <LoaderCircle size={15} className="animate-spin" /> : <PackagePlus size={16} />}{saving ? "Enregistrement…" : "Créer le brouillon"}</button></div>
+              <div className="flex justify-end gap-2 border-t border-slate-100 pt-4"><button type="button" disabled={saving} onClick={() => setCreateOpen(false)} className="button-secondary">Annuler</button><button disabled={saving || suppliers.length === 0 || articles.length === 0} className="button-primary min-w-52">{saving ? <LoaderCircle size={15} className="animate-spin" /> : <PackagePlus size={16} />}{saving ? "Enregistrement…" : editing?.statut === "RECU" ? "Enregistrer la correction" : editing ? "Enregistrer le brouillon" : "Créer le brouillon"}</button></div>
             </form>
           </section>
         </div>
@@ -330,7 +383,7 @@ function Metric({ title, count }: { title: string; count: number | string }) {
   return <Indicateur libelle={title} valeur={count} />;
 }
 
-function SupplyRows({ supply, expanded, busy, onToggle, onReceive, onDelete }: { supply: Supply; expanded: boolean; busy: boolean; onToggle: () => void; onReceive: () => void; onDelete: () => void }) {
+function SupplyRows({ supply, expanded, busy, onToggle, onReceive, onDelete, onEdit }: { supply: Supply; expanded: boolean; busy: boolean; onToggle: () => void; onReceive: () => void; onDelete: () => void; onEdit: () => void }) {
   const status = supply.statut === "RECU"
     ? { text: "Réceptionné", style: "bg-emerald-50 text-emerald-700", dot: "bg-emerald-500" }
     : supply.statut === "ANNULE"
@@ -341,11 +394,11 @@ function SupplyRows({ supply, expanded, busy, onToggle, onReceive, onDelete }: {
       <td className="px-5 py-3.5"><button onClick={onToggle} className="flex items-center gap-2 text-left"><span className="grid size-8 place-items-center rounded-lg bg-slate-50 text-slate-500"><FileText size={15} /></span><span><span className="block text-xs font-bold text-slate-800">{supply.numero}</span><span className="mt-1 block text-xs text-slate-400">{supply.lignes.length} ligne(s)</span></span><ChevronRight className={`ml-1 text-slate-400 transition ${expanded ? "rotate-90" : ""}`} size={15} /></button></td>
       <td className="px-4 py-3.5"><div className="flex items-center gap-2 text-xs font-semibold text-slate-700"><Truck size={14} className="text-slate-400" />{supply.fournisseur}</div></td>
       <td className="px-4 py-3.5 text-xs text-slate-600">{dateLabel(supply.dateApprovisionnement)}</td>
-      <td className="px-4 py-3.5 text-xs text-slate-600">{supply.lignes.reduce((sum, line) => sum + line.quantite, 0)} unité(s)</td>
+      <td className="px-4 py-3.5 text-xs text-slate-600">{formatQuantite(supply.lignes.reduce((sum, line) => sum + line.quantite, 0))} unité(s)</td>
       <td className="px-4 py-3.5 text-xs font-bold text-slate-800">{money.format(supply.montantTotal)}</td>
       <td className="px-4 py-3.5"><span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ${status.style}`}><span className={`size-1.5 rounded-full ${status.dot}`} />{status.text}</span></td>
-      <td className="px-5 py-3.5"><div className="flex justify-end gap-2">{supply.statut === "BROUILLON" && <><button disabled={busy} onClick={onDelete} title="Supprimer le brouillon" className="icon-button text-slate-400 hover:bg-rose-50 hover:text-rose-600"><Trash2 size={15} /></button><button disabled={busy} onClick={onReceive} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50">{busy ? <LoaderCircle size={13} className="animate-spin" /> : <ArrowDownToLine size={13} />}{busy ? "Réception…" : "Valider réception"}</button></>}</div></td>
+      <td className="px-5 py-3.5"><div className="flex justify-end gap-2">{supply.statut !== "ANNULE" && <button disabled={busy} onClick={onEdit} title={supply.statut === "RECU" ? "Corriger le bon réceptionné" : "Modifier le brouillon"} aria-label={`Modifier le bon ${supply.numero}`} className="icon-button text-slate-500 hover:bg-emerald-50 hover:text-emerald-700"><Pencil size={15} /></button>}{supply.statut === "BROUILLON" && <><button disabled={busy} onClick={onDelete} title="Supprimer le brouillon" className="icon-button text-slate-400 hover:bg-rose-50 hover:text-rose-600"><Trash2 size={15} /></button><button disabled={busy} onClick={onReceive} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50">{busy ? <LoaderCircle size={13} className="animate-spin" /> : <ArrowDownToLine size={13} />}{busy ? "Réception…" : "Valider réception"}</button></>}</div></td>
     </tr>
-    {expanded && <tr className="bg-slate-50/60"><td colSpan={7} className="px-5 py-4"><div className="overflow-hidden rounded-xl border border-slate-200 bg-white"><table className="w-full text-left"><thead className="bg-slate-50 text-xs font-semibold text-slate-600"><tr><th className="px-3 py-2">Article</th><th className="px-3 py-2">Quantité</th><th className="px-3 py-2">Prix unitaire</th><th className="px-3 py-2 text-right">Total ligne</th></tr></thead><tbody className="divide-y divide-slate-100">{supply.lignes.map((line) => <tr key={line.id ?? `${supply.id}-${line.articleId}`}><td className="px-3 py-2.5"><p className="text-xs font-semibold text-slate-700">{line.designationArticle}</p><p className="mt-0.5 text-xs text-slate-400">{line.referenceArticle}</p></td><td className="px-3 py-2.5 text-xs text-slate-600">{line.quantite}</td><td className="px-3 py-2.5 text-xs text-slate-600">{money.format(line.prixUnitaire)}</td><td className="px-3 py-2.5 text-right text-xs font-bold text-slate-800">{money.format(line.montantLigne)}</td></tr>)}</tbody></table></div></td></tr>}
+    {expanded && <tr className="bg-slate-50/60"><td colSpan={7} className="px-5 py-4"><div className="overflow-hidden rounded-xl border border-slate-200 bg-white"><table className="w-full text-left"><thead className="bg-slate-50 text-xs font-semibold text-slate-600"><tr><th className="px-3 py-2">Article</th><th className="px-3 py-2">Quantité</th><th className="px-3 py-2">Prix d’achat</th><th className="px-3 py-2">Prix de revente</th><th className="px-3 py-2 text-right">Total ligne</th></tr></thead><tbody className="divide-y divide-slate-100">{supply.lignes.map((line) => <tr key={line.id ?? `${supply.id}-${line.articleId}`}><td className="px-3 py-2.5"><p className="text-xs font-semibold text-slate-700">{line.designationArticle}</p><p className="mt-0.5 text-xs text-slate-400">{line.referenceArticle}</p></td><td className="px-3 py-2.5 text-xs text-slate-600">{formatQuantite(line.quantite)}</td><td className="px-3 py-2.5 text-xs text-slate-600">{money.format(line.prixUnitaire)}</td><td className="px-3 py-2.5 text-xs text-slate-600">{line.prixVente === null ? "—" : money.format(line.prixVente)}</td><td className="px-3 py-2.5 text-right text-xs font-bold text-slate-800">{money.format(line.montantLigne)}</td></tr>)}</tbody></table></div></td></tr>}
   </>;
 }

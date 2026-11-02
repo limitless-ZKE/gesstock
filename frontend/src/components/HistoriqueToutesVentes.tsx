@@ -10,6 +10,7 @@ import { moneyPrecise as money } from "../lib/format";
 import { PAR_PAGE, libellePaiement, momentDansLaPeriode, nomDeFichier, nombre, useHistorique, type ProprietesHistorique } from "../lib/historique";
 import { api } from "../services/api";
 import { apiErrorMessage as errorMessage } from "../services/apiError";
+import { formatQuantite } from "../lib/quantite";
 
 type LigneHistorique = {
   id: number;
@@ -171,7 +172,7 @@ export default function HistoriqueToutesVentes(proprietes: ProprietesHistorique)
                     <td className="whitespace-nowrap px-5 py-3 text-sm text-slate-600">{momentDansLaPeriode(sale.dateVente, plusieursJours)}</td>
                     <td className="px-3 py-3">
                       <p className="whitespace-nowrap text-sm font-semibold text-slate-900">{sale.code}</p>
-                      <p className="mt-0.5 text-xs text-slate-500">{sale.nombreArticles} article(s)</p>
+                      <p className="mt-0.5 text-xs text-slate-500">{formatQuantite(sale.nombreArticles)} article(s)</p>
                     </td>
                     <td className="px-3 py-3 text-sm text-slate-700">{sale.client ?? "Client de passage"}</td>
                     <td className="px-3 py-3 text-sm text-slate-700">{sale.vendeur ?? "—"}</td>

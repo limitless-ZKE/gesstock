@@ -31,7 +31,7 @@ class StockNonModifiableTests {
     @Autowired
     private EntityManager entityManager;
 
-    private ArticleRequest requete(Article article, Integer stock, String prixVente) {
+    private ArticleRequest requete(Article article, BigDecimal stock, String prixVente) {
         return new ArticleRequest(article.getReference(), "Téléphone", article.getPrixAchat(), new BigDecimal(prixVente),
             article.getSeuilAlerte(), stock, null, null);
     }
@@ -39,16 +39,16 @@ class StockNonModifiableTests {
     @Test
     void modifierLeStockDepuisLaFicheEstRefuseEtLeStockResteIntact() {
         Article telephone = articleRepository.findByReferenceIgnoreCase("ELEC-001").orElseThrow();
-        int stock = telephone.getQuantiteStock();
+        BigDecimal stock = telephone.getQuantiteStock();
         long mouvements = mouvementRepository.count();
 
-        assertThatThrownBy(() -> articleService.modifier(telephone.getId(), requete(telephone, 999, "245000")))
+        assertThatThrownBy(() -> articleService.modifier(telephone.getId(), requete(telephone, BigDecimal.valueOf(999), "245000")))
             .isInstanceOf(RequeteInvalideException.class)
             .hasMessageContaining("Ajuster le stock");
 
         entityManager.flush();
         entityManager.clear();
-        assertThat(articleRepository.findById(telephone.getId()).orElseThrow().getQuantiteStock()).isEqualTo(stock);
+        assertThat(articleRepository.findById(telephone.getId()).orElseThrow().getQuantiteStock()).isEqualByComparingTo(stock);
         assertThat(mouvementRepository.count()).isEqualTo(mouvements);
     }
 
@@ -60,22 +60,22 @@ class StockNonModifiableTests {
         var reponse = articleService.modifier(telephone.getId(), requete(telephone, telephone.getQuantiteStock(), "250000"));
 
         assertThat(reponse.prixVente()).isEqualByComparingTo("250000");
-        assertThat(reponse.quantiteStock()).isEqualTo(telephone.getQuantiteStock());
+        assertThat(reponse.quantiteStock()).isEqualByComparingTo(telephone.getQuantiteStock());
     }
 
     @Test
     void unNouvelArticleGardeSonStockDeDepart() {
         var cree = articleService.creer(new ArticleRequest("NEUF-001", "Article neuf", new BigDecimal("100"),
-            new BigDecimal("150"), 2, 40, null, null));
+            new BigDecimal("150"), 2, BigDecimal.valueOf(40), null, null));
 
-        assertThat(cree.quantiteStock()).isEqualTo(40);
+        assertThat(cree.quantiteStock()).isEqualByComparingTo("40");
         // le stock de départ laisse un mouvement : la somme des mouvements explique le stock
         assertThat(mouvementRepository.findAll()).filteredOn(m -> m.getArticle().getId().equals(cree.id()))
             .singleElement().satisfies(m -> {
                 assertThat(m.getType()).isEqualTo(com.gesstock.gesstock.entities.TypeMouvementStock.STOCK_INITIAL);
-                assertThat(m.getQuantite()).isEqualTo(40);
+                assertThat(m.getQuantite()).isEqualByComparingTo("40");
                 assertThat(m.getStockAvant()).isZero();
-                assertThat(m.getStockApres()).isEqualTo(40);
+                assertThat(m.getStockApres()).isEqualByComparingTo("40");
                 assertThat(m.getCoutUnitaire()).isEqualByComparingTo("100");
             });
     }
@@ -83,7 +83,7 @@ class StockNonModifiableTests {
     @Test
     void unArticleCreeSansStockDeDepartNeLaisseAucunMouvement() {
         var cree = articleService.creer(new ArticleRequest("VIDE-001", "Article sans stock", new BigDecimal("100"),
-            new BigDecimal("150"), 2, 0, null, null));
+            new BigDecimal("150"), 2, BigDecimal.ZERO, null, null));
 
         assertThat(mouvementRepository.findAll()).noneMatch(m -> m.getArticle().getId().equals(cree.id()));
     }

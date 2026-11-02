@@ -27,6 +27,7 @@ import com.gesstock.gesstock.repositories.MouvementStockRepository;
 import com.gesstock.gesstock.repositories.RetourFournisseurRepository;
 import com.gesstock.gesstock.repositories.UtilisateurRepository;
 import com.gesstock.gesstock.stock.CoutMoyenPondere;
+import com.gesstock.gesstock.stock.Quantites;
 import jakarta.persistence.EntityManager;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -115,7 +116,7 @@ public class RetourFournisseurService {
                 ligne.getArticle().getDesignation(),
                 ligne.getQuantite(),
                 ligne.getQuantiteRetournee(),
-                ligne.getQuantite() - ligne.getQuantiteRetournee(),
+                ligne.getQuantite().subtract(ligne.getQuantiteRetournee()),
                 ligne.getPrixUnitaire(),
                 ligne.getArticle().getQuantiteStock()))
             .toList();
@@ -148,11 +149,11 @@ public class RetourFournisseurService {
                 throw new RequeteInvalideException("La ligne " + demande.ligneApprovisionnementId()
                     + " ne fait pas partie du bon " + bon.getNumero());
             }
-            int retournable = ligneBon.getQuantite() - ligneBon.getQuantiteRetournee();
-            if (demande.quantite() > retournable) {
+            BigDecimal retournable = ligneBon.getQuantite().subtract(ligneBon.getQuantiteRetournee());
+            if (demande.quantite().compareTo(retournable) > 0) {
                 throw new ConflitRessourceException("Article " + ligneBon.getArticle().getReference() + " : seulement "
-                    + retournable + " unité(s) encore retournable(s) sur le bon " + bon.getNumero() + " (reçu "
-                    + ligneBon.getQuantite() + ", déjà rendu " + ligneBon.getQuantiteRetournee() + ")");
+                    + Quantites.texte(retournable) + " unité(s) encore retournable(s) sur le bon " + bon.getNumero() + " (reçu "
+                    + Quantites.texte(ligneBon.getQuantite()) + ", déjà rendu " + Quantites.texte(ligneBon.getQuantiteRetournee()) + ")");
             }
             LigneRetourFournisseur ligne = new LigneRetourFournisseur();
             ligne.setRetour(retour);
@@ -196,14 +197,14 @@ public class RetourFournisseurService {
                 .orElseThrow(() -> new RessourceIntrouvableException("Article introuvable: " + articleId))));
 
         // 3. Tout vérifier AVANT de rien modifier : on ne rend que ce qui est encore en rayon.
-        Map<Long, Integer> restant = new HashMap<>();
+        Map<Long, BigDecimal> restant = new HashMap<>();
         articles.forEach((articleId, article) -> restant.put(articleId, article.getQuantiteStock()));
         for (LigneRetourFournisseur ligne : lignes) {
             Article article = articles.get(ligne.getArticle().getId());
-            int reste = restant.merge(article.getId(), -ligne.getQuantite(), Integer::sum);
-            if (reste < 0) {
-                throw new ConflitRessourceException("Stock insuffisant pour rendre " + ligne.getQuantite() + " × "
-                    + article.getReference() + " : il n'en reste que " + article.getQuantiteStock()
+            BigDecimal reste = restant.merge(article.getId(), ligne.getQuantite().negate(), BigDecimal::add);
+            if (reste.signum() < 0) {
+                throw new ConflitRessourceException("Stock insuffisant pour rendre " + Quantites.texte(ligne.getQuantite()) + " × "
+                    + article.getReference() + " : il n'en reste que " + Quantites.texte(article.getQuantiteStock())
                     + " en rayon (le reste a été vendu ou ajusté)");
             }
         }
@@ -212,8 +213,8 @@ public class RetourFournisseurService {
         Approvisionnement bon = retour.getApprovisionnement();
         for (LigneRetourFournisseur ligne : lignes) {
             Article article = articles.get(ligne.getArticle().getId());
-            int stockAvant = article.getQuantiteStock();
-            int stockApres = stockAvant - ligne.getQuantite();
+            BigDecimal stockAvant = article.getQuantiteStock();
+            BigDecimal stockApres = stockAvant.subtract(ligne.getQuantite());
             article.setCmp(CoutMoyenPondere.apresRetourFournisseur(stockAvant, article.getCmp(), ligne.getQuantite(), ligne.getCoutUnitaire()));
             article.setQuantiteStock(stockApres);
 
