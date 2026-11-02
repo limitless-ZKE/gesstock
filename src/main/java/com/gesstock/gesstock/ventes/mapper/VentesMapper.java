@@ -4,6 +4,7 @@ import com.gesstock.gesstock.entities.*;
 import com.gesstock.gesstock.ventes.dto.*;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 public final class VentesMapper {
 
@@ -38,6 +39,11 @@ public final class VentesMapper {
     }
 
     public static VenteResponse toResponse(Vente vente) {
+        return toResponse(vente, List.of());
+    }
+
+    /** @param avertissements messages pour le vendeur (vente sous le prix d'achat), vides en dehors de la validation */
+    public static VenteResponse toResponse(Vente vente, List<String> avertissements) {
         var lignes = vente.getLignesVente().stream()
             .map(ligne -> {
                 BigDecimal prix = ligne.getPrixUnitaire();
@@ -48,9 +54,7 @@ public final class VentesMapper {
                     ligne.getUniteVente() == null ? null : ligne.getUniteVente().getId(),
                     ligne.getQuantite(),
                     prix,
-                    prix.subtract(ligne.getRemiseUnitaire() == null
-                            ? BigDecimal.ZERO : ligne.getRemiseUnitaire())
-                        .multiply(BigDecimal.valueOf(ligne.getQuantite())),
+                    ligne.getMontantLigne(),
                     ligne.getPromotion() == null ? null : ligne.getPromotion().getId(),
                     ligne.getRemiseUnitaire(),
                     ligne.getPrixCatalogue() == null ? prix : ligne.getPrixCatalogue()
@@ -74,7 +78,8 @@ public final class VentesMapper {
             vente.getTauxTva() == null ? BigDecimal.ZERO : vente.getTauxTva(),
             vente.getModeReglement(),
             vente.getMontantRecu(),
-            lignes
+            lignes,
+            avertissements
         );
     }
 }

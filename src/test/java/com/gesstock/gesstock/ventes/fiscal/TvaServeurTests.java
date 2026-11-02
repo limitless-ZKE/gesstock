@@ -37,7 +37,7 @@ class TvaServeurTests {
         VenteResponse creer(BigDecimal tauxEnvoye) {
             Article telephone = articleRepository.findByReferenceIgnoreCase("ELEC-001").orElseThrow();
             return ventesService.creerVenteDirecte(new VenteDirecteRequest(null, false,
-                List.of(new LigneDocumentRequest(telephone.getId(), null, 2, null, null)),
+                List.of(new LigneDocumentRequest(telephone.getId(), null, BigDecimal.valueOf(2), null, null)),
                 tauxEnvoye, ModeReglement.ESPECES, new BigDecimal("10000000")), ADMIN);
         }
     }

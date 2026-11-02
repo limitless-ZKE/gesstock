@@ -11,12 +11,12 @@ public record LigneInventaireResponse(
     String designation,
     String categorie,
     String unite,
-    int stockTheorique,
-    Integer stockCompte,
-    Integer ecart,
+    BigDecimal stockTheorique,
+    BigDecimal stockCompte,
+    BigDecimal ecart,
     BigDecimal coutUnitaire,
     BigDecimal valeurEcart,
     MotifAjustementStock motif,
     String commentaire,
-    Integer ecartApplique
+    BigDecimal ecartApplique
 ) {}

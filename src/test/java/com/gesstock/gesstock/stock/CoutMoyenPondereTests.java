@@ -75,13 +75,13 @@ class CoutMoyenPondereTests {
         FournisseurResponse fournisseur = fournisseurService.creer(
             new FournisseurRequest("Fournisseur " + numero, "0100000000", "f@example.com", "Adresse"));
         ApprovisionnementResponse bon = entreeService.creer(new ApprovisionnementRequest(numero, LocalDate.now(), fournisseur.id(),
-            List.of(new LigneApprovisionnementRequest(telephone().getId(), quantite, new BigDecimal(prix)))));
+            List.of(new LigneApprovisionnementRequest(telephone().getId(), BigDecimal.valueOf(quantite), new BigDecimal(prix)))));
         entreeService.valider(bon.id(), ADMIN);
     }
 
     private VenteResponse vendre(int quantite, Long clientId, boolean aCredit) {
         VenteResponse brouillon = ventesService.creerVenteDirecte(new VenteDirecteRequest(clientId, aCredit,
-            List.of(new LigneDocumentRequest(telephone().getId(), null, quantite, null, null)),
+            List.of(new LigneDocumentRequest(telephone().getId(), null, BigDecimal.valueOf(quantite), null, null)),
             BigDecimal.ZERO, aCredit ? null : ModeReglement.ESPECES, aCredit ? null : new BigDecimal("10000000")), ADMIN);
         return ventesService.validerVente(brouillon.id(), ADMIN);
     }
@@ -102,7 +102,7 @@ class CoutMoyenPondereTests {
         recevoir("BR-CMP-1", 10, "230000");
 
         Article article = telephone();
-        assertThat(article.getQuantiteStock()).isEqualTo(22);
+        assertThat(article.getQuantiteStock()).isEqualByComparingTo("22");
         assertThat(article.getCmp()).as("(12 × 189 000 + 10 × 230 000) / 22").isEqualByComparingTo("207636.3636");
         assertThat(article.getPrixAchat()).as("dernier prix d'achat, à titre informatif").isEqualByComparingTo("230000");
 
@@ -113,8 +113,8 @@ class CoutMoyenPondereTests {
         assertThat(ligne.getNouveauPrix()).isEqualByComparingTo("230000");
         assertThat(ligne.getAncienCmp()).isEqualByComparingTo("189000");
         assertThat(ligne.getNouveauCmp()).isEqualByComparingTo("207636.3636");
-        assertThat(ligne.getStockAvant()).isEqualTo(12);
-        assertThat(ligne.getQuantiteRecue()).isEqualTo(10);
+        assertThat(ligne.getStockAvant()).isEqualByComparingTo("12");
+        assertThat(ligne.getQuantiteRecue()).isEqualByComparingTo("10");
         assertThat(ligne.getUtilisateur().getUsername()).isEqualTo(ADMIN);
     }
 
@@ -142,7 +142,7 @@ class CoutMoyenPondereTests {
         ventesService.annulerVenteACredit(vente.id(), "Retour client", false, ADMIN);
 
         Article article = telephone();
-        assertThat(article.getQuantiteStock()).isEqualTo(22);
+        assertThat(article.getQuantiteStock()).isEqualByComparingTo("22");
         // les 2 unités reviennent à 189 000 (leur coût à la vente), pas au CMP du jour : (20 × 209 500 + 2 × 189 000) / 22
         assertThat(article.getCmp()).isEqualByComparingTo("207636.3636");
 
@@ -161,13 +161,13 @@ class CoutMoyenPondereTests {
         recevoir("BR-CMP-4", 10, "230000");
 
         BigDecimal attendu = articleRepository.findAll().stream()
-            .map(article -> article.getCmp().multiply(BigDecimal.valueOf(article.getQuantiteStock())))
+            .map(article -> article.getCmp().multiply(article.getQuantiteStock()))
             .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         assertThat(articleRepository.valeurTotaleStock()).isEqualByComparingTo(attendu);
         assertThat(articleRepository.valeurTotaleStock()).as("l'ancien calcul (dernier prix × quantité) donnait davantage")
             .isLessThan(articleRepository.findAll().stream()
-                .map(article -> article.getPrixAchat().multiply(BigDecimal.valueOf(article.getQuantiteStock())))
+                .map(article -> article.getPrixAchat().multiply(article.getQuantiteStock()))
                 .reduce(BigDecimal.ZERO, BigDecimal::add));
     }
 }

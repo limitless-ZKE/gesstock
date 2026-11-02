@@ -2,14 +2,15 @@ package com.gesstock.gesstock.entities;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.DecimalMin;
-import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
@@ -30,19 +31,19 @@ public class MouvementStock {
     private TypeMouvementStock type;
 
     @NotNull
-    @Min(1)
-    @Column(nullable = false)
-    private Integer quantite;
+    @Positive
+    @Column(nullable = false, precision = 15, scale = 3)
+    private BigDecimal quantite;
 
     @NotNull
-    @Min(0)
-    @Column(nullable = false)
-    private Integer stockAvant;
+    @DecimalMin("0.0")
+    @Column(nullable = false, precision = 15, scale = 3)
+    private BigDecimal stockAvant;
 
     @NotNull
-    @Min(0)
-    @Column(nullable = false)
-    private Integer stockApres;
+    @DecimalMin("0.0")
+    @Column(nullable = false, precision = 15, scale = 3)
+    private BigDecimal stockApres;
 
     @NotNull
     @Column(nullable = false)

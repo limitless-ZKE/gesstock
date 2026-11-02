@@ -1,8 +1,8 @@
 package com.gesstock.gesstock.entities;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -19,10 +19,11 @@ public class LigneApprovisionnement {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Min(1)
-    @Column(nullable = false)
-    private int quantite;
-    
+    @NotNull
+    @Positive
+    @Column(nullable = false, precision = 15, scale = 3)
+    private java.math.BigDecimal quantite;
+
     @PositiveOrZero
     @Column(nullable = false, precision = 19, scale = 4)
     private java.math.BigDecimal prixUnitaire = java.math.BigDecimal.ZERO;
@@ -31,8 +32,8 @@ public class LigneApprovisionnement {
      * Unités déjà rendues au fournisseur. Jamais modifié par l'entité : seul l'UPDATE conditionnel du dépôt le fait, ce qui
      * rend « jamais plus rendu que reçu » vrai même avec deux validations simultanées (la base le garantit aussi par un CHECK).
      */
-    @Column(nullable = false, updatable = false)
-    private int quantiteRetournee;
+    @Column(nullable = false, updatable = false, precision = 15, scale = 3)
+    private java.math.BigDecimal quantiteRetournee = java.math.BigDecimal.ZERO;
 
     @ManyToOne
     @JoinColumn(name = "approvisionnement_id", nullable = false)

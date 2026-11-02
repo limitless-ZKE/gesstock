@@ -132,7 +132,7 @@ class JournalOperationsTests {
     @WithMockUser(username = "admin")
     void lesChangementsDuCatalogueDesClientsEtDesComptesSontEnregistresAvecCeQuiAChange() {
         ArticleResponse article = articleService.creer(new ArticleRequest("JRN-001", "Eau minérale 1,5 L",
-            new BigDecimal("250"), new BigDecimal("400"), 5, 0, null, null));
+            new BigDecimal("250"), new BigDecimal("400"), 5, BigDecimal.ZERO, null, null));
         ArticleRequest nouveauPrix = new ArticleRequest("JRN-001", "Eau minérale 1,5 L", new BigDecimal("250"), new BigDecimal("450"), 5, null, null, null);
         articleService.modifier(article.id(), nouveauPrix);
         articleService.modifier(article.id(), nouveauPrix);   // rien ne change : aucune trace

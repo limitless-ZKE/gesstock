@@ -29,6 +29,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.gesstock.gesstock.stock.Quantites;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -184,7 +186,7 @@ public class InventaireService {
             throw new ConflitRessourceException("Comptez au moins un article avant de soumettre l'inventaire");
         }
         List<String> sansMotif = comptees.stream()
-            .filter(ligne -> ligne.ecart() != 0)
+            .filter(ligne -> ligne.ecart().signum() != 0)
             .filter(ligne -> ligne.getMotif() == null
                 || (ligne.getMotif() == MotifAjustementStock.AUTRE && (ligne.getCommentaire() == null || ligne.getCommentaire().isBlank())))
             .map(ligne -> ligne.getArticle().getReference())
@@ -231,7 +233,7 @@ public class InventaireService {
         }
 
         List<LigneInventaire> aAppliquer = ligneRepository.toutes(id).stream()
-            .filter(ligne -> ligne.getStockCompte() != null && ligne.ecart() != 0)
+            .filter(ligne -> ligne.getStockCompte() != null && ligne.ecart().signum() != 0)
             .sorted(Comparator.comparing(ligne -> ligne.getArticle().getId()))
             .toList();
 
@@ -246,26 +248,27 @@ public class InventaireService {
         // Première passe : tout vérifier AVANT de rien modifier. Un seul article à recompter suffit à refuser la validation entière.
         for (LigneInventaire ligne : aAppliquer) {
             Article article = articles.get(ligne.getArticle().getId());
-            int stockAvant = article.getQuantiteStock();
-            if (stockAvant + ligne.ecart() < 0) {
+            BigDecimal stockAvant = article.getQuantiteStock();
+            if (stockAvant.add(ligne.ecart()).signum() < 0) {
                 throw new ConflitRessourceException("Recomptez l'article " + article.getReference() + " : des ventes ont eu lieu "
-                    + "depuis l'ouverture de l'inventaire (stock actuel " + stockAvant + ", écart compté " + ligne.ecart() + ")");
+                    + "depuis l'ouverture de l'inventaire (stock actuel " + Quantites.texte(stockAvant) + ", écart compté "
+                    + Quantites.texte(ligne.ecart()) + ")");
             }
         }
 
         BigDecimal valeurTotale = BigDecimal.ZERO;
         for (LigneInventaire ligne : aAppliquer) {
             Article article = articles.get(ligne.getArticle().getId());
-            int ecart = ligne.ecart();
-            int stockAvant = article.getQuantiteStock();
-            int stockApres = stockAvant + ecart;
+            BigDecimal ecart = ligne.ecart();
+            BigDecimal stockAvant = article.getQuantiteStock();
+            BigDecimal stockApres = stockAvant.add(ecart);
             article.setQuantiteStock(stockApres);
             ligne.setEcartApplique(ecart);
-            valeurTotale = valeurTotale.add(ligne.getCoutUnitaire().multiply(BigDecimal.valueOf(ecart)));
+            valeurTotale = valeurTotale.add(Quantites.montant(ligne.getCoutUnitaire(), ecart));
 
             MouvementStock mouvement = new MouvementStock();
-            mouvement.setType(ecart > 0 ? TypeMouvementStock.AJUSTEMENT_POSITIF : TypeMouvementStock.AJUSTEMENT_NEGATIF);
-            mouvement.setQuantite(Math.abs(ecart));
+            mouvement.setType(ecart.signum() > 0 ? TypeMouvementStock.AJUSTEMENT_POSITIF : TypeMouvementStock.AJUSTEMENT_NEGATIF);
+            mouvement.setQuantite(ecart.abs());
             mouvement.setStockAvant(stockAvant);
             mouvement.setStockApres(stockApres);
             mouvement.setCoutUnitaire(ligne.getCoutUnitaire());
@@ -362,7 +365,7 @@ public class InventaireService {
 
     private static LigneInventaireResponse reponse(LigneInventaire ligne) {
         Article article = ligne.getArticle();
-        Integer ecart = ligne.ecart();
+        BigDecimal ecart = ligne.ecart();
         return new LigneInventaireResponse(
             article.getId(),
             article.getReference(),
@@ -373,7 +376,7 @@ public class InventaireService {
             ligne.getStockCompte(),
             ecart,
             ligne.getCoutUnitaire(),
-            ecart == null ? null : ligne.getCoutUnitaire().multiply(BigDecimal.valueOf(ecart)),
+            ecart == null ? null : Quantites.montant(ligne.getCoutUnitaire(), ecart),
             ligne.getMotif(),
             ligne.getCommentaire(),
             ligne.getEcartApplique());

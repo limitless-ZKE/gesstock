@@ -20,6 +20,8 @@ import com.gesstock.gesstock.repositories.UtilisateurRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.gesstock.gesstock.stock.Quantites;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -82,13 +84,14 @@ public class ArticleCatalogueService {
         Article enregistre = articleRepository.save(article);
         journalService.enregistrer("CREATION", "ARTICLE", enregistre.getId(), "Article " + enregistre.getReference() + " « "
             + enregistre.getDesignation() + " » créé : prix de vente " + texte(enregistre.getPrix()) + ", prix d'achat "
-            + texte(enregistre.getPrixAchat()) + (enregistre.getQuantiteStock() > 0 ? ", stock de départ " + enregistre.getQuantiteStock() : ""),
+            + texte(enregistre.getPrixAchat())
+            + (enregistre.getQuantiteStock().signum() > 0 ? ", stock de départ " + Quantites.texte(enregistre.getQuantiteStock()) : ""),
             username);
-        if (enregistre.getQuantiteStock() > 0) {
+        if (enregistre.getQuantiteStock().signum() > 0) {
             MouvementStock mouvement = new MouvementStock();
             mouvement.setType(TypeMouvementStock.STOCK_INITIAL);
             mouvement.setQuantite(enregistre.getQuantiteStock());
-            mouvement.setStockAvant(0);
+            mouvement.setStockAvant(BigDecimal.ZERO);
             mouvement.setStockApres(enregistre.getQuantiteStock());
             mouvement.setCoutUnitaire(enregistre.getCmp());
             mouvement.setDateMouvement(LocalDateTime.now());
@@ -108,7 +111,7 @@ public class ArticleCatalogueService {
         verifierReferenceDisponible(request.reference(), id);
         // Le stock ne se corrige JAMAIS ici : toute variation doit laisser un mouvement (ajustement de stock), sinon
         // la somme des mouvements ne correspond plus au stock et l'erreur ou la fraude devient invisible.
-        if (request.quantiteStock() != null && request.quantiteStock() != article.getQuantiteStock()) {
+        if (request.quantiteStock() != null && request.quantiteStock().compareTo(article.getQuantiteStock()) != 0) {
             throw new RequeteInvalideException(
                 "Le stock ne se modifie pas depuis la fiche article : utilisez « Ajuster le stock » (motif obligatoire)");
         }

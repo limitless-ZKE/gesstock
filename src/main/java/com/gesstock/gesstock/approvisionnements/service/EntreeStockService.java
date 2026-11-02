@@ -112,14 +112,8 @@ public class EntreeStockService {
 
         for (LigneApprovisionnement ligne : approvisionnement.getLignes()) {
             Article article = articlesVerrouilles.get(ligne.getArticle().getId());
-            int stockAvant = article.getQuantiteStock();
-            int stockApres;
-            try {
-                stockApres = Math.addExact(stockAvant, ligne.getQuantite());
-            } catch (ArithmeticException exception) {
-                throw new ConflitRessourceException(
-                    "La quantité dépasserait la capacité de stock pour l'article " + article.getReference());
-            }
+            BigDecimal stockAvant = article.getQuantiteStock();
+            BigDecimal stockApres = stockAvant.add(ligne.getQuantite());
             // Le coût de l'article est le coût moyen pondéré, recalculé à chaque entrée ; le prix saisi n'est que le dernier prix.
             BigDecimal ancienPrix = article.getPrixAchat();
             BigDecimal ancienCmp = article.getCmp();
@@ -148,7 +142,7 @@ public class EntreeStockService {
         BigDecimal ancienPrix,
         BigDecimal ancienCmp,
         BigDecimal nouveauCmp,
-        int stockAvant,
+        BigDecimal stockAvant,
         LigneApprovisionnement ligne
     ) {
         HistoriquePrixAchat historique = new HistoriquePrixAchat();
@@ -169,8 +163,8 @@ public class EntreeStockService {
         Approvisionnement approvisionnement,
         LigneApprovisionnement ligne,
         Article article,
-        int stockAvant,
-        int stockApres
+        BigDecimal stockAvant,
+        BigDecimal stockApres
     ) {
         MouvementStock mouvement = new MouvementStock();
         mouvement.setType(TypeMouvementStock.ENTREE_APPROVISIONNEMENT);

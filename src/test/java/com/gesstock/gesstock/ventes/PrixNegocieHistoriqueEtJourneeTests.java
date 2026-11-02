@@ -62,7 +62,7 @@ class PrixNegocieHistoriqueEtJourneeTests {
     private VenteResponse venteDirecte(int quantite, String prixNegocie) {
         return ventesService.creerVenteDirecte(new VenteDirecteRequest(
             null, false,
-            List.of(new LigneDocumentRequest(telephone().getId(), null, quantite,
+            List.of(new LigneDocumentRequest(telephone().getId(), null, BigDecimal.valueOf(quantite),
                 prixNegocie == null ? null : new BigDecimal(prixNegocie), null)),
             BigDecimal.ZERO, ModeReglement.ESPECES, new BigDecimal("10000000")), ADMIN);
     }
@@ -104,7 +104,7 @@ class PrixNegocieHistoriqueEtJourneeTests {
         ouvrirSession();
         ProformaResponse proforma = ventesService.creerProforma(new ProformaRequest(
             "PF-NEGO-1", LocalDate.now(), LocalDate.now().plusDays(7), null,
-            List.of(new LigneDocumentRequest(telephone().getId(), null, 1, new BigDecimal("200000"), null))), ADMIN);
+            List.of(new LigneDocumentRequest(telephone().getId(), null, BigDecimal.valueOf(1), new BigDecimal("200000"), null))), ADMIN);
         assertThat(proforma.lignes().get(0).prixCatalogue()).isEqualByComparingTo("245000");
         ventesService.modifierStatutProforma(proforma.id(), StatutProforma.ENVOYEE, ADMIN);
         ventesService.modifierStatutProforma(proforma.id(), StatutProforma.ACCEPTEE, ADMIN);

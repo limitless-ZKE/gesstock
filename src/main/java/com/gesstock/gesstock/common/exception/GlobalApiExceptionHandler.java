@@ -48,16 +48,6 @@ public class GlobalApiExceptionHandler extends ResponseEntityExceptionHandler {
         return problem(HttpStatus.CONFLICT, exception.getMessage(), "CONFLIT");
     }
 
-    @ExceptionHandler(ApprobationRequiseException.class)
-    public ProblemDetail traiterApprobationRequise(ApprobationRequiseException exception) {
-        return problem(HttpStatus.CONFLICT, exception.getMessage(), "APPROBATION_REQUISE");
-    }
-
-    @ExceptionHandler(ApprobationRefuseeException.class)
-    public ProblemDetail traiterApprobationRefusee(ApprobationRefuseeException exception) {
-        return problem(HttpStatus.CONFLICT, exception.getMessage(), "APPROBATION_REFUSEE");
-    }
-
     @ExceptionHandler(RequeteInvalideException.class)
     public ProblemDetail traiterRequeteInvalide(RequeteInvalideException exception) {
         return problem(HttpStatus.BAD_REQUEST, exception.getMessage(), "REQUETE_INVALIDE");

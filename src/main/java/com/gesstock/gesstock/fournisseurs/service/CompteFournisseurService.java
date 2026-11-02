@@ -32,6 +32,8 @@ import com.gesstock.gesstock.repositories.UtilisateurRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.gesstock.gesstock.stock.Quantites;
+
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
@@ -131,7 +133,7 @@ public class CompteFournisseurService {
     public void enregistrerDette(Approvisionnement bon, String username) {
         BigDecimal total = BigDecimal.ZERO;
         for (LigneApprovisionnement ligne : bon.getLignes()) {
-            total = total.add(ligne.getPrixUnitaire().multiply(BigDecimal.valueOf(ligne.getQuantite())));
+            total = total.add(Quantites.montant(ligne.getPrixUnitaire(), ligne.getQuantite()));
         }
         total = total.setScale(ECHELLE_MONETAIRE, RoundingMode.UNNECESSARY);
         if (total.signum() <= 0) {

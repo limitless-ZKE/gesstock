@@ -55,7 +55,7 @@ class GestionVentesServiceTests {
         return new VenteDirecteRequest(
             null,
             false,
-            List.of(new LigneDocumentRequest(telephone().getId(), null, quantite, null, null)),
+            List.of(new LigneDocumentRequest(telephone().getId(), null, BigDecimal.valueOf(quantite), null, null)),
             new BigDecimal(tauxTva),
             ModeReglement.ESPECES,
             new BigDecimal("10000000")); // une vente au comptant doit être couverte par le montant reçu
@@ -74,13 +74,13 @@ class GestionVentesServiceTests {
     @Test
     void validationDecrementeLeStockEtAlimenteLeChiffreDAffairesDeSession() {
         SessionCaisseResponse session = ouvrirSession();
-        int stockAvant = telephone().getQuantiteStock();
+        BigDecimal stockAvant = telephone().getQuantiteStock();
 
         VenteResponse brouillon = ventesService.creerVenteDirecte(vente(2, "0"), ADMIN);
         VenteResponse validee = ventesService.validerVente(brouillon.id(), ADMIN);
 
         assertThat(validee.statut()).isEqualTo(StatutVente.VALIDEE);
-        assertThat(telephone().getQuantiteStock()).isEqualTo(stockAvant - 2);
+        assertThat(telephone().getQuantiteStock()).isEqualByComparingTo(stockAvant.subtract(BigDecimal.valueOf(2)));
         assertThat(venteRepository.chiffreAffairesSession(session.id(), StatutVente.VALIDEE))
             .isEqualByComparingTo("490000");
         assertThat(venteRepository.chiffreAffairesEntre(StatutVente.VALIDEE,
@@ -91,14 +91,14 @@ class GestionVentesServiceTests {
     @Test
     void stockInsuffisantEstRefuseEtLeStockResteIntact() {
         ouvrirSession();
-        int stockAvant = telephone().getQuantiteStock();
+        BigDecimal stockAvant = telephone().getQuantiteStock();
 
-        VenteResponse brouillon = ventesService.creerVenteDirecte(vente(stockAvant + 1, "0"), ADMIN);
+        VenteResponse brouillon = ventesService.creerVenteDirecte(vente(stockAvant.intValueExact() + 1, "0"), ADMIN);
 
         assertThatThrownBy(() -> ventesService.validerVente(brouillon.id(), ADMIN))
             .isInstanceOf(ConflitRessourceException.class)
             .hasMessageContaining("Stock insuffisant");
-        assertThat(telephone().getQuantiteStock()).isEqualTo(stockAvant);
+        assertThat(telephone().getQuantiteStock()).isEqualByComparingTo(stockAvant);
     }
 
     @Test
@@ -114,7 +114,7 @@ class GestionVentesServiceTests {
     void ventesACreditExigentUnClient() {
         VenteDirecteRequest creditSansClient = new VenteDirecteRequest(
             null, true,
-            List.of(new LigneDocumentRequest(telephone().getId(), null, 1, null, null)),
+            List.of(new LigneDocumentRequest(telephone().getId(), null, BigDecimal.valueOf(1), null, null)),
             BigDecimal.ZERO, null, null);
 
         assertThatThrownBy(() -> ventesService.creerVenteDirecte(creditSansClient, ADMIN))

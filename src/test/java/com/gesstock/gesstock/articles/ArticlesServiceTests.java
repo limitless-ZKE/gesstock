@@ -41,7 +41,7 @@ class ArticlesServiceTests {
 
     private ArticleRequest article(String reference, int stock, int seuil) {
         return new ArticleRequest(reference, "Article " + reference, new BigDecimal("100"),
-            new BigDecimal("150"), seuil, stock, null, null);
+            new BigDecimal("150"), seuil, BigDecimal.valueOf(stock), null, null);
     }
 
     // --- Catégories et sous-catégories ---

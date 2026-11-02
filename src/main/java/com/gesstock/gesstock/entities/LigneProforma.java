@@ -2,8 +2,8 @@ package com.gesstock.gesstock.entities;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.DecimalMin;
-import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -24,9 +24,9 @@ public class LigneProforma {
     private Long id;
 
     @NotNull
-    @Min(1)
-    @Column(nullable = false)
-    private Integer quantite;
+    @Positive
+    @Column(nullable = false, precision = 15, scale = 3)
+    private BigDecimal quantite;
 
     @NotNull
     @DecimalMin("0.0")

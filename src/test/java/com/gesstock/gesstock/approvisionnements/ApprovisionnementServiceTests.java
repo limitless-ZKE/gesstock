@@ -50,7 +50,7 @@ class ApprovisionnementServiceTests {
 
     private ApprovisionnementRequest bon(String numero, Long fournisseurId, Long articleId, int quantite, String prix) {
         return new ApprovisionnementRequest(numero, LocalDate.now(), fournisseurId,
-            List.of(new LigneApprovisionnementRequest(articleId, quantite, new BigDecimal(prix))));
+            List.of(new LigneApprovisionnementRequest(articleId, BigDecimal.valueOf(quantite), new BigDecimal(prix))));
     }
 
     private Article telephone() {
@@ -89,20 +89,20 @@ class ApprovisionnementServiceTests {
     @Test
     void brouillonNeChangePasLeStockMaisLaValidationLIncremente() {
         Article article = telephone();
-        int stockInitial = article.getQuantiteStock();
+        BigDecimal stockInitial = article.getQuantiteStock();
         FournisseurResponse f = fournisseur("Fournisseur stock");
 
         ApprovisionnementResponse brouillon = entreeService.creer(bon("BR-001", f.id(), article.getId(), 7, "200000"));
         assertThat(brouillon.statut()).isEqualTo(StatutApprovisionnement.BROUILLON);
         assertThat(brouillon.montantTotal()).isEqualByComparingTo("1400000");
-        assertThat(telephone().getQuantiteStock()).isEqualTo(stockInitial);
+        assertThat(telephone().getQuantiteStock()).isEqualByComparingTo(stockInitial);
 
         long mouvementsAvant = mouvementRepository.count();
         ApprovisionnementResponse recu = entreeService.valider(brouillon.id(), ADMIN);
 
         assertThat(recu.statut()).isEqualTo(StatutApprovisionnement.RECU);
         Article apres = telephone();
-        assertThat(apres.getQuantiteStock()).isEqualTo(stockInitial + 7);
+        assertThat(apres.getQuantiteStock()).isEqualByComparingTo(stockInitial.add(BigDecimal.valueOf(7)));
         assertThat(apres.getPrixAchat()).isEqualByComparingTo("200000");
         assertThat(mouvementRepository.count()).isEqualTo(mouvementsAvant + 1);
     }

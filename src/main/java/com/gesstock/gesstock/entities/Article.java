@@ -48,8 +48,11 @@ public class Article {
     @Column(nullable = false, precision = 19, scale = 4)
     private BigDecimal prix = BigDecimal.ZERO;
 
-    @Min(0)
-    private int quantite;
+    /** Stock en unité de stock, à 3 décimales au plus (V15 : une caisse entamée, un liquide au litre…). */
+    @NotNull
+    @DecimalMin("0.0")
+    @Column(nullable = false, precision = 15, scale = 3)
+    private BigDecimal quantite = BigDecimal.ZERO;
 
     @Min(0)
     private int seuilAlerte = 0;
@@ -70,7 +73,7 @@ public class Article {
 
     public Article() {}
 
-    public Article(String nom, BigDecimal prix, int quantite) {
+    public Article(String nom, BigDecimal prix, BigDecimal quantite) {
         this.nom = nom;
         this.prix = prix;
         this.quantite = quantite;
@@ -85,8 +88,8 @@ public class Article {
     public BigDecimal getPrix() { return prix; }
     public void setPrix(BigDecimal prix) { this.prix = prix; }
 
-    public int getQuantite() { return quantite; }
-    public void setQuantite(int quantite) { this.quantite = quantite; }
+    public BigDecimal getQuantite() { return quantite; }
+    public void setQuantite(BigDecimal quantite) { this.quantite = quantite; }
 
     public String getReference() { return reference; }
     public void setReference(String reference) { this.reference = reference; }
@@ -121,11 +124,11 @@ public class Article {
         this.nom = designation;
     }
 
-    public int getQuantiteStock() {
+    public BigDecimal getQuantiteStock() {
         return quantite;
     }
 
-    public void setQuantiteStock(int quantiteStock) {
+    public void setQuantiteStock(BigDecimal quantiteStock) {
         this.quantite = quantiteStock;
     }
 }

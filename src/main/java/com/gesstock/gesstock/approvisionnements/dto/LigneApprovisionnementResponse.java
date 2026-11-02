@@ -7,7 +7,7 @@ public record LigneApprovisionnementResponse(
     Long articleId,
     String referenceArticle,
     String designationArticle,
-    Integer quantite,
+    BigDecimal quantite,
     BigDecimal prixUnitaire,
     BigDecimal montantLigne
 ) {}

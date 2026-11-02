@@ -9,7 +9,7 @@ public record ArticleResponse(
     BigDecimal prixAchat,
     BigDecimal coutMoyen,
     BigDecimal prixVente,
-    Integer quantiteStock,
+    BigDecimal quantiteStock,
     Integer seuilAlerteStock,
     Long categorieId,
     String categorie,

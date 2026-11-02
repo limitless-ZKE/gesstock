@@ -76,7 +76,7 @@ class RetourFournisseurTests {
     }
 
     private LigneApprovisionnementRequest ligne(int quantite, String prix) {
-        return new LigneApprovisionnementRequest(telephone().getId(), quantite, new BigDecimal(prix));
+        return new LigneApprovisionnementRequest(telephone().getId(), BigDecimal.valueOf(quantite), new BigDecimal(prix));
     }
 
     private RetourFournisseurRequest retour(ApprovisionnementResponse bon, String motif, LigneRetourFournisseurRequest... lignes) {
@@ -84,7 +84,7 @@ class RetourFournisseurTests {
     }
 
     private LigneRetourFournisseurRequest rendre(LigneRetournableResponse ligne, int quantite) {
-        return new LigneRetourFournisseurRequest(ligne.ligneApprovisionnementId(), quantite);
+        return new LigneRetourFournisseurRequest(ligne.ligneApprovisionnementId(), BigDecimal.valueOf(quantite));
     }
 
     private DetteFournisseurResponse dette(FournisseurResponse fournisseur) {
@@ -96,8 +96,8 @@ class RetourFournisseurTests {
         FournisseurResponse f = fournisseur("Grossiste retour");
         ApprovisionnementResponse bon = bonRecu("BR-RET-1", f, ligne(10, "200000"));   // stock 22, coût moyen 194 000
         LigneRetournableResponse retournable = retourService.lignesRetournables(bon.id()).get(0);
-        assertThat(retournable.quantiteRetournable()).isEqualTo(10);
-        assertThat(retournable.stockActuel()).isEqualTo(22);
+        assertThat(retournable.quantiteRetournable()).isEqualByComparingTo("10");
+        assertThat(retournable.stockActuel()).isEqualByComparingTo("22");
 
         RetourFournisseurResponse brouillon = retourService.creer(retour(bon, "Écrans défectueux", rendre(retournable, 4)), PREPARATEUR);
 
@@ -105,7 +105,7 @@ class RetourFournisseurTests {
         assertThat(brouillon.numero()).startsWith("RF-");
         assertThat(brouillon.creePar()).isEqualTo(PREPARATEUR);
         assertThat(brouillon.montantTotal()).isEqualByComparingTo("800000");
-        assertThat(telephone().getQuantiteStock()).as("un brouillon ne touche pas au stock").isEqualTo(22);
+        assertThat(telephone().getQuantiteStock()).as("un brouillon ne touche pas au stock").isEqualByComparingTo("22");
         assertThat(dette(f).montantRegle()).as("ni au compte").isEqualByComparingTo("0");
 
         RetourFournisseurResponse valide = retourService.valider(brouillon.id(), VALIDATEUR);
@@ -114,16 +114,16 @@ class RetourFournisseurTests {
         assertThat(valide.validePar()).isEqualTo(VALIDATEUR);
         assertThat(valide.avoirId()).isNotNull();
         Article apres = telephone();
-        assertThat(apres.getQuantiteStock()).isEqualTo(18);
+        assertThat(apres.getQuantiteStock()).isEqualByComparingTo("18");
         assertThat(apres.getCmp()).as("(194 000 × 22 − 4 × 200 000) / 18").isEqualByComparingTo("192666.6667");
 
         List<MouvementStock> mouvements = mouvementRepository.findAll().stream()
             .filter(m -> m.getRetourFournisseur() != null && m.getRetourFournisseur().getId().equals(valide.id())).toList();
         assertThat(mouvements).singleElement().satisfies(m -> {
             assertThat(m.getType()).isEqualTo(TypeMouvementStock.RETOUR_FOURNISSEUR);
-            assertThat(m.getQuantite()).isEqualTo(4);
-            assertThat(m.getStockAvant()).isEqualTo(22);
-            assertThat(m.getStockApres()).isEqualTo(18);
+            assertThat(m.getQuantite()).isEqualByComparingTo("4");
+            assertThat(m.getStockAvant()).isEqualByComparingTo("22");
+            assertThat(m.getStockApres()).isEqualByComparingTo("18");
             assertThat(m.getCoutUnitaire()).isEqualByComparingTo("200000");
             assertThat(m.getReferenceDocument()).isEqualTo(valide.numero());
             assertThat(m.getEffectuePar().getUsername()).isEqualTo(VALIDATEUR);
@@ -140,8 +140,8 @@ class RetourFournisseurTests {
         assertThat(compte.soldeDu()).isEqualByComparingTo("1200000");
 
         LigneRetournableResponse apresRetour = retourService.lignesRetournables(bon.id()).get(0);
-        assertThat(apresRetour.quantiteDejaRetournee()).isEqualTo(4);
-        assertThat(apresRetour.quantiteRetournable()).isEqualTo(6);
+        assertThat(apresRetour.quantiteDejaRetournee()).isEqualByComparingTo("4");
+        assertThat(apresRetour.quantiteRetournable()).isEqualByComparingTo("6");
     }
 
     @Test
@@ -156,14 +156,14 @@ class RetourFournisseurTests {
         RetourFournisseurResponse premier = retourService.creer(retour(bon, "Premier", rendre(retournable, 7)), PREPARATEUR);
         RetourFournisseurResponse second = retourService.creer(retour(bon, "Second", rendre(retournable, 7)), PREPARATEUR);
         retourService.valider(premier.id(), VALIDATEUR);
-        int stockApresPremier = telephone().getQuantiteStock();
+        BigDecimal stockApresPremier = telephone().getQuantiteStock();
 
         assertThatThrownBy(() -> retourService.valider(second.id(), VALIDATEUR))
             .as("les 7 unités restantes ne suffisent pas : la base refuse de compter plus de 10 rendues")
             .isInstanceOf(ConflitRessourceException.class).hasMessageContaining("déjà été rendues");
-        assertThat(telephone().getQuantiteStock()).isEqualTo(stockApresPremier);
+        assertThat(telephone().getQuantiteStock()).isEqualByComparingTo(stockApresPremier);
         assertThat(retourService.obtenir(second.id()).statut()).isEqualTo(StatutRetourFournisseur.BROUILLON);
-        assertThat(retourService.lignesRetournables(bon.id()).get(0).quantiteRetournable()).isEqualTo(3);
+        assertThat(retourService.lignesRetournables(bon.id()).get(0).quantiteRetournable()).isEqualByComparingTo("3");
     }
 
     @Test
@@ -174,13 +174,13 @@ class RetourFournisseurTests {
         RetourFournisseurResponse brouillon = retourService.creer(retour(bon, "Retour", rendre(retournable, 4)), PREPARATEUR);
 
         Article article = telephone();
-        article.setQuantiteStock(3);   // le reste a été vendu
+        article.setQuantiteStock(BigDecimal.valueOf(3));   // le reste a été vendu
         articleRepository.saveAndFlush(article);
 
         assertThatThrownBy(() -> retourService.valider(brouillon.id(), VALIDATEUR))
             .isInstanceOf(ConflitRessourceException.class)
             .hasMessageContaining("Stock insuffisant").hasMessageContaining("il n'en reste que 3");
-        assertThat(telephone().getQuantiteStock()).isEqualTo(3);
+        assertThat(telephone().getQuantiteStock()).isEqualByComparingTo("3");
         assertThat(retourService.obtenir(brouillon.id()).statut()).isEqualTo(StatutRetourFournisseur.BROUILLON);
         assertThat(compteService.obtenir(f.id()).avoirs()).isEmpty();
     }
@@ -198,7 +198,7 @@ class RetourFournisseurTests {
 
         retourService.valider(brouillon.id(), VALIDATEUR);
 
-        assertThat(telephone().getQuantiteStock()).isEqualTo(12);   // 12 + 5 reçus − 5 rendus
+        assertThat(telephone().getQuantiteStock()).isEqualByComparingTo("12");   // 12 + 5 reçus − 5 rendus
         assertThat(compteService.obtenir(f.id()).avoirs()).singleElement()
             .satisfies(avoir -> assertThat(avoir.montant()).isEqualByComparingTo("1100"));
     }
@@ -212,7 +212,7 @@ class RetourFournisseurTests {
         RetourFournisseurResponse abandonne = retourService.creer(retour(bon, "Finalement non", rendre(retournable, 1)), PREPARATEUR);
         assertThat(retourService.annuler(abandonne.id(), PREPARATEUR).statut()).isEqualTo(StatutRetourFournisseur.ANNULE);
         assertThatThrownBy(() -> retourService.valider(abandonne.id(), VALIDATEUR)).isInstanceOf(ConflitRessourceException.class);
-        assertThat(retourService.lignesRetournables(bon.id()).get(0).quantiteRetournable()).isEqualTo(5);
+        assertThat(retourService.lignesRetournables(bon.id()).get(0).quantiteRetournable()).isEqualByComparingTo("5");
 
         RetourFournisseurResponse valide = retourService.valider(
             retourService.creer(retour(bon, "Défaut", rendre(retournable, 1)), PREPARATEUR).id(), VALIDATEUR);
@@ -233,7 +233,7 @@ class RetourFournisseurTests {
             new RetourFournisseurRequest(brouillonDeBon.id(), "x", List.of(rendre(retournable, 1))), PREPARATEUR))
             .isInstanceOf(ConflitRessourceException.class);
         assertThatThrownBy(() -> retourService.creer(
-            retour(bon, "x", new LigneRetourFournisseurRequest(-1L, 1)), PREPARATEUR)).isInstanceOf(RequeteInvalideException.class);
+            retour(bon, "x", new LigneRetourFournisseurRequest(-1L, BigDecimal.valueOf(1))), PREPARATEUR)).isInstanceOf(RequeteInvalideException.class);
         assertThatThrownBy(() -> retourService.creer(
             retour(bon, "x", rendre(retournable, 1), rendre(retournable, 2)), PREPARATEUR)).isInstanceOf(RequeteInvalideException.class);
         assertThatThrownBy(() -> retourService.creer(
@@ -253,7 +253,7 @@ class RetourFournisseurTests {
 
         assertThat(valide.statut()).isEqualTo(StatutRetourFournisseur.VALIDE);
         assertThat(valide.avoirId()).isNull();
-        assertThat(telephone().getQuantiteStock()).isEqualTo(12);
+        assertThat(telephone().getQuantiteStock()).isEqualByComparingTo("12");
         assertThat(compteService.obtenir(f.id()).avoirs()).isEmpty();
     }
 }

@@ -86,7 +86,7 @@ class AnnulationVenteACreditTests {
     private VenteResponse venteACreditValidee(ClientResponse client, int quantite) {
         VenteResponse brouillon = ventesService.creerVenteDirecte(new VenteDirecteRequest(
             client.id(), true,
-            List.of(new LigneDocumentRequest(telephone().getId(), null, quantite, null, null)),
+            List.of(new LigneDocumentRequest(telephone().getId(), null, BigDecimal.valueOf(quantite), null, null)),
             BigDecimal.ZERO, null, null), ADMIN);
         return ventesService.validerVente(brouillon.id(), ADMIN);
     }
@@ -104,16 +104,16 @@ class AnnulationVenteACreditTests {
     void annulationRemetLeStockEnRayonEtAnnuleLaDette() {
         SessionCaisseResponse session = ouvrirSession();
         ClientResponse c = client();
-        int stockInitial = telephone().getQuantiteStock();
+        BigDecimal stockInitial = telephone().getQuantiteStock();
         VenteResponse vente = venteACreditValidee(c, 2);
-        assertThat(telephone().getQuantiteStock()).isEqualTo(stockInitial - 2);
+        assertThat(telephone().getQuantiteStock()).isEqualByComparingTo(stockInitial.subtract(BigDecimal.valueOf(2)));
         rafraichir();
 
         VenteResponse annulee = ventesService.annulerVenteACredit(vente.id(), "Erreur de saisie", false, ADMIN).vente();
         rafraichir();
 
         assertThat(annulee.statut()).isEqualTo(StatutVente.ANNULEE);
-        assertThat(telephone().getQuantiteStock()).isEqualTo(stockInitial);
+        assertThat(telephone().getQuantiteStock()).isEqualByComparingTo(stockInitial);
 
         DetteResponse dette = detteService.listerDettesClient(c.id()).get(0);
         assertThat(dette.statut()).isEqualTo(StatutDette.ANNULEE);
@@ -127,8 +127,8 @@ class AnnulationVenteACreditTests {
             telephone().getId(), LocalDateTime.now().minusMinutes(5), LocalDateTime.now().plusMinutes(5));
         assertThat(mouvements).anySatisfy(m -> {
             assertThat(m.getType()).isEqualTo(TypeMouvementStock.RETOUR_CLIENT);
-            assertThat(m.getQuantite()).isEqualTo(2);
-            assertThat(m.getStockApres()).isEqualTo(stockInitial);
+            assertThat(m.getQuantite()).isEqualByComparingTo("2");
+            assertThat(m.getStockApres()).isEqualByComparingTo(stockInitial);
         });
         assertThat(journalService.listerJournee(LocalDate.now()))
             .extracting(JournalActiviteResponse::action).contains("ANNULATION");
@@ -142,11 +142,11 @@ class AnnulationVenteACreditTests {
         rafraichir();
         ventesService.annulerVenteACredit(vente.id(), "Doublon", false, ADMIN);
         rafraichir();
-        int stockApres = telephone().getQuantiteStock();
+        BigDecimal stockApres = telephone().getQuantiteStock();
 
         assertThatThrownBy(() -> ventesService.annulerVenteACredit(vente.id(), "Encore", false, ADMIN))
             .isInstanceOf(ConflitRessourceException.class);
-        assertThat(telephone().getQuantiteStock()).isEqualTo(stockApres); // pas de double retour en stock
+        assertThat(telephone().getQuantiteStock()).isEqualByComparingTo(stockApres); // pas de double retour en stock
 
         DetteResponse dette = detteService.listerDettesClient(c.id()).get(0);
         assertThatThrownBy(() -> detteService.enregistrerReglement(dette.id(),
@@ -158,7 +158,7 @@ class AnnulationVenteACreditTests {
     void annulationRefuseeSiLeClientAdejaVerseUnReglement() {
         ouvrirSession();
         ClientResponse c = client();
-        int stockInitial = telephone().getQuantiteStock();
+        BigDecimal stockInitial = telephone().getQuantiteStock();
         VenteResponse vente = venteACreditValidee(c, 1);
         rafraichir();
         DetteResponse dette = detteService.listerDettesClient(c.id()).get(0);
@@ -170,7 +170,7 @@ class AnnulationVenteACreditTests {
         assertThatThrownBy(() -> ventesService.annulerVenteACredit(vente.id(), "Client mécontent", false, ADMIN))
             .isInstanceOf(ConflitRessourceException.class)
             .hasMessageContaining("articles en l'état");
-        assertThat(telephone().getQuantiteStock()).isEqualTo(stockInitial - 1);
+        assertThat(telephone().getQuantiteStock()).isEqualByComparingTo(stockInitial.subtract(BigDecimal.valueOf(1)));
         assertThat(detteService.obtenirDette(dette.id()).statut()).isEqualTo(StatutDette.PARTIELLEMENT_REGLEE);
         assertThat(mouvementCaisseService.lister(sessionCaisseDuJour()).stream()
             .filter(m -> m.motif().startsWith("Remboursement"))).isEmpty();
@@ -180,7 +180,7 @@ class AnnulationVenteACreditTests {
     void ventePartiellementPayeeEnEspecesEstAnnuleeEtRembourseeEnEspeces() {
         SessionCaisseResponse session = ouvrirSession();
         ClientResponse c = client();
-        int stockInitial = telephone().getQuantiteStock();
+        BigDecimal stockInitial = telephone().getQuantiteStock();
         VenteResponse vente = venteACreditValidee(c, 1);
         rafraichir();
         DetteResponse dette = detteService.listerDettesClient(c.id()).get(0);
@@ -196,7 +196,7 @@ class AnnulationVenteACreditTests {
         assertThat(resultat.montantRembourse()).isEqualByComparingTo("100000");
         assertThat(resultat.remboursementEspeces()).isEqualByComparingTo("100000");
         assertThat(resultat.remboursementAutresModes()).isEqualByComparingTo("0");
-        assertThat(telephone().getQuantiteStock()).isEqualTo(stockInitial);
+        assertThat(telephone().getQuantiteStock()).isEqualByComparingTo(stockInitial);
         assertThat(detteService.obtenirDette(dette.id()).statut()).isEqualTo(StatutDette.ANNULEE);
         assertThat(clientService.obtenirEncours(c.id()).montantDu()).isEqualByComparingTo("0");
 
@@ -234,7 +234,7 @@ class AnnulationVenteACreditTests {
     void remboursementEnEspecesRefuseSiLaCaisseNeContientPasAssezEtRienNeChange() {
         SessionCaisseResponse session = ouvrirSession(); // fond de caisse : 1 000
         ClientResponse c = client();
-        int stockInitial = telephone().getQuantiteStock();
+        BigDecimal stockInitial = telephone().getQuantiteStock();
         VenteResponse vente = venteACreditValidee(c, 1);
         rafraichir();
         DetteResponse dette = detteService.listerDettesClient(c.id()).get(0);
@@ -248,7 +248,7 @@ class AnnulationVenteACreditTests {
         assertThatThrownBy(() -> ventesService.annulerVenteACredit(vente.id(), "Retour", true, ADMIN))
             .isInstanceOf(ConflitRessourceException.class)
             .hasMessageContaining("solde théorique");
-        assertThat(telephone().getQuantiteStock()).isEqualTo(stockInitial - 1);
+        assertThat(telephone().getQuantiteStock()).isEqualByComparingTo(stockInitial.subtract(BigDecimal.valueOf(1)));
         assertThat(detteService.obtenirDette(dette.id()).statut()).isEqualTo(StatutDette.PARTIELLEMENT_REGLEE);
         assertThat(mouvementCaisseService.lister(session.id())).hasSize(1); // seul le dépôt existe
     }
@@ -257,7 +257,7 @@ class AnnulationVenteACreditTests {
     void ardoiseSoldeeSeClotureSeuleEtResteSoldee() {
         ouvrirSession();
         ClientResponse c = client();
-        int stockInitial = telephone().getQuantiteStock();
+        BigDecimal stockInitial = telephone().getQuantiteStock();
         VenteResponse vente = venteACreditValidee(c, 1);
         rafraichir();
         DetteResponse dette = detteService.listerDettesClient(c.id()).get(0);
@@ -280,26 +280,26 @@ class AnnulationVenteACreditTests {
         assertThatThrownBy(() -> ventesService.annulerVenteACredit(vente.id(), "Retour", false, ADMIN))
             .isInstanceOf(ConflitRessourceException.class);
         assertThat(detteService.obtenirDette(dette.id()).statut()).isEqualTo(StatutDette.REGLEE);
-        assertThat(telephone().getQuantiteStock()).isEqualTo(stockInitial - 1);
+        assertThat(telephone().getQuantiteStock()).isEqualByComparingTo(stockInitial.subtract(BigDecimal.valueOf(1)));
 
         // avec les articles rapportés en l'état, elle s'annule et les 245 000 versés sont remboursés
         AnnulationVenteResponse resultat = ventesService.annulerVenteACredit(vente.id(), "Retour", true, ADMIN);
         rafraichir();
         assertThat(resultat.montantRembourse()).isEqualByComparingTo("245000");
         assertThat(resultat.remboursementEspeces()).isEqualByComparingTo("245000");
-        assertThat(telephone().getQuantiteStock()).isEqualTo(stockInitial);
+        assertThat(telephone().getQuantiteStock()).isEqualByComparingTo(stockInitial);
         assertThat(detteService.obtenirDette(dette.id()).statut()).isEqualTo(StatutDette.ANNULEE);
     }
 
     @Test
     void seuleUneVenteACreditValideePeutEtreAnnulee() {
         ouvrirSession();
-        int stockInitial = telephone().getQuantiteStock();
+        BigDecimal stockInitial = telephone().getQuantiteStock();
 
         // vente au comptant validée
         VenteResponse comptant = ventesService.validerVente(ventesService.creerVenteDirecte(new VenteDirecteRequest(
             null, false,
-            List.of(new LigneDocumentRequest(telephone().getId(), null, 1, null, null)),
+            List.of(new LigneDocumentRequest(telephone().getId(), null, BigDecimal.valueOf(1), null, null)),
             BigDecimal.ZERO, ModeReglement.ESPECES, new BigDecimal("1000000")), ADMIN).id(), ADMIN);
         assertThatThrownBy(() -> ventesService.annulerVenteACredit(comptant.id(), "Test", false, ADMIN))
             .isInstanceOf(ConflitRessourceException.class)
@@ -308,12 +308,12 @@ class AnnulationVenteACreditTests {
         // brouillon à crédit non validé
         VenteResponse brouillon = ventesService.creerVenteDirecte(new VenteDirecteRequest(
             client().id(), true,
-            List.of(new LigneDocumentRequest(telephone().getId(), null, 1, null, null)),
+            List.of(new LigneDocumentRequest(telephone().getId(), null, BigDecimal.valueOf(1), null, null)),
             BigDecimal.ZERO, null, null), ADMIN);
         assertThatThrownBy(() -> ventesService.annulerVenteACredit(brouillon.id(), "Test", false, ADMIN))
             .isInstanceOf(ConflitRessourceException.class)
             .hasMessageContaining("validée");
 
-        assertThat(telephone().getQuantiteStock()).isEqualTo(stockInitial - 1);
+        assertThat(telephone().getQuantiteStock()).isEqualByComparingTo(stockInitial.subtract(BigDecimal.valueOf(1)));
     }
 }

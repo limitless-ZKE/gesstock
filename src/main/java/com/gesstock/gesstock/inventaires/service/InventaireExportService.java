@@ -61,9 +61,9 @@ public class InventaireExportService {
                 row.createCell(1).setCellValue(ligne.designation());
                 row.createCell(2).setCellValue(ligne.categorie() == null ? "" : ligne.categorie());
                 row.createCell(3).setCellValue(ligne.unite() == null ? "" : ligne.unite());
-                row.createCell(4).setCellValue(ligne.stockTheorique());
+                row.createCell(4).setCellValue(ligne.stockTheorique().doubleValue());
                 if (ligne.stockCompte() != null) {
-                    row.createCell(5).setCellValue(ligne.stockCompte());
+                    row.createCell(5).setCellValue(ligne.stockCompte().doubleValue());
                 } else {
                     row.createCell(5); // à remplir au comptage
                 }

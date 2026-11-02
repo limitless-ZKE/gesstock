@@ -79,7 +79,7 @@ class CaisseRapportEtDettesTests {
     }
 
     private List<LigneDocumentRequest> unTelephone(int quantite) {
-        return List.of(new LigneDocumentRequest(telephone().getId(), null, quantite, null, null));
+        return List.of(new LigneDocumentRequest(telephone().getId(), null, BigDecimal.valueOf(quantite), null, null));
     }
 
     /** Vente à crédit validée de 2 téléphones (490 000) : crée la dette du client. */

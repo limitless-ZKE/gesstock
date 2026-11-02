@@ -38,6 +38,7 @@ public final class OperationsConnues {
         connue("VALIDATION", "VENTE", "Vente validée", Famille.VENTES),
         connue("ANNULATION", "VENTE", "Vente annulée", Famille.VENTES),
         connue("APPROBATION_REMISE", "VENTE", "Remise approuvée sur une vente", Famille.VENTES),
+        connue("VENTE_SOUS_COUT", "VENTE", "Vente sous le prix d'achat", Famille.VENTES),
         connue("CREATION", "PROFORMA", "Proforma créé", Famille.VENTES),
         connue("APPROBATION_REMISE", "PROFORMA", "Remise approuvée sur un proforma", Famille.VENTES),
         connue("CHANGEMENT_STATUT", "PROFORMA", "Statut d'un proforma modifié", Famille.VENTES),

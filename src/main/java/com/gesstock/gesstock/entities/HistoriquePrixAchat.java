@@ -42,11 +42,11 @@ public class HistoriquePrixAchat {
     @Column(nullable = false, precision = 19, scale = 4)
     private BigDecimal nouveauCmp;
 
-    @Column(nullable = false)
-    private int stockAvant;
+    @Column(nullable = false, precision = 15, scale = 3)
+    private BigDecimal stockAvant;
 
-    @Column(nullable = false)
-    private int quantiteRecue;
+    @Column(nullable = false, precision = 15, scale = 3)
+    private BigDecimal quantiteRecue;
 
     @ManyToOne
     @JoinColumn(name = "approvisionnement_id")

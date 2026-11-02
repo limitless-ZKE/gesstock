@@ -1,8 +1,9 @@
 package com.gesstock.gesstock.entities;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.Min;
+import com.gesstock.gesstock.stock.Quantites;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -36,15 +37,16 @@ public class LigneRetourFournisseur {
     @JoinColumn(name = "article_id", nullable = false)
     private Article article;
 
-    @Min(1)
-    @Column(nullable = false)
-    private int quantite;
+    @NotNull
+    @Positive
+    @Column(nullable = false, precision = 15, scale = 3)
+    private BigDecimal quantite;
 
     @NotNull
     @Column(nullable = false, precision = 19, scale = 4)
     private BigDecimal coutUnitaire;
 
     public BigDecimal montant() {
-        return coutUnitaire.multiply(BigDecimal.valueOf(quantite));
+        return Quantites.montant(coutUnitaire, quantite);
     }
 }

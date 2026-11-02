@@ -3,13 +3,12 @@ package com.gesstock.gesstock.ventes.service;
 import com.gesstock.gesstock.entities.*;
 import com.gesstock.gesstock.repositories.*;
 import com.gesstock.gesstock.ventes.dto.*;
-import com.gesstock.gesstock.common.exception.ApprobationRequiseException;
 import com.gesstock.gesstock.common.exception.ConflitRessourceException;
 import com.gesstock.gesstock.common.exception.RequeteInvalideException;
 import com.gesstock.gesstock.common.exception.RessourceIntrouvableException;
 import com.gesstock.gesstock.stock.CoutMoyenPondere;
+import com.gesstock.gesstock.stock.Quantites;
 import com.gesstock.gesstock.ventes.fiscal.CalculTva;
-import com.gesstock.gesstock.ventes.politique.PolitiqueRemise;
 import com.gesstock.gesstock.ventes.mapper.VentesMapper;
 import com.gesstock.gesstock.promotions.service.PromotionService;
 import com.gesstock.gesstock.caisse.dto.MouvementCaisseRequest;
@@ -48,8 +47,6 @@ public class GestionVentesService {
     private final JournalActiviteService journalActiviteService;
     private final MouvementCaisseService mouvementCaisseService;
     private final CalculTva calculTva;
-    private final PolitiqueRemise politiqueRemise;
-    private final ApprobationRemiseService approbationRemiseService;
 
     public GestionVentesService(
         ProformaRepository proformaRepository,
@@ -64,13 +61,9 @@ public class GestionVentesService {
         PromotionService promotionService,
         JournalActiviteService journalActiviteService,
         MouvementCaisseService mouvementCaisseService,
-        CalculTva calculTva,
-        PolitiqueRemise politiqueRemise,
-        ApprobationRemiseService approbationRemiseService
+        CalculTva calculTva
     ) {
         this.calculTva = calculTva;
-        this.politiqueRemise = politiqueRemise;
-        this.approbationRemiseService = approbationRemiseService;
         this.mouvementCaisseService = mouvementCaisseService;
         this.proformaRepository = proformaRepository;
         this.venteRepository = venteRepository;
@@ -105,12 +98,11 @@ public class GestionVentesService {
         Utilisateur createur = trouverUtilisateurActif(username);
         proforma.setCreePar(createur);
         proforma.setClient(request.clientId() == null ? null : trouverClient(request.clientId()));
-        Utilisateur approbateur = remplacerLignesProforma(proforma, request.lignes(), createur, request.approbation());
+        remplacerLignesProforma(proforma, request.lignes());
         validerPeriodeProforma(proforma);
         Proforma saved = proformaRepository.save(proforma);
         journalActiviteService.enregistrer("CREATION", "PROFORMA", saved.getId(),
-            "Création du proforma " + saved.getNumero()
-                + (approbateur == null ? "" : ", remise approuvée par " + approbateur.getUsername()), username);
+            "Création du proforma " + saved.getNumero(), username);
         return VentesMapper.toResponse(saved);
     }
 
@@ -124,13 +116,10 @@ public class GestionVentesService {
         proforma.setDateEmission(request.dateEmission() == null ? proforma.getDateEmission() : request.dateEmission());
         proforma.setDateExpiration(request.dateExpiration());
         proforma.setClient(request.clientId() == null ? null : trouverClient(request.clientId()));
-        Utilisateur approbateur = remplacerLignesProforma(proforma, request.lignes(), trouverUtilisateurActif(username), request.approbation());
+        trouverUtilisateurActif(username);
+        remplacerLignesProforma(proforma, request.lignes());
         validerPeriodeProforma(proforma);
         Proforma saved = proformaRepository.save(proforma);
-        if (approbateur != null) {
-            journalActiviteService.enregistrer("APPROBATION_REMISE", "PROFORMA", saved.getId(),
-                "Proforma " + saved.getNumero() + " modifié, remise approuvée par " + approbateur.getUsername(), username);
-        }
         return VentesMapper.toResponse(saved);
     }
 
@@ -217,43 +206,29 @@ public class GestionVentesService {
         vente.setVendeur(vendeur);
         vente.setClient(request.clientId() == null ? null : trouverClient(request.clientId()));
         vente.setLignesVente(new ArrayList<>());
-        // Une remise au-delà du plafond du vendeur, ou un prix sous le coût, exige l'accord d'un AUTRE responsable.
-        List<String> motifs = new ArrayList<>();
-        List<LigneVente> aApprouver = new ArrayList<>();
+        // Le vendeur fixe librement le prix négocié, quel que soit le taux de remise (décision du client, novembre 2026) :
+        // aucun accord n'est demandé. Une vente sous le prix d'achat est signalée à la validation, sans être bloquée.
         for (LigneDocumentRequest requestLigne : request.lignes()) {
-            LigneVente ligne = creerLigneVente(vente, requestLigne);
-            String motif = motifApprobation(vendeur, ligne.getArticle(), ligne.getUniteVente(),
-                ligne.getPrixCatalogue(), ligne.getPrixUnitaire(), ligne.getRemiseUnitaire());
-            if (motif != null) {
-                motifs.add(motif);
-                aApprouver.add(ligne);
-            }
-            vente.getLignesVente().add(ligne);
+            vente.getLignesVente().add(creerLigneVente(vente, requestLigne));
         }
-        Utilisateur approbateur = obtenirApprobation(vendeur, request.approbation(), motifs);
-        aApprouver.forEach(ligne -> ligne.setRemiseApprouveePar(approbateur));
         CalculTva.Montants montants = calculTva.decomposer(calculerTotalVente(vente.getLignesVente()));
         vente.setMontantHT(montants.montantHT());
         vente.setMontantTva(montants.montantTva());
         vente.setMontantTotal(montants.montantTotal());
         validerMontantRecu(vente);
         Vente saved = venteRepository.save(vente);
-        if (approbateur != null) {
-            journalActiviteService.enregistrer("APPROBATION_REMISE", "VENTE", saved.getId(),
-                "Vente " + saved.getCode() + " : remise approuvée par " + approbateur.getUsername() + " pour " + username
-                    + " (" + String.join(" ; ", motifs) + ")", username);
-        }
         return VentesMapper.toResponse(saved);
     }
 
+    /** Valide la vente ; la réponse signale les lignes vendues sous le prix d'achat (la vente passe quand même). */
     public VenteResponse validerVente(Long id, String username) {
         Vente vente = venteRepository.findByIdForUpdate(id)
             .orElseThrow(() -> new RessourceIntrouvableException("Vente introuvable: " + id));
         if (vente.getStatut() != StatutVente.BROUILLON) {
             throw new ConflitRessourceException("Seule une vente brouillon peut être validée");
         }
-        validerEtDecrementerStock(vente, username);
-        return VentesMapper.toResponse(venteRepository.save(vente));
+        List<String> avertissements = validerEtDecrementerStock(vente, username);
+        return VentesMapper.toResponse(venteRepository.save(vente), avertissements);
     }
 
     /** Annule une vente validée, à crédit ou au comptant : chaque cas a ses propres conditions. */
@@ -386,22 +361,22 @@ public class GestionVentesService {
      * vente, pas au coût du jour : le coût moyen pondéré est recalculé comme pour une entrée.
      */
     private void remettreEnRayon(Vente vente, String motif, Utilisateur utilisateur) {
-        Map<Long, Integer> quantitesBase = new LinkedHashMap<>();
+        Map<Long, BigDecimal> quantitesBase = new LinkedHashMap<>();
         for (LigneVente ligne : vente.getLignesVente()) {
-            quantitesBase.merge(ligne.getArticle().getId(), quantiteEnUniteDeStock(ligne), Math::addExact);
+            quantitesBase.merge(ligne.getArticle().getId(), quantiteEnUniteDeStock(ligne), BigDecimal::add);
         }
         Map<Long, Article> articles = new HashMap<>();
         quantitesBase.keySet().stream().sorted().forEach(articleId -> articles.put(articleId,
             articleRepository.findByIdForUpdate(articleId)
                 .orElseThrow(() -> new RessourceIntrouvableException("Article introuvable: " + articleId))));
 
-        Map<Long, Integer> stockCourant = new HashMap<>();
+        Map<Long, BigDecimal> stockCourant = new HashMap<>();
         articles.forEach((articleId, article) -> stockCourant.put(articleId, article.getQuantiteStock()));
         for (LigneVente ligne : vente.getLignesVente()) {
             Article article = articles.get(ligne.getArticle().getId());
-            int quantite = quantiteEnUniteDeStock(ligne);
-            int avant = stockCourant.get(article.getId());
-            int apres = avant + quantite;
+            BigDecimal quantite = quantiteEnUniteDeStock(ligne);
+            BigDecimal avant = stockCourant.get(article.getId());
+            BigDecimal apres = avant.add(quantite);
             stockCourant.put(article.getId(), apres);
             BigDecimal cout = coutParUniteDeStock(ligne, article);
             article.setCmp(CoutMoyenPondere.apresEntree(avant, article.getCmp(), quantite, cout));
@@ -458,8 +433,7 @@ public class GestionVentesService {
             ligne.setPrixCatalogue(ligneProforma.getPrixCatalogue());
             ligne.setPromotion(ligneProforma.getPromotion());
             ligne.setRemiseUnitaire(ligneProforma.getRemiseUnitaire());
-            // L'accord donné à la création du proforma suit la ligne : la conversion ne le redemande pas et ne le perd pas.
-            ligne.setRemiseApprouveePar(ligneProforma.getRemiseApprouveePar());
+            ligne.setMontantLigne(ligneProforma.getMontantLigne());
             vente.getLignesVente().add(ligne);
         }
         vente.setMontantTotal(proforma.getMontantTotal());
@@ -474,17 +448,21 @@ public class GestionVentesService {
         vente = venteRepository.save(vente);
         proforma.setVente(vente);
 
-        validerEtDecrementerStock(vente, username);
+        List<String> avertissements = validerEtDecrementerStock(vente, username);
         vente.setStatut(StatutVente.VALIDEE);
         proforma.setStatut(StatutProforma.CONVERTIE);
         proformaRepository.save(proforma);
         Vente saved = venteRepository.save(vente);
         journalActiviteService.enregistrer("VALIDATION", "VENTE", saved.getId(),
             "Vente " + saved.getCode() + " issue du proforma " + proforma.getNumero(), username);
-        return VentesMapper.toResponse(saved);
+        return VentesMapper.toResponse(saved, avertissements);
     }
 
-    private void validerEtDecrementerStock(Vente vente, String username) {
+    /**
+     * Sort les articles du stock et valide la vente. Renvoie les avertissements « vendu sous le prix d'achat » : la vente
+     * passe quand même (décision du client), mais elle est notée au journal des opérations pour que le responsable la voie.
+     */
+    private List<String> validerEtDecrementerStock(Vente vente, String username) {
         LocalDate aujourdHui = LocalDate.now();
         SessionCaisse session = sessionCaisseRepository.findByJourneeAndStatutForUpdate(
                 aujourdHui, StatutSessionCaisse.OUVERTE)
@@ -498,25 +476,19 @@ public class GestionVentesService {
             throw new ConflitRessourceException("Une vente sans ligne ne peut pas être validée");
         }
 
-        Map<Long, Integer> quantitesBase = new LinkedHashMap<>();
+        Map<Long, BigDecimal> quantitesBase = new LinkedHashMap<>();
         for (LigneVente ligne : vente.getLignesVente()) {
-            long articleId = ligne.getArticle().getId();
-            int quantiteBase = quantiteEnUniteDeStock(ligne);
-            try {
-                quantitesBase.merge(articleId, quantiteBase, Math::addExact);
-            } catch (ArithmeticException exception) {
-                throw new ConflitRessourceException("Quantité agrégée trop importante pour l'article " + articleId);
-            }
+            quantitesBase.merge(ligne.getArticle().getId(), quantiteEnUniteDeStock(ligne), BigDecimal::add);
         }
 
         Map<Long, Article> articles = new HashMap<>();
         quantitesBase.keySet().stream().sorted().forEach(articleId -> {
             Article article = articleRepository.findByIdForUpdate(articleId)
                 .orElseThrow(() -> new RessourceIntrouvableException("Article introuvable: " + articleId));
-            int necessaire = quantitesBase.get(articleId);
-            if (article.getQuantiteStock() < necessaire) {
+            BigDecimal necessaire = quantitesBase.get(articleId);
+            if (article.getQuantiteStock().compareTo(necessaire) < 0) {
                 throw new ConflitRessourceException("Stock insuffisant pour l'article " + article.getReference()
-                    + ": demandé " + necessaire + ", disponible " + article.getQuantiteStock());
+                    + ": demandé " + Quantites.texte(necessaire) + ", disponible " + Quantites.texte(article.getQuantiteStock()));
             }
             articles.put(articleId, article);
         });
@@ -531,24 +503,36 @@ public class GestionVentesService {
             creerDetteVente(vente);
         }
 
-        Map<Long, Integer> stockCourant = new HashMap<>();
+        Map<Long, BigDecimal> stockCourant = new HashMap<>();
         articles.forEach((id, article) -> stockCourant.put(id, article.getQuantiteStock()));
+        List<String> sousLeCout = new ArrayList<>();
         for (LigneVente ligne : vente.getLignesVente()) {
             Article article = articles.get(ligne.getArticle().getId());
-            int quantite = quantiteEnUniteDeStock(ligne);
-            int avant = stockCourant.get(article.getId());
-            int apres = avant - quantite;
+            BigDecimal quantite = quantiteEnUniteDeStock(ligne);
+            BigDecimal avant = stockCourant.get(article.getId());
+            BigDecimal apres = avant.subtract(quantite);
             stockCourant.put(article.getId(), apres);
             article.setQuantiteStock(apres);
             // Une sortie ne change pas le CMP : elle sort à son niveau du moment, mémorisé sur la ligne (la marge de cette
             // vente ne bougera plus, quoi qu'il arrive aux prix d'achat ensuite).
             ligne.setCoutUnitaire(article.getCmp().multiply(facteurDe(ligne)).setScale(4, RoundingMode.HALF_UP));
             ligne.setCoutEstime(false);
+            BigDecimal coutLigne = Quantites.montant(ligne.getCoutUnitaire(), ligne.getQuantite());
+            if (ligne.getMontantLigne().compareTo(coutLigne) < 0) {
+                sousLeCout.add(article.getReference() + " « " + article.getDesignation() + " » : vendu "
+                    + ligne.getMontantLigne().setScale(2, RoundingMode.HALF_UP).toPlainString() + " pour "
+                    + Quantites.texte(ligne.getQuantite()) + ", prix d'achat " + coutLigne.setScale(2, RoundingMode.HALF_UP).toPlainString());
+            }
             creerMouvementStock(vente, ligne, article, quantite, avant, apres, vendeur, session);
         }
         articleRepository.saveAll(articles.values());
         journalActiviteService.enregistrer("VALIDATION", "VENTE", vente.getId(),
             "Validation de la vente " + vente.getCode() + ", total " + vente.getMontantTotal(), username);
+        if (!sousLeCout.isEmpty()) {
+            journalActiviteService.enregistrer("VENTE_SOUS_COUT", "VENTE", vente.getId(),
+                "Vente " + vente.getCode() + " sous le prix d'achat : " + String.join(" ; ", sousLeCout), username);
+        }
+        return sousLeCout.stream().map(detail -> "Vendu sous le prix d'achat — " + detail).toList();
     }
 
     private void creerDetteVente(Vente vente) {
@@ -582,14 +566,13 @@ public class GestionVentesService {
         return ligne.getCoutUnitaire().divide(facteurDe(ligne), 4, RoundingMode.HALF_UP);
     }
 
-    private int quantiteEnUniteDeStock(LigneVente ligne) {
-        BigDecimal facteur = facteurDe(ligne);
+    /** Quantité vendue convertie en unité de stock ; elle doit tenir en 3 décimales (sinon le stock serait arrondi en silence). */
+    private BigDecimal quantiteEnUniteDeStock(LigneVente ligne) {
         try {
-            return facteur.multiply(BigDecimal.valueOf(ligne.getQuantite()))
-                .setScale(0, RoundingMode.UNNECESSARY)
-                .intValueExact();
+            return facteurDe(ligne).multiply(ligne.getQuantite()).setScale(Quantites.ECHELLE, RoundingMode.UNNECESSARY);
         } catch (ArithmeticException exception) {
-            throw new ConflitRessourceException("La conversion en unité de stock doit donner une quantité entière");
+            throw new ConflitRessourceException("Article " + ligne.getArticle().getReference() + " : la quantité convertie en "
+                + "unité de stock aurait plus de 3 chiffres après la virgule ; arrondissez la quantité vendue");
         }
     }
 
@@ -597,9 +580,9 @@ public class GestionVentesService {
         Vente vente,
         LigneVente ligne,
         Article article,
-        int quantite,
-        int avant,
-        int apres,
+        BigDecimal quantite,
+        BigDecimal avant,
+        BigDecimal apres,
         Utilisateur vendeur,
         SessionCaisse session
     ) {
@@ -636,102 +619,81 @@ public class GestionVentesService {
         return demande;
     }
 
+    /**
+     * Prix d'une ligne de document (vente ou proforma). Deux façons de négocier :
+     * <ul>
+     *   <li>un prix par unité ({@code prixUnitaire}), sur lequel la promotion éventuelle s'applique encore ;</li>
+     *   <li>un prix pour la ligne entière ({@code montantNegocie}) : il est définitif, sans promotion par-dessus, et le prix
+     *       unitaire affiché en est déduit.</li>
+     * </ul>
+     */
+    private record PrixLigne(
+        BigDecimal prixCatalogue, BigDecimal prixUnitaire, Promotion promotion, BigDecimal remiseUnitaire, BigDecimal montantLigne
+    ) {}
+
+    private PrixLigne prixLigne(Article article, UniteVente unite, LigneDocumentRequest demande, LocalDateTime moment) {
+        BigDecimal prixCatalogue = prixCatalogue(article, unite);
+        BigDecimal quantite = demande.quantite();
+        if (demande.montantNegocie() != null) {
+            BigDecimal totalCatalogue = Quantites.montant(prixCatalogue, quantite);
+            if (demande.montantNegocie().compareTo(totalCatalogue) > 0) {
+                throw new RequeteInvalideException("Le prix négocié de la ligne " + article.getReference() + " ("
+                    + demande.montantNegocie().toPlainString() + ") ne peut pas dépasser son total au prix catalogue ("
+                    + totalCatalogue.setScale(2, RoundingMode.HALF_UP).toPlainString() + ")");
+            }
+            BigDecimal montant = demande.montantNegocie().setScale(4, RoundingMode.HALF_UP);
+            return new PrixLigne(prixCatalogue, montant.divide(quantite, 4, RoundingMode.HALF_UP), null, BigDecimal.ZERO, montant);
+        }
+        BigDecimal prix = prixApplique(demande.prixUnitaire(), prixCatalogue, article);
+        Promotion promotion = promotionService.promotionChoisie(article, demande.promotionId(), moment);
+        BigDecimal remiseUnitaire = promotionService.montantRemise(promotion, prix);
+        return new PrixLigne(prixCatalogue, prix, promotion, remiseUnitaire, Quantites.montant(prix.subtract(remiseUnitaire), quantite));
+    }
+
     private LigneVente creerLigneVente(Vente vente, LigneDocumentRequest request) {
         Article article = trouverArticle(request.articleId());
         UniteVente unite = request.uniteVenteId() == null ? null : trouverUniteVente(request.uniteVenteId(), article);
-        BigDecimal prixCatalogue = prixCatalogue(article, unite);
-        BigDecimal prix = prixApplique(request.prixUnitaire(), prixCatalogue, article);
+        PrixLigne prix = prixLigne(article, unite, request, LocalDateTime.now());
         LigneVente ligne = new LigneVente();
-        ligne.setPrixCatalogue(prixCatalogue);
+        ligne.setPrixCatalogue(prix.prixCatalogue());
         ligne.setVente(vente);
         ligne.setArticle(article);
         ligne.setUniteVente(unite);
         ligne.setQuantite(request.quantite());
-        ligne.setPrixUnitaire(prix);
-        Promotion promotion = promotionService.promotionChoisie(article, request.promotionId(), LocalDateTime.now());
-        ligne.setPromotion(promotion);
-        ligne.setRemiseUnitaire(promotionService.montantRemise(promotion, prix));
+        ligne.setPrixUnitaire(prix.prixUnitaire());
+        ligne.setPromotion(prix.promotion());
+        ligne.setRemiseUnitaire(prix.remiseUnitaire());
+        ligne.setMontantLigne(prix.montantLigne());
         return ligne;
     }
 
-    /**
-     * Remplace les lignes du proforma. Renvoie le responsable dont l'accord a été nécessaire (remise au-delà du plafond du
-     * demandeur, prix sous le coût), ou null si aucune ligne n'en demandait.
-     */
-    private Utilisateur remplacerLignesProforma(
-        Proforma proforma, List<LigneDocumentRequest> demandes, Utilisateur demandeur, ApprobationRequest approbation
-    ) {
+    private void remplacerLignesProforma(Proforma proforma, List<LigneDocumentRequest> demandes) {
         proforma.getLignes().clear();
         BigDecimal total = BigDecimal.ZERO;
-        List<String> motifs = new ArrayList<>();
-        List<LigneProforma> aApprouver = new ArrayList<>();
         for (LigneDocumentRequest demande : demandes) {
             Article article = trouverArticle(demande.articleId());
             UniteVente unite = demande.uniteVenteId() == null
                 ? null
                 : trouverUniteVente(demande.uniteVenteId(), article);
-            BigDecimal prixCatalogue = prixCatalogue(article, unite);
-            BigDecimal prix = prixApplique(demande.prixUnitaire(), prixCatalogue, article);
-            Promotion promotion = promotionService.promotionChoisie(
-                article, demande.promotionId(), proforma.getDateEmission().atStartOfDay());
-            BigDecimal remiseUnitaire = promotionService.montantRemise(promotion, prix);
-            BigDecimal montantNet = prix.subtract(remiseUnitaire).multiply(BigDecimal.valueOf(demande.quantite()));
+            PrixLigne prix = prixLigne(article, unite, demande, proforma.getDateEmission().atStartOfDay());
             LigneProforma ligne = new LigneProforma();
             ligne.setProforma(proforma);
             ligne.setArticle(article);
             ligne.setUniteVente(unite);
             ligne.setQuantite(demande.quantite());
-            ligne.setPrixUnitaire(prix);
-            ligne.setPrixCatalogue(prixCatalogue);
-            ligne.setMontantLigne(montantNet);
-            ligne.setPromotion(promotion);
-            ligne.setRemiseUnitaire(remiseUnitaire);
-            String motif = motifApprobation(demandeur, article, unite, prixCatalogue, prix, remiseUnitaire);
-            if (motif != null) {
-                motifs.add(motif);
-                aApprouver.add(ligne);
-            }
+            ligne.setPrixUnitaire(prix.prixUnitaire());
+            ligne.setPrixCatalogue(prix.prixCatalogue());
+            ligne.setMontantLigne(prix.montantLigne());
+            ligne.setPromotion(prix.promotion());
+            ligne.setRemiseUnitaire(prix.remiseUnitaire());
             proforma.getLignes().add(ligne);
-            total = total.add(montantNet);
+            total = total.add(prix.montantLigne());
         }
         proforma.setMontantTotal(total);
-        Utilisateur approbateur = obtenirApprobation(demandeur, approbation, motifs);
-        aApprouver.forEach(ligne -> ligne.setRemiseApprouveePar(approbateur));
-        return approbateur;
-    }
-
-    private List<String> rolesDe(Utilisateur utilisateur) {
-        return utilisateur.getRoles().stream().map(Role::getName).toList();
-    }
-
-    /** Motif pour lequel cette ligne exige l'accord d'un responsable, ou null si le demandeur peut la décider seul. */
-    private String motifApprobation(
-        Utilisateur demandeur, Article article, UniteVente unite, BigDecimal prixCatalogue, BigDecimal prixNegocie,
-        BigDecimal remiseUnitaire
-    ) {
-        BigDecimal coutUnitaire = article.getCmp().multiply(unite == null ? BigDecimal.ONE : unite.getFacteurConversion());
-        PolitiqueRemise.Decision decision = politiqueRemise.evaluer(rolesDe(demandeur), prixCatalogue, prixNegocie,
-            prixNegocie.subtract(remiseUnitaire == null ? BigDecimal.ZERO : remiseUnitaire), coutUnitaire);
-        return decision.approbationRequise() ? article.getReference() + " : " + decision.motif() : null;
-    }
-
-    /** Exige et vérifie l'accord d'un responsable si au moins une ligne en a besoin ; null si aucun accord n'était nécessaire. */
-    private Utilisateur obtenirApprobation(Utilisateur demandeur, ApprobationRequest approbation, List<String> motifs) {
-        if (motifs.isEmpty()) {
-            return null;
-        }
-        if (approbation == null) {
-            throw new ApprobationRequiseException("Accord d'un responsable requis — " + String.join(" ; ", motifs));
-        }
-        return approbationRemiseService.verifier(demandeur.getUsername(), approbation);
     }
 
     private BigDecimal calculerTotalVente(List<LigneVente> lignes) {
-        return lignes.stream()
-            .map(ligne -> ligne.getPrixUnitaire()
-                .subtract(ligne.getRemiseUnitaire() == null ? BigDecimal.ZERO : ligne.getRemiseUnitaire())
-                .multiply(BigDecimal.valueOf(ligne.getQuantite())))
-            .reduce(BigDecimal.ZERO, BigDecimal::add);
+        return lignes.stream().map(LigneVente::getMontantLigne).reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     private void validerMontantRecu(Vente vente) {

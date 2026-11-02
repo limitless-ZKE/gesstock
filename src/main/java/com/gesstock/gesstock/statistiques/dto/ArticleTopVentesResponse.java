@@ -1,3 +1,3 @@
 package com.gesstock.gesstock.statistiques.dto;
 
-public record ArticleTopVentesResponse(Long articleId, String reference, String designation, Long quantiteVendue) {}
+public record ArticleTopVentesResponse(Long articleId, String reference, String designation, java.math.BigDecimal quantiteVendue) {}

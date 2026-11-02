@@ -75,7 +75,7 @@ public class StatistiquesService {
                 ((Number) row[0]).longValue(),
                 (String) row[1],
                 (String) row[2],
-                ((Number) row[3]).longValue()))
+                valeurOuZero((Number) row[3])))
             .toList();
 
         Map<LocalDate, PointVentesResponse> ventesParDate = new HashMap<>();
@@ -122,7 +122,7 @@ public class StatistiquesService {
                 ((Number) row[0]).longValue(),
                 (String) row[1],
                 (String) row[2],
-                ((Number) row[3]).longValue(),
+                valeurOuZero((Number) row[3]),
                 chiffreAffaires,
                 cout,
                 chiffreAffaires.subtract(cout)
@@ -197,7 +197,7 @@ public class StatistiquesService {
             ((Number) top.get(0)[0]).longValue(),
             (String) top.get(0)[1],
             (String) top.get(0)[2],
-            ((Number) top.get(0)[3]).longValue()
+            valeurOuZero((Number) top.get(0)[3])
         );
         return new SyntheseStatistiquesResponse(
             jour,

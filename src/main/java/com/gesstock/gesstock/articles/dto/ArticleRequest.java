@@ -1,6 +1,7 @@
 package com.gesstock.gesstock.articles.dto;
 
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -14,7 +15,7 @@ public record ArticleRequest(
     @NotNull @DecimalMin("0.0") BigDecimal prixAchat,
     @NotNull @DecimalMin("0.0") BigDecimal prixVente,
     @NotNull @Min(0) Integer seuilAlerteStock,
-    @Min(0) Integer quantiteStock,
+    @DecimalMin("0.0") @Digits(integer = 12, fraction = 3) BigDecimal quantiteStock,
     Long categorieId,
     Long uniteMesureId
 ) {}

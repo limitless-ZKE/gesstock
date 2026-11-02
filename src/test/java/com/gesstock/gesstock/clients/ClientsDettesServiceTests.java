@@ -66,7 +66,7 @@ class ClientsDettesServiceTests {
         sessionService.ouvrir(new OuvertureSessionRequest(LocalDate.now(), new BigDecimal("1000")), ADMIN);
         VenteResponse brouillon = ventesService.creerVenteDirecte(new VenteDirecteRequest(
             client.id(), true,
-            List.of(new LigneDocumentRequest(telephone().getId(), null, 2, null, null)),
+            List.of(new LigneDocumentRequest(telephone().getId(), null, BigDecimal.valueOf(2), null, null)),
             BigDecimal.ZERO, null, null), ADMIN);
         ventesService.validerVente(brouillon.id(), ADMIN);
         entityManager.flush();

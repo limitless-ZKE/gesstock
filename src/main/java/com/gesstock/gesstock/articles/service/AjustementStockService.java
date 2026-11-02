@@ -17,6 +17,9 @@ import com.gesstock.gesstock.repositories.UtilisateurRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.gesstock.gesstock.stock.Quantites;
+
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
@@ -55,21 +58,21 @@ public class AjustementStockService {
         // verrou pessimiste : une vente qui s'exécute en même temps attend la fin de l'ajustement
         Article article = articleRepository.findByIdForUpdate(articleId)
             .orElseThrow(() -> new RessourceIntrouvableException("Article introuvable: " + articleId));
-        int stockAvant = article.getQuantiteStock();
-        if (stockAvant != request.stockAffiche()) {
-            throw new ConflitRessourceException("Le stock a changé depuis l'affichage (" + stockAvant
+        BigDecimal stockAvant = article.getQuantiteStock();
+        if (stockAvant.compareTo(request.stockAffiche()) != 0) {
+            throw new ConflitRessourceException("Le stock a changé depuis l'affichage (" + Quantites.texte(stockAvant)
                 + " actuellement) : rechargez la fiche puis recommencez");
         }
-        int stockApres = request.nouveauStock();
-        if (stockApres == stockAvant) {
-            throw new ConflitRessourceException("Le stock de cet article est déjà de " + stockAvant);
+        BigDecimal stockApres = request.nouveauStock();
+        if (stockApres.compareTo(stockAvant) == 0) {
+            throw new ConflitRessourceException("Le stock de cet article est déjà de " + Quantites.texte(stockAvant));
         }
 
         String details = request.motif().libelle() + (commentaireAbsent ? "" : " — " + request.commentaire().trim());
         MouvementStock mouvement = new MouvementStock();
-        mouvement.setType(stockApres > stockAvant
+        mouvement.setType(stockApres.compareTo(stockAvant) > 0
             ? TypeMouvementStock.AJUSTEMENT_POSITIF : TypeMouvementStock.AJUSTEMENT_NEGATIF);
-        mouvement.setQuantite(Math.abs(stockApres - stockAvant));
+        mouvement.setQuantite(stockApres.subtract(stockAvant).abs());
         mouvement.setStockAvant(stockAvant);
         mouvement.setStockApres(stockApres);
         mouvement.setDateMouvement(LocalDateTime.now());
@@ -82,7 +85,8 @@ public class AjustementStockService {
         article.setQuantiteStock(stockApres);
         Article enregistre = articleRepository.save(article);
         journalActiviteService.enregistrer("AJUSTEMENT_STOCK", "ARTICLE", enregistre.getId(),
-            "Stock de " + enregistre.getReference() + " : " + stockAvant + " → " + stockApres + " (" + details + ")",
+            "Stock de " + enregistre.getReference() + " : " + Quantites.texte(stockAvant) + " → " + Quantites.texte(stockApres)
+                + " (" + details + ")",
             username);
         return CatalogueMapper.toResponse(enregistre);
     }

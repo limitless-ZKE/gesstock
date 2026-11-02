@@ -6,7 +6,7 @@ public record MargeArticleResponse(
     Long articleId,
     String reference,
     String designation,
-    long quantiteVendue,
+    BigDecimal quantiteVendue,
     BigDecimal chiffreAffaires,
     BigDecimal coutAchat,
     BigDecimal margeBrute

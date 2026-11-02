@@ -46,8 +46,8 @@ class RequetesSqlTests {
         Article riz = articleRepository.findByReferenceIgnoreCase("ALIM-001").orElseThrow();
         for (int i = 0; i < nombreDeVentes; i++) {
             VenteResponse brouillon = ventesService.creerVenteDirecte(new VenteDirecteRequest(null, false,
-                List.of(new LigneDocumentRequest(riz.getId(), null, 1, null, null),
-                        new LigneDocumentRequest(articleRepository.findByReferenceIgnoreCase("ALIM-002").orElseThrow().getId(), null, 1, null, null)),
+                List.of(new LigneDocumentRequest(riz.getId(), null, BigDecimal.valueOf(1), null, null),
+                        new LigneDocumentRequest(articleRepository.findByReferenceIgnoreCase("ALIM-002").orElseThrow().getId(), null, BigDecimal.valueOf(1), null, null)),
                 BigDecimal.ZERO, ModeReglement.ESPECES, new BigDecimal("10000")), ADMIN);
             ventesService.validerVente(brouillon.id(), ADMIN);
         }

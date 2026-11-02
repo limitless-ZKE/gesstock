@@ -77,7 +77,7 @@ class DocumentsCaissierTests {
         var article = articleRepository.findByReferenceIgnoreCase(reference).orElseThrow();
         BigDecimal recu = mode == ModeReglement.ESPECES ? new BigDecimal("1000000") : article.getPrix().multiply(BigDecimal.valueOf(quantite));
         VenteResponse brouillon = ventesService.creerVenteDirecte(new VenteDirecteRequest(null, false,
-            List.of(new LigneDocumentRequest(article.getId(), null, quantite, null, null)), BigDecimal.ZERO, mode, recu), acteur);
+            List.of(new LigneDocumentRequest(article.getId(), null, BigDecimal.valueOf(quantite), null, null)), BigDecimal.ZERO, mode, recu), acteur);
         return ventesService.validerVente(brouillon.id(), acteur);
     }
 

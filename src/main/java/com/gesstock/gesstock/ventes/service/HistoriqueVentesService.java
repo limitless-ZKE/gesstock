@@ -9,6 +9,7 @@ import com.gesstock.gesstock.entities.StatutVente;
 import com.gesstock.gesstock.entities.Vente;
 import com.gesstock.gesstock.repositories.ReglementClientRepository;
 import com.gesstock.gesstock.repositories.VenteRepository;
+import com.gesstock.gesstock.stock.Quantites;
 import com.gesstock.gesstock.ventes.dto.HistoriqueVentesResponse;
 import com.gesstock.gesstock.ventes.dto.LigneHistoriqueVente;
 import com.gesstock.gesstock.ventes.dto.LigneVenteSoldee;
@@ -180,14 +181,12 @@ public class HistoriqueVentesService {
         return new HistoriqueVentesResponse(debut, fin, new ResumeHistoriqueVentes(validees, chiffre, remises, annulees, annule), lignes);
     }
 
-    /** Remise négociée (prix catalogue − prix appliqué, jamais négative) + remise de promotion, sur toutes les lignes. */
+    /** Remises de toutes les lignes : total au prix catalogue − montant facturé (négociée par unité ou sur la ligne, et promotion), jamais négatif. */
     static BigDecimal remisesDe(Vente vente) {
         BigDecimal total = BigDecimal.ZERO;
         for (LigneVente ligne : vente.getLignesVente()) {
             BigDecimal catalogue = ligne.getPrixCatalogue() == null ? ligne.getPrixUnitaire() : ligne.getPrixCatalogue();
-            BigDecimal negociee = catalogue.subtract(ligne.getPrixUnitaire()).max(BigDecimal.ZERO);
-            BigDecimal promotion = ligne.getRemiseUnitaire() == null ? BigDecimal.ZERO : ligne.getRemiseUnitaire();
-            total = total.add(negociee.add(promotion).multiply(BigDecimal.valueOf(ligne.getQuantite())));
+            total = total.add(Quantites.montant(catalogue, ligne.getQuantite()).subtract(ligne.getMontantLigne()).max(BigDecimal.ZERO));
         }
         return total.setScale(2, RoundingMode.HALF_UP);
     }
@@ -202,7 +201,7 @@ public class HistoriqueVentesService {
             vente.getVendeur() == null ? null : vente.getVendeur().getUsername(),
             vente.isVenteACredit(),
             vente.getModeReglement(),
-            vente.getLignesVente().stream().mapToInt(LigneVente::getQuantite).sum(),
+            vente.getLignesVente().stream().map(LigneVente::getQuantite).reduce(BigDecimal.ZERO, BigDecimal::add),
             remisesDe(vente),
             vente.getMontantTotal());
     }
