@@ -21,6 +21,7 @@ import { api } from "../services/api";
 import { apiErrorMessage as errorMessage } from "../services/apiError";
 import { money } from "../lib/format";
 import Indicateur from "../components/Indicateur";
+import { formatQuantite } from "../lib/quantite";
 
 type Article = {
   id: number;
@@ -300,8 +301,8 @@ export default function ApprovisionnementsPage() {
                     const article = articles.find((item) => String(item.id) === line.articleId);
                     const rowTotal = (Number(line.quantite) || 0) * (Number(line.prixUnitaire) || 0);
                     return <div key={index} className="grid gap-3 p-3 sm:grid-cols-[minmax(0,1fr)_105px_150px_120px_38px] sm:items-end">
-                      <label className="block min-w-0"><span className="mb-1 block text-xs font-bold text-slate-500">Article</span><select required className="input-field h-10" value={line.articleId} onChange={(event) => updateDraftLine(index, { articleId: event.target.value })}><option value="">Sélectionner un article</option>{articles.map((item) => <option key={item.id} value={item.id}>{item.reference} · {item.designation} (stock {item.quantiteStock})</option>)}</select>{article && <span className="mt-1 block text-xs text-slate-400">Stock actuel : {article.quantiteStock} {article.uniteMesure ?? ""}</span>}</label>
-                      <label className="block"><span className="mb-1 block text-xs font-bold text-slate-500">Quantité</span><input required min="1" step="1" type="number" className="input-field h-10" value={line.quantite} onChange={(event) => updateDraftLine(index, { quantite: event.target.value })} /></label>
+                      <label className="block min-w-0"><span className="mb-1 block text-xs font-bold text-slate-500">Article</span><select required className="input-field h-10" value={line.articleId} onChange={(event) => updateDraftLine(index, { articleId: event.target.value })}><option value="">Sélectionner un article</option>{articles.map((item) => <option key={item.id} value={item.id}>{item.reference} · {item.designation} (stock {formatQuantite(item.quantiteStock)})</option>)}</select>{article && <span className="mt-1 block text-xs text-slate-400">Stock actuel : {formatQuantite(article.quantiteStock)} {article.uniteMesure ?? ""}</span>}</label>
+                      <label className="block"><span className="mb-1 block text-xs font-bold text-slate-500">Quantité</span><input required min="0.001" step="0.001" type="number" inputMode="decimal" className="input-field h-10" value={line.quantite} onChange={(event) => updateDraftLine(index, { quantite: event.target.value })} /></label>
                       <label className="block"><span className="mb-1 block text-xs font-bold text-slate-500">Prix unitaire</span><input required min="0" step="any" type="number" className="input-field h-10" value={line.prixUnitaire} onChange={(event) => updateDraftLine(index, { prixUnitaire: event.target.value })} /></label>
                       <div><span className="mb-1 block text-xs font-bold text-slate-500">Montant</span><p className="flex h-10 items-center text-xs font-bold text-slate-800">{money.format(rowTotal)}</p></div>
                       <button type="button" title="Retirer la ligne" disabled={draftLines.length === 1} onClick={() => setDraftLines((current) => current.filter((_, lineIndex) => lineIndex !== index))} className="icon-button mb-0.5 disabled:opacity-30"><Trash2 size={15} /></button>

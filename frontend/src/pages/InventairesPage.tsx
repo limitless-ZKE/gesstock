@@ -17,6 +17,7 @@ import { money } from "../lib/format";
 import { telecharger } from "../lib/telechargement";
 import { api } from "../services/api";
 import { apiErrorMessage as errorMessage } from "../services/apiError";
+import { formatQuantite } from "../lib/quantite";
 
 type Status = "EN_SAISIE" | "SOUMIS" | "VALIDE" | "ANNULE";
 type Reason = "CASSE" | "VOL" | "PEREMPTION" | "ERREUR_DE_SAISIE" | "ECART_DE_COMPTAGE" | "AUTRE";
@@ -75,7 +76,7 @@ function dateTime(value: string | null) {
 }
 
 function signed(value: number) {
-  return `${value > 0 ? "+" : ""}${value}`;
+  return `${value > 0 ? "+" : ""}${formatQuantite(value)}`;
 }
 
 export default function InventairesPage() {
@@ -328,15 +329,15 @@ export default function InventairesPage() {
                     return (
                       <tr key={line.articleId} className={gap ? "bg-amber-50/40" : ""}>
                         <td className="px-5 py-2.5"><p className="text-xs font-bold text-slate-800">{line.designation}</p><p className="text-xs text-slate-400">{line.reference}{line.unite ? ` · ${line.unite}` : ""}</p></td>
-                        <td className="px-3 py-2.5 text-right text-xs text-slate-600">{line.stockTheorique}</td>
+                        <td className="px-3 py-2.5 text-right text-xs text-slate-600">{formatQuantite(line.stockTheorique)}</td>
                         <td className="px-3 py-2.5">
                           {editable ? (
                             <input
-                              type="number" min="0" step="1" aria-label={`Quantité comptée de ${line.designation}`}
+                              type="number" min="0" step="0.001" inputMode="decimal" aria-label={`Quantité comptée de ${line.designation}`}
                               className="input-field h-9 w-24" defaultValue={line.stockCompte ?? ""}
                               onBlur={(event) => { const value = event.target.value; if (value !== "" && Number(value) !== line.stockCompte) void saveLine(line, { stockCompte: Number(value) }); }}
                             />
-                          ) : <span className="text-xs text-slate-700">{line.stockCompte ?? "—"}</span>}
+                          ) : <span className="text-xs text-slate-700">{line.stockCompte === null ? "—" : formatQuantite(line.stockCompte)}</span>}
                         </td>
                         <td className={`px-3 py-2.5 text-right text-xs font-bold ${gap ? (line.ecart! < 0 ? "text-rose-700" : "text-emerald-700") : "text-slate-400"}`}>{line.ecart === null ? "—" : signed(line.ecart)}</td>
                         <td className="px-3 py-2.5 text-right text-xs text-slate-600">{line.valeurEcart === null || !gap ? "—" : money.format(line.valeurEcart)}</td>

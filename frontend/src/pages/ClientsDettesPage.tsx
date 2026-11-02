@@ -24,12 +24,12 @@ import {
 } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
 import { api } from "../services/api";
-import { apiErrorMessage as errorMessage, parseApiError } from "../services/apiError";
-import ApprobationModal, { type Approbation } from "../components/ApprobationModal";
+import { apiErrorMessage as errorMessage } from "../services/apiError";
 import EnTeteDocument from "../components/EnTeteDocument";
 import { imprimer } from "../lib/impression";
 import { money as currency } from "../lib/format";
 import Indicateur from "../components/Indicateur";
+import { formatQuantite } from "../lib/quantite";
 
 type Client = { id: number; nom: string; email: string | null; telephone: string | null; adresse: string | null; nombreAchats: number };
 type Article = { id: number; reference: string; designation: string; prixVente: number; quantiteStock: number };
@@ -155,7 +155,6 @@ export default function ClientsDettesPage() {
   const [expirationDate, setExpirationDate] = useState("");
   const [draftLines, setDraftLines] = useState<DraftLine[]>([blankLine()]);
   const [proformaSaving, setProformaSaving] = useState(false);
-  const [approbationDemandee, setApprobationDemandee] = useState<{ message: string; erreur: string } | null>(null);
   const [busyProformaId, setBusyProformaId] = useState<number | null>(null);
   const [convertCreditId, setConvertCreditId] = useState<number | null>(null);
   const [cashProforma, setCashProforma] = useState<Proforma | null>(null);
@@ -314,8 +313,8 @@ export default function ClientsDettesPage() {
     await envoyerProforma();
   }
 
-  /** Enregistre le proforma, avec l'accord d'un responsable quand le serveur l'a demandé (remise au-delà du plafond, prix sous le coût). */
-  async function envoyerProforma(approbation?: Approbation) {
+  /** Enregistre le proforma ; le prix négocié est libre (aucun accord de responsable n'est demandé). */
+  async function envoyerProforma() {
     const validLines = draftLines.filter((line) => line.articleId && Number(line.quantite) > 0
       && Number(line.prixUnitaire) >= 0 && Number(line.prixUnitaire) <= (articles.find((article) => String(article.id) === line.articleId)?.prixVente ?? Infinity));
     if (!validLines.length) {
@@ -334,7 +333,6 @@ export default function ClientsDettesPage() {
           quantite: Number(line.quantite),
           prixUnitaire: round2(Number(line.prixUnitaire)),
         })),
-        approbation,
       };
       if (proformaModal === "new") await api.post("/proformas", request);
       else if (proformaModal) await api.put(`/proformas/${proformaModal.id}`, request);
@@ -342,11 +340,6 @@ export default function ClientsDettesPage() {
       showNotice(proformaModal === "new" ? "La facture proforma a été créée en brouillon." : "Le brouillon proforma a été modifié.");
       await loadData();
     } catch (error) {
-      const probleme = parseApiError(error);
-      if (probleme.code === "APPROBATION_REQUISE" || probleme.code === "APPROBATION_REFUSEE") {
-        setApprobationDemandee({ message: probleme.message, erreur: probleme.code === "APPROBATION_REFUSEE" ? probleme.message : "" });
-        return;
-      }
       showNotice(errorMessage(error, "L’enregistrement du proforma a échoué."), true);
     } finally {
       setProformaSaving(false);
@@ -566,7 +559,7 @@ export default function ClientsDettesPage() {
           <div className="divide-y divide-slate-100">
             {draftLines.map((line, index) => <div key={index} className="grid gap-3 p-3 sm:grid-cols-[minmax(0,1fr)_85px_100px_130px_115px_36px] sm:items-end">
               <Field label="Article"><select required className="input-field h-10" value={line.articleId} onChange={(event) => updateLine(index, { articleId: event.target.value })}><option value="">Sélectionner</option>{articles.map((article) => <option key={article.id} value={article.id}>{article.reference} · {article.designation} ({currency.format(article.prixVente)})</option>)}</select></Field>
-              <Field label="Qté"><input required type="number" min="1" step="1" className="input-field h-10" value={line.quantite} onChange={(event) => updateLine(index, { quantite: event.target.value })} /></Field>
+              <Field label="Qté"><input required type="number" min="0.001" step="0.001" inputMode="decimal" className="input-field h-10" value={line.quantite} onChange={(event) => updateLine(index, { quantite: event.target.value })} /></Field>
               <Field label="Remise %"><input type="number" min="0" max="100" step="0.01" className="input-field h-10" value={line.remise} onChange={(event) => updateLine(index, { remise: event.target.value })} /></Field>
               <Field label="Prix négocié"><input required type="number" min="0" step="any" className="input-field h-10" value={line.prixUnitaire} onChange={(event) => updateLine(index, { prixUnitaire: event.target.value })} /></Field>
               <div><span className="mb-1 block text-xs font-bold text-slate-500">Total ligne</span><p className="flex h-10 items-center text-xs font-bold text-slate-800">{currency.format((Number(line.quantite) || 0) * (Number(line.prixUnitaire) || 0))}</p></div>
@@ -591,8 +584,6 @@ export default function ClientsDettesPage() {
       {clientDebts.length ? <div className="max-h-40 overflow-auto rounded-xl border border-slate-200"><table className="w-full text-left"><tbody className="divide-y divide-slate-100">{clientDebts.map((debt) => <tr key={debt.id}><td className="px-3 py-2.5 text-xs font-semibold text-slate-700">{debt.numeroVente}</td><td className="px-3 py-2.5 text-xs text-slate-500">{dateLabel(debt.dateCreation)}</td><td className="px-3 py-2.5"><DebtBadge status={debt.statut} /></td><td className="px-3 py-2.5 text-right text-xs font-bold text-slate-800">{currency.format(debt.solde)}</td></tr>)}</tbody></table></div> : <Empty>Aucune dette client.</Empty>}
       <div className="mt-5 flex justify-end"><button onClick={() => { setClientDetail(null); openClientForm(clientDetail); }} className="button-secondary"><Pencil size={14} /> Modifier la fiche</button></div>
     </Modal>}
-
-    {approbationDemandee && <ApprobationModal message={approbationDemandee.message} erreur={approbationDemandee.erreur} occupe={proformaSaving} libelleAction="Enregistrer le proforma" onAnnuler={() => setApprobationDemandee(null)} onSoumettre={(approbation) => { setApprobationDemandee(null); void envoyerProforma(approbation); }} />}
     {cashProforma && <Modal title={`Règlement · ${cashProforma.numero}`} onClose={() => busyProformaId === null && setCashProforma(null)}>
       <div className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4"><p className="text-xs font-semibold text-emerald-700">Total à encaisser</p><p className="mt-1 text-xl font-extrabold text-emerald-900">{currency.format(cashProforma.montantTotal)}</p></div>
       <form onSubmit={(event) => void confirmCashConversion(event)} className="space-y-4">
@@ -664,7 +655,7 @@ function ProformasTable({ proformas, loading, busyId, convertCreditId, onConvert
     <thead className="bg-slate-50/80 text-xs font-semibold text-slate-600"><tr><th className="px-5 py-3">Proforma</th><th className="px-4 py-3">Client</th><th className="px-4 py-3">Émise le</th><th className="px-4 py-3">Validité</th><th className="px-4 py-3">Articles</th><th className="px-4 py-3">Montant</th><th className="px-4 py-3">Statut</th><th className="px-5 py-3 text-right">Actions</th></tr></thead>
     <tbody className="divide-y divide-slate-100">{loading ? <LoadingRow cols={8} /> : proformas.length ? proformas.map((proforma) => {
       const busy = busyId === proforma.id;
-      return <tr key={proforma.id} className="hover:bg-slate-50/70"><td className="px-5 py-3.5"><p className="text-xs font-bold text-slate-800">{proforma.numero}</p><p className="mt-1 text-xs text-slate-400">{proforma.lignes.length} ligne(s)</p></td><td className="px-4 py-3.5 text-xs text-slate-600">{proforma.client || "Client comptoir"}</td><td className="px-4 py-3.5 text-xs text-slate-600">{dateLabel(proforma.dateEmission)}</td><td className="px-4 py-3.5 text-xs text-slate-600">{dateLabel(proforma.dateExpiration)}</td><td className="px-4 py-3.5 text-xs text-slate-600">{proforma.lignes.reduce((sum, line) => sum + line.quantite, 0)} unité(s)</td><td className="px-4 py-3.5 text-xs font-bold text-slate-800">{currency.format(proforma.montantTotal)}</td><td className="px-4 py-3.5"><ProformaBadge status={proforma.statut} /></td><td className="px-5 py-3.5"><div className="flex flex-wrap items-center justify-end gap-1">
+      return <tr key={proforma.id} className="hover:bg-slate-50/70"><td className="px-5 py-3.5"><p className="text-xs font-bold text-slate-800">{proforma.numero}</p><p className="mt-1 text-xs text-slate-400">{proforma.lignes.length} ligne(s)</p></td><td className="px-4 py-3.5 text-xs text-slate-600">{proforma.client || "Client comptoir"}</td><td className="px-4 py-3.5 text-xs text-slate-600">{dateLabel(proforma.dateEmission)}</td><td className="px-4 py-3.5 text-xs text-slate-600">{dateLabel(proforma.dateExpiration)}</td><td className="px-4 py-3.5 text-xs text-slate-600">{formatQuantite(proforma.lignes.reduce((sum, line) => sum + line.quantite, 0))} unité(s)</td><td className="px-4 py-3.5 text-xs font-bold text-slate-800">{currency.format(proforma.montantTotal)}</td><td className="px-4 py-3.5"><ProformaBadge status={proforma.statut} /></td><td className="px-5 py-3.5"><div className="flex flex-wrap items-center justify-end gap-1">
         {proforma.statut === "BROUILLON" && <><button disabled={busy} onClick={() => onEdit(proforma)} title="Modifier le brouillon" className="icon-button text-slate-400 hover:text-emerald-700"><Pencil size={14} /></button><button disabled={busy} onClick={() => onDelete(proforma)} title="Supprimer" className="icon-button text-slate-400 hover:text-rose-600"><Trash2 size={14} /></button><button disabled={busy} onClick={() => onStatus(proforma, "ENVOYEE")} className="button-secondary h-8 px-2.5 text-xs">Marquer envoyée</button></>}
         {proforma.statut === "ENVOYEE" && <><button disabled={busy} onClick={() => onStatus(proforma, "ACCEPTEE")} className="inline-flex h-8 items-center gap-1 rounded-lg bg-emerald-600 px-2.5 text-xs font-bold text-white disabled:opacity-50">{busy ? <LoaderCircle size={12} className="animate-spin" /> : <Check size={12} />}Accepter</button><button disabled={busy} onClick={() => onStatus(proforma, "REFUSEE")} className="button-secondary h-8 px-2.5 text-xs">Refuser</button></>}
         {proforma.statut === "ACCEPTEE" && <><label className="flex items-center gap-1 text-xs font-semibold text-slate-500"><input type="checkbox" checked={convertCreditId === proforma.id} onChange={(event) => onConvertCredit(event.target.checked ? proforma.id : null)} />À crédit</label><button disabled={busy} onClick={() => onConvert(proforma)} className="inline-flex h-8 items-center gap-1 rounded-lg bg-emerald-600 px-2.5 text-xs font-bold text-white disabled:opacity-50">{busy ? <LoaderCircle size={12} className="animate-spin" /> : <Check size={12} />}Convertir en vente</button></>}

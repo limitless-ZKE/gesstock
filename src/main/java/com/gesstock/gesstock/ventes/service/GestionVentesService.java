@@ -519,9 +519,8 @@ public class GestionVentesService {
             ligne.setCoutEstime(false);
             BigDecimal coutLigne = Quantites.montant(ligne.getCoutUnitaire(), ligne.getQuantite());
             if (ligne.getMontantLigne().compareTo(coutLigne) < 0) {
-                sousLeCout.add(article.getReference() + " « " + article.getDesignation() + " » : vendu "
-                    + ligne.getMontantLigne().setScale(2, RoundingMode.HALF_UP).toPlainString() + " pour "
-                    + Quantites.texte(ligne.getQuantite()) + ", prix d'achat " + coutLigne.setScale(2, RoundingMode.HALF_UP).toPlainString());
+                sousLeCout.add(article.getReference() + " « " + article.getDesignation() + " » : " + Quantites.texte(ligne.getQuantite())
+                    + " vendu(s) " + montantLisible(ligne.getMontantLigne()) + ", prix d'achat " + montantLisible(coutLigne));
             }
             creerMouvementStock(vente, ligne, article, quantite, avant, apres, vendeur, session);
         }
@@ -533,6 +532,11 @@ public class GestionVentesService {
                 "Vente " + vente.getCode() + " sous le prix d'achat : " + String.join(" ; ", sousLeCout), username);
         }
         return sousLeCout.stream().map(detail -> "Vendu sous le prix d'achat — " + detail).toList();
+    }
+
+    /** 150000.0000 -> « 150000 », 1234.5000 -> « 1234,5 » : un montant lisible dans un message au vendeur. */
+    private static String montantLisible(BigDecimal montant) {
+        return Quantites.texte(montant.setScale(2, RoundingMode.HALF_UP));
     }
 
     private void creerDetteVente(Vente vente) {

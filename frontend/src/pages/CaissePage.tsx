@@ -18,13 +18,13 @@ import {
   WalletCards,
   X,
 } from "lucide-react";
-import ApprobationModal, { type Approbation } from "../components/ApprobationModal";
 import ChampClient from "../components/ChampClient";
 import QuantiteSaisie from "../components/QuantiteSaisie";
 import ReceiptModal, { type Sale } from "../components/ReceiptModal";
 import { api } from "../services/api";
-import { apiErrorMessage as messageFor, parseApiError } from "../services/apiError";
+import { apiErrorMessage as messageFor } from "../services/apiError";
 import { money as currency, moneyPrecise as money2 } from "../lib/format";
+import { arrondirQuantite, formatQuantite } from "../lib/quantite";
 
 type Category = { id: number; nom: string };
 type Article = {
@@ -67,8 +67,10 @@ type SaleResponse = Sale;
 type PaymentMode = "ESPECES" | "MOBILE_MONEY" | "CARTE" | "VIREMENT";
 /** Le crédit n'est pas un mode de règlement : la vente devient une dette du client, rien n'est encaissé. */
 type ChoixReglement = PaymentMode | "CREDIT";
-// prixNegocie : prix convenu avec le client pour cette ligne (texte saisi) ; vide = prix catalogue.
-type CartLine = { article: Article; quantite: number; promotionId: number | null; prixNegocie: string };
+// prixNegocie : prix convenu avec le client par unité (texte saisi) ; vide = prix catalogue.
+// totalNegocie : prix convenu pour la LIGNE entière (remise sur le total de l'article) ; il remplace le prix unitaire et la
+// promotion. Les deux s'excluent : saisir l'un vide l'autre.
+type CartLine = { article: Article; quantite: number; promotionId: number | null; prixNegocie: string; totalNegocie: string };
 
 const round2 = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
 const round4 = (value: number) => Math.round((value + Number.EPSILON) * 10000) / 10000;
@@ -92,6 +94,41 @@ function negotiatedPriceError(line: CartLine): string | null {
 /** Prix de base appliqué à la ligne : le prix négocié s'il est valide, sinon le prix catalogue. */
 function basePrice(line: CartLine): number {
   return negotiatedPriceError(line) === null ? parseNegotiatedPrice(line.prixNegocie) ?? line.article.prixVente : line.article.prixVente;
+}
+
+/** Total de la ligne au prix catalogue (sans remise ni promotion). */
+const catalogueTotal = (line: CartLine) => round2(line.article.prixVente * line.quantite);
+
+/** Message d'erreur du total négocié d'une ligne, ou null s'il est valide (ou vide). */
+function negotiatedTotalError(line: CartLine): string | null {
+  if (line.totalNegocie.trim() === "") return null;
+  const total = parseNegotiatedPrice(line.totalNegocie);
+  if (total === null) return "Montant invalide.";
+  if (total > catalogueTotal(line)) return `Ne peut pas dépasser le total au prix catalogue (${currency.format(catalogueTotal(line))}).`;
+  return null;
+}
+
+/** Total négocié de la ligne s'il est saisi et valide ; null sinon. */
+function negotiatedLineTotal(line: CartLine): number | null {
+  return negotiatedTotalError(line) === null ? parseNegotiatedPrice(line.totalNegocie) : null;
+}
+
+function promotionOf(line: CartLine, promotions: Promotion[]) {
+  return line.promotionId == null
+    ? bestPromotion(line.article.id, promotions)
+    : promotions.find((candidate) => candidate.id === line.promotionId);
+}
+
+/**
+ * Montant de la ligne, calculé comme le serveur : le total négocié s'il y en a un, sinon
+ * (prix − promotion arrondie à 4 décimales) × quantité, arrondi à 4 décimales.
+ */
+function lineAmount(line: CartLine, promotions: Promotion[]): number {
+  const total = negotiatedLineTotal(line);
+  if (total !== null) return total;
+  const rate = promotionOf(line, promotions)?.pourcentage ?? 0;
+  const unitDiscount = round4(basePrice(line) * rate / 100);
+  return round4((basePrice(line) - unitDiscount) * line.quantite);
 }
 
 
@@ -136,7 +173,8 @@ export default function CaissePage() {
   const [paymentMode, setPaymentMode] = useState<ChoixReglement>("ESPECES");
   const [amountReceived, setAmountReceived] = useState("");
   const [checkoutBusy, setCheckoutBusy] = useState(false);
-  const [approbationDemandee, setApprobationDemandee] = useState<{ message: string; erreur: string } | null>(null);
+  // Lignes vendues sous le prix d'achat lors de la dernière vente : la vente est passée, le vendeur est prévenu.
+  const [avertissements, setAvertissements] = useState<string[]>([]);
   const [pendingDraft, setPendingDraft] = useState<SaleResponse | null>(null);
   const [receipt, setReceipt] = useState<SaleResponse | null>(null);
   const [notice, setNotice] = useState("");
@@ -154,15 +192,8 @@ export default function CaissePage() {
   }, [articles, categoryId, search]);
 
   const cartTotals = useMemo(() => {
-    const subtotal = cart.reduce((total, line) => {
-      const promotion = line.promotionId == null
-        ? bestPromotion(line.article.id, promotions)
-        : promotions.find((candidate) => candidate.id === line.promotionId);
-      const rate = promotion?.pourcentage ?? 0;
-      // Même arrondi que le serveur (remise unitaire à 4 décimales) : le total affiché est exactement le total facturé.
-      const unitDiscount = round4(basePrice(line) * rate / 100);
-      return total + (basePrice(line) - unitDiscount) * line.quantite;
-    }, 0);
+    // Même calcul que le serveur, ligne par ligne : le total affiché est exactement le total facturé.
+    const subtotal = cart.reduce((total, line) => total + lineAmount(line, promotions), 0);
     // Mêmes formules que le serveur (CalculTva) : le total affiché est exactement le total facturé.
     const net = round4(subtotal);
     if (fiscal.tauxTva === 0) return { subtotal: net, tax: 0, total: net };
@@ -219,15 +250,16 @@ export default function CaissePage() {
   }
 
   function addToCart(article: Article) {
-    if (article.quantiteStock < 1) return;
+    if (article.quantiteStock <= 0) return;
     setCart((current) => {
       const existing = current.find((line) => line.article.id === article.id);
       if (existing) {
         return current.map((line) => line.article.id === article.id
-          ? { ...line, quantite: Math.min(line.quantite + 1, article.quantiteStock) }
+          ? { ...line, quantite: arrondirQuantite(Math.min(line.quantite + 1, article.quantiteStock)) }
           : line);
       }
-      return [...current, { article, quantite: 1, promotionId: null, prixNegocie: "" }];
+      // Un reste de stock inférieur à 1 (0,5 caisse) se vend tel quel.
+      return [...current, { article, quantite: Math.min(1, article.quantiteStock), promotionId: null, prixNegocie: "", totalNegocie: "" }];
     });
   }
 
@@ -239,7 +271,7 @@ export default function CaissePage() {
       return;
     }
     setCart((current) => current.map((line) => line.article.id === articleId
-      ? { ...line, quantite: Math.min(quantity, article.quantiteStock) }
+      ? { ...line, quantite: arrondirQuantite(Math.min(quantity, article.quantiteStock)) }
       : line));
   }
 
@@ -308,12 +340,12 @@ export default function CaissePage() {
     await envoyerVente();
   }
 
-  /** Enregistre puis valide la vente. Avec l'accord d'un responsable quand le serveur l'a demandé (remise au-delà du plafond, prix sous le coût). */
-  async function envoyerVente(approbation?: Approbation) {
+  /** Enregistre puis valide la vente. Le prix négocié est libre (aucun accord de responsable n'est demandé). */
+  async function envoyerVente() {
     if (!session || cart.length === 0) return;
-    const invalidLine = cart.find((line) => negotiatedPriceError(line) !== null);
+    const invalidLine = cart.find((line) => negotiatedPriceError(line) !== null || negotiatedTotalError(line) !== null);
     if (invalidLine) {
-      showNotice(`Prix négocié invalide pour « ${invalidLine.article.designation} ». ${negotiatedPriceError(invalidLine)}`, true);
+      showNotice(`Prix négocié invalide pour « ${invalidLine.article.designation} ». ${negotiatedPriceError(invalidLine) ?? negotiatedTotalError(invalidLine)}`, true);
       return;
     }
     // À crédit : ni mode de règlement ni montant reçu, la vente est inscrite en dette au nom du client.
@@ -341,17 +373,21 @@ export default function CaissePage() {
         tauxTva: fiscal.tauxTva,
         modeReglement,
         montantRecu: aCredit ? null : received,
-        approbation,
-        lignes: cart.map((line) => ({
-          articleId: line.article.id,
-          quantite: line.quantite,
-          promotionId: line.promotionId,
-          // prix négocié envoyé seulement s'il diffère du prix catalogue
-          prixUnitaire: (() => {
-            const negotiated = parseNegotiatedPrice(line.prixNegocie);
-            return negotiated !== null && negotiated !== line.article.prixVente ? negotiated : null;
-          })(),
-        })),
+        lignes: cart.map((line) => {
+          // total négocié pour la ligne entière : il remplace le prix unitaire et la promotion (envoyé s'il diffère du catalogue)
+          const total = negotiatedLineTotal(line);
+          if (total !== null && total !== catalogueTotal(line)) {
+            return { articleId: line.article.id, quantite: line.quantite, promotionId: null, prixUnitaire: null, montantNegocie: total };
+          }
+          const negotiated = parseNegotiatedPrice(line.prixNegocie);
+          return {
+            articleId: line.article.id,
+            quantite: line.quantite,
+            promotionId: line.promotionId,
+            // prix négocié envoyé seulement s'il diffère du prix catalogue
+            prixUnitaire: negotiated !== null && negotiated !== line.article.prixVente ? negotiated : null,
+          };
+        }),
       };
       let draft = pendingDraft;
       if (!draft) {
@@ -362,23 +398,18 @@ export default function CaissePage() {
       }
       const { data: validated } = await api.post<SaleResponse>(`/ventes/${draft.id}/validation`);
       setReceipt(validated);
+      setAvertissements(validated.avertissements ?? []);
       setPendingDraft(null);
       setCart([]);
       setClientId("");
       setCheckoutOpen(false);
       setArticles((current) => current.map((article) => {
         const sold = cart.find((line) => line.article.id === article.id);
-        return sold ? { ...article, quantiteStock: article.quantiteStock - sold.quantite } : article;
+        return sold ? { ...article, quantiteStock: arrondirQuantite(article.quantiteStock - sold.quantite) } : article;
       }));
       showNotice("Vente enregistrée et stock mis à jour.");
       void refreshSession().catch(() => setSession(null));
     } catch (error) {
-      const probleme = parseApiError(error);
-      if (probleme.code === "APPROBATION_REQUISE" || probleme.code === "APPROBATION_REFUSEE") {
-        // le serveur demande (ou a refusé) l'accord d'un responsable : on ouvre la fenêtre de saisie, la vente reste dans le panier
-        setApprobationDemandee({ message: probleme.message, erreur: probleme.code === "APPROBATION_REFUSEE" ? probleme.message : "" });
-        return;
-      }
       showNotice(
         draftAlreadyExists
           ? `Le brouillon reste enregistré. ${messageFor(error, "La validation a échoué.")} Corrigez le problème puis réessayez.`
@@ -412,6 +443,20 @@ export default function CaissePage() {
           {noticeIsError ? <CircleAlert size={17} className="mt-0.5 shrink-0" /> : <CheckCircle2 size={17} className="mt-0.5 shrink-0" />}
           <span>{notice}</span>
           <button className="ml-auto opacity-60 hover:opacity-100" onClick={() => setNotice("")} aria-label="Fermer"><X size={16} /></button>
+        </div>
+      )}
+
+      {avertissements.length > 0 && (
+        <div role="alert" className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
+          <CircleAlert size={17} className="mt-0.5 shrink-0" />
+          <div>
+            <p className="font-bold">Vente enregistrée sous le prix d’achat</p>
+            <ul className="mt-1 list-disc pl-4">
+              {avertissements.map((avertissement) => <li key={avertissement}>{avertissement.replace(/^Vendu sous le prix d'achat — /, "")}</li>)}
+            </ul>
+            <p className="mt-1 text-xs">Elle est notée dans le journal des opérations.</p>
+          </div>
+          <button className="ml-auto opacity-60 hover:opacity-100" onClick={() => setAvertissements([])} aria-label="Fermer l’avertissement"><X size={16} /></button>
         </div>
       )}
 
@@ -488,7 +533,7 @@ export default function CaissePage() {
                       onClick={() => addToCart(article)}
                       className="group relative flex min-h-[160px] flex-col rounded-xl border border-slate-200 p-4 text-left transition hover:border-emerald-300 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-55"
                     >
-                      {inCart > 0 && <span className="absolute right-3 top-3 grid size-6 place-items-center rounded-full bg-emerald-600 text-xs font-bold text-white">{inCart}</span>}
+                      {inCart > 0 && <span className="absolute right-3 top-3 grid h-6 min-w-6 place-items-center rounded-full bg-emerald-600 px-1.5 text-xs font-bold text-white">{formatQuantite(inCart)}</span>}
                       
                       <p className="line-clamp-2 pr-7 text-base font-semibold text-slate-900">{article.designation}</p>
                       <p className="mt-1 text-xs font-medium text-slate-400">{article.reference}{article.categorie ? ` · ${article.categorie}` : ""}</p>
@@ -496,7 +541,7 @@ export default function CaissePage() {
                         <div>
                           <p className="text-sm font-extrabold text-slate-900">{currency.format(article.prixVente)}</p>
                           <p className={`mt-1 text-xs font-semibold ${outOfStock || lowStock ? "text-amber-700" : "text-slate-400"}`}>
-                            Stock : {article.quantiteStock} {article.uniteMesure ?? ""}
+                            Stock : {formatQuantite(article.quantiteStock)} {article.uniteMesure ?? ""}
                             {outOfStock ? " · Rupture" : lowStock ? " · Alerte" : ""}
                           </p>
                         </div>
@@ -514,7 +559,7 @@ export default function CaissePage() {
           <div className="flex items-center justify-between border-b border-slate-100 p-5 md:p-6">
             <div className="flex items-center gap-3">
               
-              <div><h2 className="font-bold text-slate-900">Panier de vente</h2><p className="mt-1 text-xs text-slate-500">{cart.reduce((count, line) => count + line.quantite, 0)} article(s)</p></div>
+              <div><h2 className="font-bold text-slate-900">Panier de vente</h2><p className="mt-1 text-xs text-slate-500">{formatQuantite(cart.reduce((count, line) => count + line.quantite, 0))} article(s)</p></div>
             </div>
             {cart.length > 0 && <button onClick={() => setCart([])} className="text-xs font-semibold text-slate-400 hover:text-rose-600">Vider</button>}
           </div>
@@ -529,12 +574,13 @@ export default function CaissePage() {
                 </div>
               ) : cart.map((line) => {
                 const availablePromotions = promotionsForArticle(line.article.id, promotions);
-                const selectedPromotion = line.promotionId == null
-                  ? bestPromotion(line.article.id, promotions)
-                  : availablePromotions.find((promotion) => promotion.id === line.promotionId);
                 const negotiationError = negotiatedPriceError(line);
+                const totalError = negotiatedTotalError(line);
+                const lineTotal = negotiatedLineTotal(line);
                 const negotiatedDiscount = round2(line.article.prixVente - basePrice(line));
-                const unitPrice = basePrice(line) * (1 - (selectedPromotion?.pourcentage ?? 0) / 100);
+                const amount = lineAmount(line, promotions);
+                const unitPrice = amount / line.quantite;
+                const lineDiscount = round2(catalogueTotal(line) - (lineTotal ?? 0));
                 return (
                   <article key={line.article.id} className="rounded-xl border border-slate-100 p-3.5">
                     <div className="flex items-start justify-between gap-3">
@@ -555,7 +601,7 @@ export default function CaissePage() {
                         />
                         <button onClick={() => changeQuantity(line.article.id, line.quantite + 1)} disabled={line.quantite >= line.article.quantiteStock} className="grid size-8 place-items-center text-slate-500 hover:bg-slate-50 disabled:opacity-30" aria-label="Augmenter quantité"><Plus size={13} /></button>
                       </div>
-                      <p className="text-xs font-extrabold text-slate-900">{money2.format(unitPrice * line.quantite)}</p>
+                      <p className="text-xs font-extrabold text-slate-900">{money2.format(amount)}</p>
                     </div>
                     <label className="mt-3 flex items-center gap-2 text-xs font-semibold text-slate-600">
                       <span className="shrink-0">Prix négocié</span>
@@ -569,20 +615,41 @@ export default function CaissePage() {
                         placeholder={`Catalogue : ${line.article.prixVente}`}
                         aria-label={`Prix négocié pour ${line.article.designation}`}
                         onChange={(event) => setCart((current) => current.map((entry) => entry.article.id === line.article.id
-                          ? { ...entry, prixNegocie: event.target.value }
+                          ? { ...entry, prixNegocie: event.target.value, totalNegocie: "" }
                           : entry))}
                         className={`input-field h-8 min-w-0 flex-1 text-right text-xs ${negotiationError ? "border-rose-300" : ""}`}
                       />
                     </label>
-                    {negotiationError
-                      ? <p role="alert" className="mt-1 text-xs font-semibold text-rose-600">{negotiationError}</p>
-                      : negotiatedDiscount > 0 && (
+                    <label className="mt-2 flex items-center gap-2 text-xs font-semibold text-slate-600">
+                      <span className="shrink-0">Total négocié</span>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        min="0"
+                        step="0.01"
+                        value={line.totalNegocie}
+                        placeholder={`Catalogue : ${catalogueTotal(line)}`}
+                        aria-label={`Total négocié pour ${line.article.designation}`}
+                        onChange={(event) => setCart((current) => current.map((entry) => entry.article.id === line.article.id
+                          ? { ...entry, totalNegocie: event.target.value, prixNegocie: "" }
+                          : entry))}
+                        className={`input-field h-8 min-w-0 flex-1 text-right text-xs ${totalError ? "border-rose-300" : ""}`}
+                      />
+                    </label>
+                    {negotiationError || totalError
+                      ? <p role="alert" className="mt-1 text-xs font-semibold text-rose-600">{negotiationError ?? totalError}</p>
+                      : lineTotal !== null && lineDiscount > 0 ? (
+                        <p className="mt-1 text-xs font-semibold text-emerald-700">
+                          Remise sur la ligne : −{money2.format(lineDiscount)}
+                          {" "}(−{round2(lineDiscount / catalogueTotal(line) * 100)} %)
+                        </p>
+                      ) : negotiatedDiscount > 0 && (
                         <p className="mt-1 text-xs font-semibold text-emerald-700">
                           Remise négociée : −{money2.format(negotiatedDiscount)} / unité
                           {" "}(−{round2(negotiatedDiscount / line.article.prixVente * 100)} %)
                         </p>
                       )}
-                    {availablePromotions.length > 0 && (
+                    {availablePromotions.length > 0 && lineTotal === null && (
                       <label className="mt-3 flex items-center gap-2 text-xs font-semibold text-emerald-700">
                         <span className="shrink-0">Remise</span>
                         <select
@@ -648,19 +715,6 @@ export default function CaissePage() {
         />
       )}
 
-      {approbationDemandee && (
-        <ApprobationModal
-          message={approbationDemandee.message}
-          erreur={approbationDemandee.erreur}
-          occupe={checkoutBusy}
-          libelleAction="Valider la vente"
-          onAnnuler={() => setApprobationDemandee(null)}
-          onSoumettre={(approbation) => {
-            setApprobationDemandee(null);
-            void envoyerVente(approbation);
-          }}
-        />
-      )}
       {receipt && <ReceiptModal sale={receipt} onClose={() => setReceipt(null)} />}
     </div>
   );

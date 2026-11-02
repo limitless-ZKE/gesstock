@@ -2,6 +2,7 @@ import { CheckCircle2, Printer, X } from "lucide-react";
 import { useEntreprise } from "../entreprise/EntrepriseContext";
 import { formatPercent, moneyPrecise as money } from "../lib/format";
 import { imprimer } from "../lib/impression";
+import { formatQuantite } from "../lib/quantite";
 import EnTeteDocument from "./EnTeteDocument";
 
 export type ReceiptPaymentMode = "ESPECES" | "MOBILE_MONEY" | "CARTE" | "VIREMENT" | "CHEQUE" | "AUTRE";
@@ -34,6 +35,8 @@ export type Sale = {
   modeReglement: ReceiptPaymentMode | null;
   montantRecu: number | null;
   lignes: ReceiptLine[];
+  /** Avertissements de la validation (vente sous le prix d'achat) ; absents ailleurs. */
+  avertissements?: string[];
 };
 
 const paymentLabels: Record<ReceiptPaymentMode, string> = {
@@ -60,7 +63,9 @@ export const remiseNegocieeUnitaire = (line: ReceiptLine) =>
 
 /** Totaux des remises d'une vente : négociée avec le client, et issue des promotions. */
 export function remisesDeLaVente(sale: Sale) {
-  const negociee = round2(sale.lignes.reduce((total, line) => total + remiseNegocieeUnitaire(line) * line.quantite, 0));
+  // remise négociée = total au prix catalogue − promotions − montant facturé : couvre aussi un prix fixé pour la ligne entière
+  const negociee = round2(sale.lignes.reduce((total, line) => total + Math.max(0,
+    (line.prixCatalogue ?? line.prixUnitaire) * line.quantite - (line.remiseUnitaire ?? 0) * line.quantite - line.montantLigne), 0));
   const promotions = round2(sale.lignes.reduce((total, line) => total + (line.remiseUnitaire ?? 0) * line.quantite, 0));
   return { negociee, promotions, total: round2(negociee + promotions) };
 }
@@ -112,7 +117,7 @@ export default function ReceiptModal({ sale, onClose, duplicata = false }: Recei
                     <span className="shrink-0">{money.format(line.montantLigne)}</span>
                   </div>
                   <p className="text-[9px] text-slate-500">
-                    {line.quantite} × {money.format(line.prixUnitaire)}
+                    {formatQuantite(line.quantite)} × {money.format(line.prixUnitaire)}
                   </p>
                   {negociee > 0 && (
                     <p className="text-[9px] text-slate-500">

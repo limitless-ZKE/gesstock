@@ -21,6 +21,7 @@ import { api } from "../services/api";
 import { apiErrorMessage as errorMessage } from "../services/apiError";
 import { money } from "../lib/format";
 import Indicateur from "../components/Indicateur";
+import { formatQuantite } from "../lib/quantite";
 
 type Category = { id: number; nom: string; description: string | null; active: boolean; parentId: number | null };
 type Unit = { id: number; code: string; libelle: string };
@@ -217,7 +218,7 @@ export default function ArticlesPage() {
         commentaire: adjustForm.commentaire.trim() || null,
       });
       setAdjustArticle(null);
-      notify(`Stock de « ${adjustArticle.designation} » ajusté : ${adjustArticle.quantiteStock} → ${Number(adjustForm.nouveauStock)}.`);
+      notify(`Stock de « ${adjustArticle.designation} » ajusté : ${formatQuantite(adjustArticle.quantiteStock)} → ${formatQuantite(Number(adjustForm.nouveauStock))}.`);
       await loadData();
     } catch (adjustError) {
       notify(errorMessage(adjustError, "Ajustement du stock impossible."), true);
@@ -437,7 +438,7 @@ export default function ArticlesPage() {
                         <td className="px-4 py-3.5 text-xs text-slate-600">{article.categorie ?? "—"}</td>
                         <td className="px-4 py-3.5 text-xs text-slate-600"><p>{money.format(article.prixAchat)}</p><p title="Coût moyen pondéré : valeur du stock divisée par sa quantité, base des marges" className="mt-1 text-xs text-slate-400">CMP {money.format(article.coutMoyen)}</p></td>
                         <td className="px-4 py-3.5 text-xs font-bold text-slate-800">{money.format(article.prixVente)}</td>
-                        <td className="px-4 py-3.5"><p className="text-xs font-bold text-slate-800">{article.quantiteStock} <span className="font-normal text-slate-400">{article.uniteMesure ?? ""}</span></p><p className="mt-1 text-xs text-slate-400">Seuil : {article.seuilAlerteStock}</p></td>
+                        <td className="px-4 py-3.5"><p className="text-xs font-bold text-slate-800">{formatQuantite(article.quantiteStock)} <span className="font-normal text-slate-400">{article.uniteMesure ?? ""}</span></p><p className="mt-1 text-xs text-slate-400">Seuil : {article.seuilAlerteStock}</p></td>
                         <td className="px-4 py-3.5"><span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ${status.className}`}><span className={`size-1.5 rounded-full ${status.dot}`} />{status.label}</span></td>
                         <td className="px-4 py-3.5">
                           <div className="flex justify-end gap-1">
@@ -472,7 +473,7 @@ export default function ArticlesPage() {
               <Field label={articleModal === "new" ? "Prix d’achat (XOF)" : "Dernier prix d’achat (XOF)"}><input required min="0" step="any" type="number" className="input-field" value={articleForm.prixAchat} onChange={(event) => setArticleForm({ ...articleForm, prixAchat: event.target.value })} /></Field>
               <Field label="Prix de vente (XOF)"><input required min="0" step="any" type="number" className="input-field" value={articleForm.prixVente} onChange={(event) => setArticleForm({ ...articleForm, prixVente: event.target.value })} /></Field>
               <Field label="Seuil d’alerte"><input required min="0" step="1" type="number" className="input-field" value={articleForm.seuilAlerteStock} onChange={(event) => setArticleForm({ ...articleForm, seuilAlerteStock: event.target.value })} /></Field>
-              <Field label={articleModal === "new" ? "Stock initial" : "Stock actuel (non modifiable ici)"}><input required min="0" step="1" type="number" readOnly={articleModal !== "new"} className="input-field read-only:bg-slate-50 read-only:text-slate-500" value={articleForm.quantiteStock} onChange={(event) => setArticleForm({ ...articleForm, quantiteStock: event.target.value })} /><span className="mt-1 block text-xs text-slate-400">{articleModal === "new" ? "Les variations de stock sont ensuite enregistrées par réception ou vente." : "Pour corriger le stock, utilisez « Ajuster le stock » dans la liste (motif obligatoire)."}</span></Field>
+              <Field label={articleModal === "new" ? "Stock initial" : "Stock actuel (non modifiable ici)"}><input required min="0" step="0.001" type="number" inputMode="decimal" readOnly={articleModal !== "new"} className="input-field read-only:bg-slate-50 read-only:text-slate-500" value={articleForm.quantiteStock} onChange={(event) => setArticleForm({ ...articleForm, quantiteStock: event.target.value })} /><span className="mt-1 block text-xs text-slate-400">{articleModal === "new" ? "Les variations de stock sont ensuite enregistrées par réception ou vente." : "Pour corriger le stock, utilisez « Ajuster le stock » dans la liste (motif obligatoire)."}</span></Field>
               <Field label="Catégorie"><select className="input-field" value={articleForm.categorieId} onChange={(event) => setArticleForm({ ...articleForm, categorieId: event.target.value })}><option value="">Sans catégorie</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.nom}</option>)}</select></Field>
               <Field label="Unité de mesure principale"><select className="input-field" value={articleForm.uniteMesureId} onChange={(event) => setArticleForm({ ...articleForm, uniteMesureId: event.target.value })}><option value="">Sans unité</option>{units.map((unit) => <option key={unit.id} value={unit.id}>{unit.libelle} ({unit.code})</option>)}</select></Field>
             </div>
@@ -482,16 +483,16 @@ export default function ArticlesPage() {
       )}
 
       {adjustArticle && (
-        <Modal title="Ajuster le stock" subtitle={`${adjustArticle.designation} (${adjustArticle.reference}) : stock enregistré ${adjustArticle.quantiteStock}`} onClose={() => setAdjustArticle(null)}>
+        <Modal title="Ajuster le stock" subtitle={`${adjustArticle.designation} (${adjustArticle.reference}) : stock enregistré ${formatQuantite(adjustArticle.quantiteStock)}`} onClose={() => setAdjustArticle(null)}>
           <form onSubmit={saveAdjustment} className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Stock réel constaté"><input required autoFocus min="0" step="1" type="number" className="input-field" value={adjustForm.nouveauStock} onChange={(event) => setAdjustForm({ ...adjustForm, nouveauStock: event.target.value })} /></Field>
+              <Field label="Stock réel constaté"><input required autoFocus min="0" step="0.001" type="number" inputMode="decimal" className="input-field" value={adjustForm.nouveauStock} onChange={(event) => setAdjustForm({ ...adjustForm, nouveauStock: event.target.value })} /></Field>
               <Field label="Motif"><select required className="input-field" value={adjustForm.motif} onChange={(event) => setAdjustForm({ ...adjustForm, motif: event.target.value })}><option value="">Choisir un motif</option>{adjustmentReasons.map((reason) => <option key={reason.value} value={reason.value}>{reason.label}</option>)}</select></Field>
             </div>
             <Field label={adjustForm.motif === "AUTRE" ? "Commentaire (obligatoire)" : "Commentaire (facultatif)"}><input required={adjustForm.motif === "AUTRE"} maxLength={300} className="input-field" value={adjustForm.commentaire} onChange={(event) => setAdjustForm({ ...adjustForm, commentaire: event.target.value })} placeholder="Ex. : carton tombé pendant le déchargement" /></Field>
             {Number(adjustForm.nouveauStock) !== adjustArticle.quantiteStock && adjustForm.nouveauStock !== "" && (
               <p className="rounded-xl bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-800">
-                Le stock passera de {adjustArticle.quantiteStock} à {Number(adjustForm.nouveauStock)} ({Number(adjustForm.nouveauStock) - adjustArticle.quantiteStock > 0 ? "+" : ""}{Number(adjustForm.nouveauStock) - adjustArticle.quantiteStock}). Un mouvement de stock et une ligne de journal seront enregistrés à votre nom.
+                Le stock passera de {formatQuantite(adjustArticle.quantiteStock)} à {formatQuantite(Number(adjustForm.nouveauStock))} ({Number(adjustForm.nouveauStock) - adjustArticle.quantiteStock > 0 ? "+" : ""}{formatQuantite(Number(adjustForm.nouveauStock) - adjustArticle.quantiteStock)}). Un mouvement de stock et une ligne de journal seront enregistrés à votre nom.
               </p>
             )}
             <ModalActions busy={savingAdjustment} onCancel={() => setAdjustArticle(null)} submitLabel="Enregistrer l’ajustement" />

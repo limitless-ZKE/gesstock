@@ -4,6 +4,7 @@ import { useAuth } from "../auth/AuthContext";
 import { money } from "../lib/format";
 import { api } from "../services/api";
 import { apiErrorMessage } from "../services/apiError";
+import { formatQuantite } from "../lib/quantite";
 
 type Status = "BROUILLON" | "VALIDE" | "ANNULE";
 type ReturnLine = {
@@ -214,7 +215,7 @@ export default function RetoursFournisseursPage() {
                           {item.lignes.map((line) => (
                             <li key={line.ligneApprovisionnementId} className="flex flex-wrap gap-x-4 text-xs text-slate-600">
                               <span className="w-64 font-semibold text-slate-800">{line.designation} <span className="font-normal text-slate-400">({line.reference})</span></span>
-                              <span>{line.quantite} × {money.format(line.coutUnitaire)}</span>
+                              <span>{formatQuantite(line.quantite)} × {money.format(line.coutUnitaire)}</span>
                               <span className="font-semibold text-slate-800">{money.format(line.montant)}</span>
                             </li>
                           ))}
@@ -257,13 +258,13 @@ export default function RetoursFournisseursPage() {
                           <Fragment key={line.ligneApprovisionnementId}>
                             <tr>
                               <td className="px-4 py-2.5"><p className="text-xs font-bold text-slate-800">{line.designation}</p><p className="text-xs text-slate-400">{line.reference}</p></td>
-                              <td className="px-3 py-2.5 text-right text-xs text-slate-600">{line.quantiteRecue}</td>
-                              <td className="px-3 py-2.5 text-right text-xs text-slate-600">{line.quantiteDejaRetournee}</td>
-                              <td className="px-3 py-2.5 text-right text-xs text-slate-600">{line.stockActuel}</td>
+                              <td className="px-3 py-2.5 text-right text-xs text-slate-600">{formatQuantite(line.quantiteRecue)}</td>
+                              <td className="px-3 py-2.5 text-right text-xs text-slate-600">{formatQuantite(line.quantiteDejaRetournee)}</td>
+                              <td className="px-3 py-2.5 text-right text-xs text-slate-600">{formatQuantite(line.stockActuel)}</td>
                               <td className="px-3 py-2.5 text-right text-xs text-slate-600">{money.format(line.coutUnitaire)}</td>
                               <td className="px-4 py-2.5">
                                 <input
-                                  type="number" min="0" max={limit} step="1" disabled={limit === 0} aria-label={`Quantité rendue de ${line.designation}`}
+                                  type="number" min="0" max={limit} step="0.001" inputMode="decimal" disabled={limit === 0} aria-label={`Quantité rendue de ${line.designation}`}
                                   className="input-field h-9 w-24" value={quantities[line.ligneApprovisionnementId] ?? ""}
                                   onChange={(event) => setQuantities({ ...quantities, [line.ligneApprovisionnementId]: event.target.value })}
                                 />
