@@ -148,6 +148,8 @@ public class SecurityConfig {
                 // contrôleur limite à son propre nom.
                 .requestMatchers(GET, "/api/caisse/journal", "/api/caisse/journal/excel", "/api/caisse/journal/pdf", "/api/caisse/journal/caissiers")
                     .hasAnyRole(ADMIN, MANAGER, GESTIONNAIRE)
+                // Un apport de fonds augmente les espèces attendues en caisse : une entrée fictive pourrait cacher un manque.
+                .requestMatchers(POST, "/api/caisse/mouvements/entrees").hasAnyRole(ADMIN, MANAGER)
                 .requestMatchers("/api/referentiels/sessions-caisse/**", "/api/caisse/**")
                     .hasAnyRole(ADMIN, MANAGER, GESTIONNAIRE, CAISSIER)
                 .requestMatchers(POST, "/api/ventes/*/annulation").hasAnyRole(ADMIN, MANAGER)

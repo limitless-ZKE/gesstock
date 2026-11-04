@@ -333,7 +333,7 @@ public class GestionVentesService {
             mouvementCaisseService.enregistrer(new MouvementCaisseRequest(
                 "Remboursement client - annulation de la vente " + vente.getCode(),
                 beneficiaire.length() > 120 ? beneficiaire.substring(0, 120) : beneficiaire,
-                remboursementEspeces), username);
+                remboursementEspeces), username, OrigineMouvementCaisse.REMBOURSEMENT_CLIENT);
         }
 
         remettreEnRayon(vente, motif, utilisateur);

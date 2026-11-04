@@ -22,6 +22,11 @@ public class MouvementCaisse {
     @Column(nullable = false, length = 20)
     private TypeMouvementCaisse type = TypeMouvementCaisse.SORTIE;
 
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 30)
+    private OrigineMouvementCaisse origine = OrigineMouvementCaisse.MANUEL;
+
     @NotBlank
     @Size(max = 500)
     @Column(nullable = false, length = 500)
@@ -55,6 +60,8 @@ public class MouvementCaisse {
     public void setId(Long id) { this.id = id; }
     public TypeMouvementCaisse getType() { return type; }
     public void setType(TypeMouvementCaisse type) { this.type = type; }
+    public OrigineMouvementCaisse getOrigine() { return origine; }
+    public void setOrigine(OrigineMouvementCaisse origine) { this.origine = origine; }
     public String getMotif() { return motif; }
     public void setMotif(String motif) { this.motif = motif; }
     public String getBeneficiaire() { return beneficiaire; }

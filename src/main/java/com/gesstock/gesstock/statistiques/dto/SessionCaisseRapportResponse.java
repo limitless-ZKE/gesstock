@@ -16,6 +16,7 @@ public record SessionCaisseRapportResponse(
     BigDecimal chiffreAffaires,
     BigDecimal montantEncaisse,
     BigDecimal reglementsClientsEspeces,
+    BigDecimal entreesDeFonds,
     BigDecimal sortiesCaisse,
     BigDecimal montantCloture,
     long nombreVentes,

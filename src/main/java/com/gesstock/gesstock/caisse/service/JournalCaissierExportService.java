@@ -147,6 +147,7 @@ public class JournalCaissierExportService {
             case VENTE -> "Vente";
             case REGLEMENT -> "Règlement";
             case SORTIE -> "Sortie";
+            case ENTREE_FONDS -> "Entrée de fonds";
         };
     }
 

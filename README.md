@@ -113,6 +113,26 @@ Seuls ces quatre rôles existent. Les anciens rôles `VENDEUR` et `USER` sont fu
   ajouté), les prix et la dette du fournisseur suivent, avec mouvements de stock et journal. C'est refusé si la marchandise à
   retirer a déjà été vendue, si le nouveau total est inférieur à ce qui a déjà été payé au fournisseur, ou si un retour au
   fournisseur a été préparé sur le bon.
+- **Réception payée en espèces de la caisse** (`POST /api/approvisionnements/{id}/validation`, corps facultatif
+  `{ "payerEnEspeces": true }`) : la fenêtre de réception propose une case cochée par défaut ; cochée, le reste dû du bon sort aussitôt
+  de la caisse du jour par le mécanisme du paiement fournisseur en espèces (sortie de caisse d'origine `REGLEMENT_FOURNISSEUR`, dette
+  réglée). Caisse fermée ou espèces insuffisantes : TOUTE la réception est refusée (rien ne change) avec un message qui dit d'ajouter
+  une entrée de fonds ou de décocher. Décochée : dette fournisseur comme avant. La réception date le bon (`recu_le`) : c'est ce
+  jour-là qu'il compte comme achat dans les statistiques.
+- **Entrées de fonds** (`POST /api/caisse/mouvements/entrees`, ADMIN et MANAGER seulement) : de l'argent ajouté dans la caisse du
+  jour (apport du patron…). Elles augmentent le solde théorique, apparaissent au journal de caisse (« Entrée de fonds », colonne
+  du récapitulatif) mais ne sont jamais du chiffre d'affaires. Un mouvement de caisse a un `type` (SORTIE ou ENTREE) et une `origine`
+  (MANUEL, REGLEMENT_FOURNISSEUR, REMBOURSEMENT_CLIENT) : seules les sorties MANUELLES sont des dépenses.
+- **Statistiques : dépenses et résultat** (`bilanDepenses` du rapport, PDF et Excel compris) : le chiffre d'affaires reste affiché tel
+  quel ; à côté, les achats (bons réceptionnés dans la période), les autres dépenses (sorties de caisse saisies à la main), le résultat
+  (chiffre d'affaires − achats − autres dépenses) et les entrées de fonds (à part, hors résultat). Le paiement d'un fournisseur et le
+  remboursement d'une vente annulée ne sont pas recomptés : le premier est déjà dans les achats, le second est déjà sorti du chiffre
+  d'affaires.
+- **Stock disponible, valeur à la revente, listes imprimables** : l'écran des articles filtre le « Stock disponible » (stock > 0)
+  comme le stock bas et la rupture. `GET /api/articles/export/pdf|excel?stock=tous|disponible|bas|rupture&categorieId=&avecStock=true`
+  donne la liste des articles classée par catégorie (« Sans catégorie » en dernier), avec le stock et sa valeur à la revente, ou en
+  liste simple (`avecStock=false`) ; le prix d'achat n'y figure jamais. Le tableau de bord donne la valeur du stock disponible au
+  prix de revente (stock × prix de vente) et le nombre d'articles disponibles.
 - **Compte fournisseur** (`/api/fournisseurs/comptes`, `/{id}/compte`) : recevoir un bon crée une dette égale à son total (quantité
   × prix) ; un bon de valeur nulle n'en crée pas, et les bons reçus avant `V11` n'en ont pas non plus (on ignore ce qui a déjà été
   payé). `POST /api/fournisseurs/dettes/{id}/reglements` enregistre un paiement : jamais au-delà du solde ; en espèces il exige une
@@ -373,6 +393,9 @@ Le contrôle de santé de Docker interroge `http://127.0.0.1:8081/actuator/healt
   retrouvés dans `information_schema` et reposés avec un nom (« > 0 ») ; colonne `lignes_vente.montant_ligne`, remplie pour les
   lignes existantes avec leur montant d'avant.
 - `V16__prix_de_revente_approvisionnement.sql` : prix de revente facultatif sur les lignes de bon.
+- `V17__entrees_de_fonds_et_depenses.sql` : mouvements de caisse `ENTREE` en plus de `SORTIE`, colonne `origine` (les anciens mouvements
+  sont classés : lien vers un règlement fournisseur, ou motif d'un remboursement de vente annulée, sinon MANUEL) ; date de réception
+  `recu_le` des bons (les bons déjà réceptionnés prennent la date de leur bon).
 - Une migration déjà appliquée ne se modifie jamais : toute évolution du schéma est un nouveau fichier
   `V<n>__description.sql`.
 - Une base créée à la main par `ddl-auto=update` n'est **pas** reprise automatiquement (`V3` échouerait : colonne

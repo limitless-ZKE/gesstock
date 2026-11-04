@@ -18,6 +18,7 @@ import com.gesstock.gesstock.entities.ReglementClient;
 import com.gesstock.gesstock.entities.SessionCaisse;
 import com.gesstock.gesstock.entities.StatutSessionCaisse;
 import com.gesstock.gesstock.entities.StatutVente;
+import com.gesstock.gesstock.entities.TypeMouvementCaisse;
 import com.gesstock.gesstock.entities.Utilisateur;
 import com.gesstock.gesstock.entities.Vente;
 import com.gesstock.gesstock.repositories.MouvementCaisseRepository;
@@ -120,11 +121,20 @@ public class JournalCaisseService {
                 horsEspeces.merge(mode, reglement.getMontant(), BigDecimal::add);
             }
         }
-        for (MouvementCaisse sortie : mouvementRepository.findBySessionCaisseIdOrderByDateMouvementDesc(session.getId())) {
-            if (!concerne(caissier, sortie.getEffectuePar())) continue;
-            ecritures.add(new Ecriture(sortie.getDateMouvement(), TypeEcritureCaisse.SORTIE,
-                "Sortie — " + sortie.getMotif() + " (" + sortie.getBeneficiaire() + ")", null,
-                sortie.getEffectuePar() == null ? null : sortie.getEffectuePar().getUsername(), null, sortie.getMontant()));
+        for (MouvementCaisse mouvement : mouvementRepository.findBySessionCaisseIdOrderByDateMouvementDesc(session.getId())) {
+            if (!concerne(caissier, mouvement.getEffectuePar())) continue;
+            String auteur = mouvement.getEffectuePar() == null ? null : mouvement.getEffectuePar().getUsername();
+            if (mouvement.getType() == TypeMouvementCaisse.ENTREE) {
+                // Un apport de fonds n'est pas une recette du caissier : il ne figure que dans le journal complet.
+                if (caissier == null) {
+                    ecritures.add(new Ecriture(mouvement.getDateMouvement(), TypeEcritureCaisse.ENTREE_FONDS,
+                        "Entrée de fonds — " + mouvement.getMotif() + " (" + mouvement.getBeneficiaire() + ")", null, auteur,
+                        mouvement.getMontant(), null));
+                }
+                continue;
+            }
+            ecritures.add(new Ecriture(mouvement.getDateMouvement(), TypeEcritureCaisse.SORTIE,
+                "Sortie — " + mouvement.getMotif() + " (" + mouvement.getBeneficiaire() + ")", null, auteur, null, mouvement.getMontant()));
         }
         ecritures.sort(Comparator.comparing(Ecriture::date));   // tri stable : à l'heure près, l'ordre de saisie est conservé
         return new Collecte(ecritures, horsEspeces, ventesACredit, validees, annulees);
@@ -150,11 +160,13 @@ public class JournalCaisseService {
             session.getOuvertePar() == null ? null : session.getOuvertePar().getUsername(), session.getFondDeCaisse(), null, solde));
         BigDecimal encaissements = BigDecimal.ZERO;
         BigDecimal reglements = BigDecimal.ZERO;
+        BigDecimal entreesDeFonds = BigDecimal.ZERO;
         BigDecimal sorties = BigDecimal.ZERO;
         for (Ecriture ecriture : ecritures) {
             if (ecriture.entree() != null) {
                 solde = solde.add(ecriture.entree());
                 if (ecriture.type() == TypeEcritureCaisse.VENTE) encaissements = encaissements.add(ecriture.entree());
+                else if (ecriture.type() == TypeEcritureCaisse.ENTREE_FONDS) entreesDeFonds = entreesDeFonds.add(ecriture.entree());
                 else reglements = reglements.add(ecriture.entree());
             } else {
                 solde = solde.subtract(ecriture.sortie());
@@ -172,7 +184,7 @@ public class JournalCaisseService {
             session.getOuvertePar() == null ? null : session.getOuvertePar().getUsername(),
             session.getFermeePar() == null ? null : session.getFermeePar().getUsername(),
             session.getOuverteLe(), session.getFermeeLe(), session.getFondDeCaisse(),
-            encaissements, reglements, sorties, solde, session.getMontantCloture(), ecart,
+            encaissements, reglements, entreesDeFonds, sorties, solde, session.getMontantCloture(), ecart,
             validees, annulees, ventesACredit, autres,
             session.getStatut() == StatutSessionCaisse.OUVERTE && session.getJournee().isBefore(LocalDate.now()),
             lignes);
@@ -256,6 +268,7 @@ public class JournalCaisseService {
         BigDecimal fonds = BigDecimal.ZERO;
         BigDecimal encaissements = BigDecimal.ZERO;
         BigDecimal reglements = BigDecimal.ZERO;
+        BigDecimal entreesDeFonds = BigDecimal.ZERO;
         BigDecimal sorties = BigDecimal.ZERO;
         BigDecimal solde = BigDecimal.ZERO;
         BigDecimal comptees = BigDecimal.ZERO;
@@ -269,6 +282,7 @@ public class JournalCaisseService {
             fonds = fonds.add(journee.fondDeCaisse());
             encaissements = encaissements.add(journee.encaissementsEspeces());
             reglements = reglements.add(journee.reglementsClientsEspeces());
+            entreesDeFonds = entreesDeFonds.add(journee.entreesDeFonds());
             sorties = sorties.add(journee.sorties());
             solde = solde.add(journee.soldeTheorique());
             if (journee.montantCloture() == null) {
@@ -282,7 +296,7 @@ public class JournalCaisseService {
             ventes += journee.nombreVentes();
             annulees += journee.nombreVentesAnnulees();
         }
-        return new TotauxJournalCaisse(journees.size(), nonCloturees, ventes, annulees, fonds, encaissements, reglements, sorties,
+        return new TotauxJournalCaisse(journees.size(), nonCloturees, ventes, annulees, fonds, encaissements, reglements, entreesDeFonds, sorties,
             solde, comptees, ecarts, autres, credit);
     }
 

@@ -10,7 +10,7 @@ import SelecteurPeriode, { type Periode } from "./SelecteurPeriode";
 
 type Ecriture = {
   date: string;
-  type: "OUVERTURE" | "VENTE" | "REGLEMENT" | "SORTIE";
+  type: "OUVERTURE" | "VENTE" | "REGLEMENT" | "SORTIE" | "ENTREE_FONDS";
   libelle: string;
   reference: string | null;
   utilisateur: string | null;
@@ -30,6 +30,8 @@ type Journee = {
   fondDeCaisse: number;
   encaissementsEspeces: number;
   reglementsClientsEspeces: number;
+  /** Apports de fonds dans la caisse (jamais du chiffre d'affaires). */
+  entreesDeFonds?: number;
   sorties: number;
   soldeTheorique: number;
   montantCloture: number | null;
@@ -51,6 +53,7 @@ type Journal = {
     nombreVentesAnnulees: number;
     encaissementsEspeces: number;
     reglementsClientsEspeces: number;
+    entreesDeFonds?: number;
     sorties: number;
     especesComptees: number;
     ecarts: number;
@@ -59,7 +62,7 @@ type Journal = {
 };
 
 const modes: Record<string, string> = { ESPECES: "Espèces", MOBILE_MONEY: "Mobile Money", CARTE: "Carte", VIREMENT: "Virement", CHEQUE: "Chèque", AUTRE: "Autre" };
-const types: Record<Ecriture["type"], string> = { OUVERTURE: "Ouverture", VENTE: "Vente", REGLEMENT: "Règlement", SORTIE: "Sortie" };
+const types: Record<Ecriture["type"], string> = { OUVERTURE: "Ouverture", VENTE: "Vente", REGLEMENT: "Règlement", SORTIE: "Sortie", ENTREE_FONDS: "Entrée de fonds" };
 const heure = new Intl.DateTimeFormat("fr-FR", { timeStyle: "short" });
 /** Montants des tableaux : sans l'unité, dite une fois sous le tableau (sinon la ligne dépasse l'écran). */
 const nombre = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 });
@@ -133,13 +136,14 @@ export default function JournalCaissePeriode({ periode: periodeFournie, onPeriod
       {error && <Alerte ton="erreur">{error}</Alerte>}
       {exportError && <Alerte ton="attention" fermer={() => setExportError(null)}>{exportError}</Alerte>}
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <Indicateur
           libelle="Journées de caisse"
           valeur={totaux ? String(totaux.nombreSessions) : "—"}
           note={totaux && totaux.sessionsNonCloturees > 0 ? `dont ${totaux.sessionsNonCloturees} non clôturée(s)` : undefined}
         />
         <Indicateur libelle="Espèces entrées" valeur={totaux ? money.format(entrees) : "—"} note="ventes + règlements de dettes" />
+        <Indicateur libelle="Entrées de fonds" valeur={totaux ? money.format(totaux.entreesDeFonds ?? 0) : "—"} note="argent ajouté, hors chiffre d’affaires" />
         <Indicateur libelle="Sorties de caisse" valeur={totaux ? money.format(totaux.sorties) : "—"} />
         <Indicateur
           libelle="Écart de clôture"
@@ -161,6 +165,7 @@ export default function JournalCaissePeriode({ periode: periodeFournie, onPeriod
                 <th className="px-3 py-3 text-right">Fond</th>
                 <th className="px-3 py-3 text-right">Ventes espèces</th>
                 <th className="px-3 py-3 text-right">Règlements</th>
+                <th className="px-3 py-3 text-right">Entrées de fonds</th>
                 <th className="px-3 py-3 text-right">Sorties</th>
                 <th className="px-3 py-3 text-right">Solde théorique</th>
                 <th className="px-3 py-3 text-right">Compté</th>
@@ -169,7 +174,7 @@ export default function JournalCaissePeriode({ periode: periodeFournie, onPeriod
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={11} className="h-32 text-center text-sm text-slate-500"><LoaderCircle className="mr-2 inline animate-spin" size={16} />Chargement…</td></tr>
+                <tr><td colSpan={12} className="h-32 text-center text-sm text-slate-500"><LoaderCircle className="mr-2 inline animate-spin" size={16} />Chargement…</td></tr>
               ) : journal?.sessions.length ? journal.sessions.map((journee) => {
                 const ouverte = ouvertes.has(journee.sessionId);
                 return (
@@ -186,6 +191,7 @@ export default function JournalCaissePeriode({ periode: periodeFournie, onPeriod
                       <td className="whitespace-nowrap px-3 py-3 text-right text-sm">{nombre.format(journee.fondDeCaisse)}</td>
                       <td className="whitespace-nowrap px-3 py-3 text-right text-sm">{nombre.format(journee.encaissementsEspeces)}</td>
                       <td className="whitespace-nowrap px-3 py-3 text-right text-sm">{nombre.format(journee.reglementsClientsEspeces)}</td>
+                      <td className={`whitespace-nowrap px-3 py-3 text-right text-sm ${(journee.entreesDeFonds ?? 0) > 0 ? "text-emerald-800" : "text-slate-500"}`}>{(journee.entreesDeFonds ?? 0) > 0 ? `+${nombre.format(journee.entreesDeFonds ?? 0)}` : "—"}</td>
                       <td className={`whitespace-nowrap px-3 py-3 text-right text-sm ${journee.sorties > 0 ? "text-rose-800" : "text-slate-500"}`}>{journee.sorties > 0 ? `−${nombre.format(journee.sorties)}` : "—"}</td>
                       <td className="whitespace-nowrap px-3 py-3 text-right text-sm font-bold text-slate-900">{nombre.format(journee.soldeTheorique)}</td>
                       <td className="whitespace-nowrap px-3 py-3 text-right text-sm">{journee.montantCloture === null ? "—" : nombre.format(journee.montantCloture)}</td>
@@ -195,19 +201,19 @@ export default function JournalCaissePeriode({ periode: periodeFournie, onPeriod
                     </tr>
                     {ouverte && (
                       <tr className="bg-slate-50">
-                        <td colSpan={11} className="px-5 pb-4 pt-1"><Ecritures journee={journee} /></td>
+                        <td colSpan={12} className="px-5 pb-4 pt-1"><Ecritures journee={journee} /></td>
                       </tr>
                     )}
                   </Fragment>
                 );
               }) : (
-                <tr><td colSpan={11} className="h-32 text-center text-sm text-slate-500">Aucune session de caisse n’a été ouverte sur cette période.</td></tr>
+                <tr><td colSpan={12} className="h-32 text-center text-sm text-slate-500">Aucune session de caisse n’a été ouverte sur cette période.</td></tr>
               )}
             </tbody>
           </table>
         </div>
         <p className="border-t border-slate-100 px-5 py-3 text-sm text-slate-600">
-          Montants en francs CFA. Le solde théorique est celui de la clôture : fond de caisse + ventes encaissées en espèces + règlements de dettes en espèces − sorties. Les paiements Mobile Money, carte ou virement passent hors du tiroir-caisse et sont indiqués à part.
+          Montants en francs CFA. Le solde théorique est celui de la clôture : fond de caisse + ventes encaissées en espèces + règlements de dettes en espèces + entrées de fonds − sorties. Les paiements Mobile Money, carte ou virement passent hors du tiroir-caisse et sont indiqués à part.
         </p>
       </section>
     </div>

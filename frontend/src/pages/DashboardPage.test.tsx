@@ -16,6 +16,8 @@ const STATS = {
   nombreVentesJour: 3,
   totalCreances: 45000,
   alertesStockCritique: 2,
+  valeurStockRevente: 8750000,
+  nombreArticlesDisponibles: 41,
   ventes7Jours: [
     { journee: "2026-10-03", nombreVentes: 0, chiffreAffaires: 0 },
     { journee: "2026-10-04", nombreVentes: 2, chiffreAffaires: 250000 },
@@ -48,6 +50,16 @@ describe("tableau de bord", () => {
     expect(normaliser(chiffres.getByText(/45 000/).textContent)).toContain("45 000");
     expect(chiffres.getByText("2 articles")).toBeInTheDocument();
     expect(chiffres.getByRole("link", { name: "Voir le catalogue" })).toHaveAttribute("href", "/articles");
+  });
+
+  it("montre la valeur du stock disponible au prix de revente et le nombre d'articles disponibles", async () => {
+    afficher();
+    const chiffres = within(await screen.findByRole("region", { name: "Chiffres du jour" }));
+    expect(chiffres.getByText("Valeur du stock à la revente")).toBeInTheDocument();
+    expect(normaliser(chiffres.getByText(/8 750 000/).textContent)).toContain("8 750 000");
+    expect(chiffres.getByText("Stock disponible × prix de vente")).toBeInTheDocument();
+    expect(chiffres.getByText("41 articles")).toBeInTheDocument();
+    expect(chiffres.getByRole("link", { name: "Voir le stock" })).toHaveAttribute("href", "/articles");
   });
 
   it("accorde « article » au singulier et n'invite pas à ouvrir le catalogue quand rien n'est à surveiller", async () => {

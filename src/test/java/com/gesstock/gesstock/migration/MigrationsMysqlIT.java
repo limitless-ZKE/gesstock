@@ -65,7 +65,7 @@ class MigrationsMysqlIT {
 
         try (ConfigurableApplicationContext contexte = demarrer(base, "--spring.flyway.baseline-on-migrate=false")) {
             JdbcTemplate jdbc = contexte.getBean(JdbcTemplate.class);
-            assertThat(versionsAppliquees(jdbc)).containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16");
+            assertThat(versionsAppliquees(jdbc)).containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17");
             assertThat(migrationsEnEchec(jdbc)).isZero();
             assertThat(derives(contexte, base)).as("enum Java absents de la base").isEmpty();
 
@@ -108,7 +108,25 @@ class MigrationsMysqlIT {
         jdbc.update("INSERT INTO vente (code, quantite, prix_unit, prix_total, montant_total, venteacredit, version, statut, article_id, date_vente) "
             + "VALUES ('VTE-ANCIENNE', 3, 1000, 3000, 3000, 0, 0, 'VALIDEE', ?, NOW())", articleId);
 
+        jdbc.update("INSERT INTO sessions_caisse (fond_de_caisse, journee, ouverte_le, ouverte_par_id, statut) "
+            + "SELECT 1000, CURRENT_DATE, NOW(), id, 'FERMEE' FROM utilisateurs WHERE username = 'chef'");
+        jdbc.update("INSERT INTO mouvements_caisse (montant, date_mouvement, effectue_par_id, session_caisse_id, beneficiaire, motif, type) "
+            + "SELECT 700, NOW(), u.id, s.id, 'Client', 'Remboursement client - annulation de la vente VTE-X', 'SORTIE' FROM utilisateurs u, sessions_caisse s "
+            + "WHERE u.username = 'chef'");
+        jdbc.update("INSERT INTO mouvements_caisse (montant, date_mouvement, effectue_par_id, session_caisse_id, beneficiaire, motif, type) "
+            + "SELECT 300, NOW(), u.id, s.id, 'Moussa', 'Transport', 'SORTIE' FROM utilisateurs u, sessions_caisse s WHERE u.username = 'chef'");
+
         migrerJusqua(base, null);
+
+        assertThat(jdbc.queryForObject("SELECT origine FROM mouvements_caisse WHERE motif LIKE 'Remboursement client%'", String.class))
+            .as("V17 : un remboursement de vente annulée n'est pas une dépense").isEqualTo("REMBOURSEMENT_CLIENT");
+        assertThat(jdbc.queryForObject("SELECT origine FROM mouvements_caisse WHERE motif = 'Transport'", String.class))
+            .as("V17 : une sortie saisie à la main reste une dépense").isEqualTo("MANUEL");
+        jdbc.update("INSERT INTO mouvements_caisse (montant, date_mouvement, effectue_par_id, session_caisse_id, beneficiaire, motif, type) "
+            + "SELECT 5000, NOW(), u.id, s.id, 'Patron', 'Apport', 'ENTREE' FROM utilisateurs u, sessions_caisse s WHERE u.username = 'chef'");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM mouvements_caisse WHERE type = 'ENTREE' AND origine = 'MANUEL'", Integer.class))
+            .as("V17 : une entrée de fonds est acceptée").isEqualTo(1);
+        assertThat(colonnesDe(jdbc, base, "approvisionnements")).as("V17 : date de réception des bons").contains("recu_le");
 
         assertThat(jdbc.queryForList("SELECT name FROM roles ORDER BY name", String.class))
             .as("VENDEUR et USER disparaissent, puis V14 complète avec les quatre rôles connus (CAISSIER et MANAGER existaient déjà par V4 et V7)")
@@ -169,7 +187,7 @@ class MigrationsMysqlIT {
         try (ConfigurableApplicationContext contexte = demarrer(base,
             "--spring.flyway.baseline-on-migrate=true", "--spring.flyway.baseline-version=3")) {
             JdbcTemplate jdbc = contexte.getBean(JdbcTemplate.class);
-            assertThat(versionsAppliquees(jdbc)).containsExactly("3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16");
+            assertThat(versionsAppliquees(jdbc)).containsExactly("3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17");
             assertThat(migrationsEnEchec(jdbc)).isZero();
         }
     }

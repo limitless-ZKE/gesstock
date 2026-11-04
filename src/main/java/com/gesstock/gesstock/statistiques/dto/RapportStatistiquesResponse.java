@@ -12,6 +12,7 @@ public record RapportStatistiquesResponse(
     BigDecimal chiffreAffaires,
     long nombreVentes,
     BigDecimal margeBrute,
+    BilanDepensesResponse bilanDepenses,
     List<MargeCategorieResponse> margesParCategorie,
     List<MargeArticleResponse> margesParArticle,
     List<SessionCaisseRapportResponse> sessionsCaisse,

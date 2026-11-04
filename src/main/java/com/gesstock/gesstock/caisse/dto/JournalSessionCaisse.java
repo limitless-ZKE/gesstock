@@ -27,6 +27,7 @@ public record JournalSessionCaisse(
     BigDecimal fondDeCaisse,
     BigDecimal encaissementsEspeces,
     BigDecimal reglementsClientsEspeces,
+    BigDecimal entreesDeFonds,
     BigDecimal sorties,
     BigDecimal soldeTheorique,
     BigDecimal montantCloture,

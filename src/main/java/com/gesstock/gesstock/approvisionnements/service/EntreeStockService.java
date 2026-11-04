@@ -110,6 +110,15 @@ public class EntreeStockService {
     }
 
     public ApprovisionnementResponse valider(Long id, String username) {
+        return valider(id, username, false);
+    }
+
+    /**
+     * Réceptionne le bon : le stock entre, le coût moyen et les prix suivent, et le bon devient une dette envers le fournisseur.
+     * Avec {@code payerEnEspeces}, le total du bon sort aussitôt de la caisse du jour (même mécanisme qu'un paiement en espèces
+     * du fournisseur : caisse ouverte et espèces suffisantes exigées, sinon TOUTE la réception est refusée).
+     */
+    public ApprovisionnementResponse valider(Long id, String username, boolean payerEnEspeces) {
         Approvisionnement approvisionnement = trouver(id);
         verifierBrouillon(approvisionnement);
         if (approvisionnement.getLignes() == null || approvisionnement.getLignes().isEmpty()) {
@@ -139,12 +148,22 @@ public class EntreeStockService {
         }
 
         approvisionnement.setStatut(StatutApprovisionnement.RECU);
+        approvisionnement.setRecuLe(java.time.LocalDateTime.now());
         articleRepository.saveAll(articlesVerrouilles.values());
         approvisionnementRepository.save(approvisionnement);
         // Le bon reçu devient une dette envers le fournisseur (et les avoirs qu'il nous doit déjà s'y imputent).
         compteFournisseurService.enregistrerDette(approvisionnement, username);
+        if (payerEnEspeces) {
+            try {
+                compteFournisseurService.payerEnEspecesALaReception(approvisionnement, username);
+            } catch (ConflitRessourceException refus) {
+                throw new ConflitRessourceException("Paiement en espèces impossible : " + refus.getMessage()
+                    + ". Ajoutez une entrée de fonds (responsable) ou décochez « Payer en espèces de la caisse » pour recevoir le bon "
+                    + "sans le payer maintenant.");
+            }
+        }
         journalActiviteService.enregistrer("VALIDATION", "APPROVISIONNEMENT", approvisionnement.getId(),
-            "Réception du bon " + approvisionnement.getNumero(), username);
+            "Réception du bon " + approvisionnement.getNumero() + (payerEnEspeces ? ", payé en espèces de la caisse" : ""), username);
         return ApprovisionnementMapper.toResponse(approvisionnement);
     }
 

@@ -4,9 +4,11 @@ import com.gesstock.gesstock.caisse.dto.MouvementCaisseRequest;
 import com.gesstock.gesstock.caisse.dto.MouvementCaisseResponse;
 import com.gesstock.gesstock.entities.MouvementCaisse;
 import com.gesstock.gesstock.entities.ModeReglement;
+import com.gesstock.gesstock.entities.OrigineMouvementCaisse;
 import com.gesstock.gesstock.entities.SessionCaisse;
 import com.gesstock.gesstock.entities.StatutSessionCaisse;
 import com.gesstock.gesstock.entities.StatutVente;
+import com.gesstock.gesstock.entities.TypeMouvementCaisse;
 import com.gesstock.gesstock.entities.Utilisateur;
 import com.gesstock.gesstock.repositories.MouvementCaisseRepository;
 import com.gesstock.gesstock.repositories.SessionCaisseRepository;
@@ -57,7 +59,13 @@ public class MouvementCaisseService {
             .stream().map(MouvementCaisseService::toResponse).toList();
     }
 
+    /** Une sortie saisie à la main : c'est une dépense dans les statistiques. */
     public MouvementCaisseResponse enregistrer(MouvementCaisseRequest request, String username) {
+        return enregistrer(request, username, OrigineMouvementCaisse.MANUEL);
+    }
+
+    /** Une sortie d'espèces ; l'origine dit si elle compte comme dépense (MANUEL) ou est déjà comptée ailleurs. */
+    public MouvementCaisseResponse enregistrer(MouvementCaisseRequest request, String username, OrigineMouvementCaisse origine) {
         SessionCaisse session = sessionRepository.findByJourneeAndStatutForUpdate(
                 LocalDate.now(), StatutSessionCaisse.OUVERTE)
             .orElseThrow(() -> new ConflitRessourceException(
@@ -76,6 +84,8 @@ public class MouvementCaisseService {
         MouvementCaisse mouvement = new MouvementCaisse();
         mouvement.setSessionCaisse(session);
         mouvement.setEffectuePar(utilisateur);
+        mouvement.setType(TypeMouvementCaisse.SORTIE);
+        mouvement.setOrigine(origine);
         mouvement.setMotif(request.motif().trim());
         mouvement.setBeneficiaire(request.beneficiaire().trim());
         mouvement.setMontant(request.montant());
@@ -86,8 +96,36 @@ public class MouvementCaisseService {
     }
 
     /**
+     * Un apport de fonds : de l'argent ajouté dans la caisse du jour (apport du patron, monnaie reçue de la banque…). Il
+     * augmente les espèces de la caisse ; ce n'est jamais du chiffre d'affaires. Réservé aux responsables (voir SecurityConfig).
+     */
+    public MouvementCaisseResponse enregistrerEntree(MouvementCaisseRequest request, String username) {
+        SessionCaisse session = sessionRepository.findByJourneeAndStatutForUpdate(
+                LocalDate.now(), StatutSessionCaisse.OUVERTE)
+            .orElseThrow(() -> new ConflitRessourceException(
+                "Une session de caisse ouverte est requise pour enregistrer une entrée de fonds"));
+        Utilisateur utilisateur = utilisateurRepository.findByUsername(username)
+            .orElseThrow(() -> new RessourceIntrouvableException("Utilisateur connecté introuvable"));
+        if (!utilisateur.isActif()) {
+            throw new ConflitRessourceException("Un utilisateur désactivé ne peut pas enregistrer une entrée de fonds");
+        }
+        MouvementCaisse mouvement = new MouvementCaisse();
+        mouvement.setSessionCaisse(session);
+        mouvement.setEffectuePar(utilisateur);
+        mouvement.setType(TypeMouvementCaisse.ENTREE);
+        mouvement.setOrigine(OrigineMouvementCaisse.MANUEL);
+        mouvement.setMotif(request.motif().trim());
+        mouvement.setBeneficiaire(request.beneficiaire().trim());
+        mouvement.setMontant(request.montant());
+        MouvementCaisse saved = mouvementRepository.save(mouvement);
+        journalService.enregistrer("ENTREE_FONDS", "SESSION_CAISSE", session.getId(),
+            request.motif().trim() + " · " + request.beneficiaire().trim() + " · " + request.montant(), username);
+        return toResponse(saved);
+    }
+
+    /**
      * Espèces que la caisse est censée contenir : fond de caisse, encaissements des ventes validées en espèces, règlements
-     * clients en espèces, moins les sorties. Une vente annulée n'y figure plus : son remboursement n'est donc PAS une sortie à
+     * clients en espèces, plus les entrées de fonds, moins les sorties. Une vente annulée n'y figure plus : son remboursement n'est donc PAS une sortie à
      * enregistrer en plus (ce serait la déduire deux fois).
      */
     @Transactional(readOnly = true)
@@ -96,6 +134,7 @@ public class MouvementCaisseService {
             .add(valeurOuZero(venteRepository.encaissementsEspecesSession(
                 session.getId(), StatutVente.VALIDEE, ModeReglement.ESPECES)))
             .add(valeurOuZero(reglementRepository.totalParSessionEtMode(session.getId(), ModeReglement.ESPECES)))
+            .add(valeurOuZero(mouvementRepository.totalEntrees(session.getId())))
             .subtract(valeurOuZero(mouvementRepository.totalSorties(session.getId())));
     }
 
@@ -109,6 +148,7 @@ public class MouvementCaisseService {
             mouvement.getId(),
             mouvement.getSessionCaisse().getId(),
             mouvement.getType().name(),
+            mouvement.getOrigine().name(),
             mouvement.getMotif(),
             mouvement.getBeneficiaire(),
             mouvement.getMontant(),

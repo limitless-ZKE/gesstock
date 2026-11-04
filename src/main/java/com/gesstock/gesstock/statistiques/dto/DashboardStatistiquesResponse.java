@@ -10,6 +10,8 @@ public record DashboardStatistiquesResponse(
     long nombreVentesJour,
     BigDecimal totalCreances,
     long alertesStockCritique,
+    BigDecimal valeurStockRevente,
+    long nombreArticlesDisponibles,
     List<PointVentesResponse> ventes7Jours,
     List<ArticleTopVentesResponse> topArticles
 ) {}

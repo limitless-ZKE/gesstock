@@ -5,6 +5,9 @@ import com.gesstock.gesstock.entreprise.service.EnteteExcel;
 import com.gesstock.gesstock.entreprise.service.EntetePdf;
 import com.gesstock.gesstock.entreprise.service.EntrepriseService;
 import com.gesstock.gesstock.entreprise.service.TailleLogo;
+import com.gesstock.gesstock.statistiques.dto.AchatRapportResponse;
+import com.gesstock.gesstock.statistiques.dto.BilanDepensesResponse;
+import com.gesstock.gesstock.statistiques.dto.DepenseRapportResponse;
 import com.gesstock.gesstock.statistiques.dto.MargeArticleResponse;
 import com.gesstock.gesstock.statistiques.dto.MargeCategorieResponse;
 import com.gesstock.gesstock.statistiques.dto.RapportStatistiquesResponse;
@@ -84,8 +87,33 @@ public class StatistiquesExportService {
             }
             autoSize(articles, 6);
 
+            Sheet depenses = workbook.createSheet("Dépenses");
+            BilanDepensesResponse bilan = rapport.bilanDepenses();
+            addHeader(depenses, header, "Type", "Date et heure", "Référence ou motif", "Fournisseur ou bénéficiaire", "Montant");
+            rowNumber = 1;
+            for (AchatRapportResponse bon : bilan.bonsRecus()) {
+                Row row = depenses.createRow(rowNumber++);
+                row.createCell(0).setCellValue("Achat (bon réceptionné)");
+                row.createCell(1).setCellValue(bon.recuLe() == null ? "" : bon.recuLe().format(DATE_TIME));
+                row.createCell(2).setCellValue(bon.numero());
+                row.createCell(3).setCellValue(bon.fournisseur());
+                row.createCell(4).setCellValue(bon.montant().doubleValue());
+            }
+            for (DepenseRapportResponse depense : bilan.depenses()) {
+                Row row = depenses.createRow(rowNumber++);
+                row.createCell(0).setCellValue("Sortie de caisse");
+                row.createCell(1).setCellValue(depense.date().format(DATE_TIME));
+                row.createCell(2).setCellValue(depense.motif());
+                row.createCell(3).setCellValue(depense.beneficiaire());
+                row.createCell(4).setCellValue(depense.montant().doubleValue());
+            }
+            Row totalLigne = depenses.createRow(rowNumber);
+            totalLigne.createCell(0).setCellValue("Total des dépenses");
+            totalLigne.createCell(4).setCellValue(bilan.totalDepenses().doubleValue());
+            autoSize(depenses, 5);
+
             Sheet caisse = workbook.createSheet("Journal de caisse");
-            addHeader(caisse, header, "Date", "Session", "Caissier", "Statut", "Fond de caisse", "Chiffre d'affaires", "Encaissements ventes", "Règlements clients (espèces)", "Sorties de caisse", "Clôture", "Ventes");
+            addHeader(caisse, header, "Date", "Session", "Caissier", "Statut", "Fond de caisse", "Chiffre d'affaires", "Encaissements ventes", "Règlements clients (espèces)", "Sorties de caisse", "Clôture", "Ventes", "Entrées de fonds");
             rowNumber = 1;
             for (SessionCaisseRapportResponse session : rapport.sessionsCaisse()) {
                 Row row = caisse.createRow(rowNumber++);
@@ -100,8 +128,9 @@ public class StatistiquesExportService {
                 row.createCell(8).setCellValue(session.sortiesCaisse().doubleValue());
                 if (session.montantCloture() != null) row.createCell(9).setCellValue(session.montantCloture().doubleValue());
                 row.createCell(10).setCellValue(session.nombreVentes());
+                row.createCell(11).setCellValue(session.entreesDeFonds().doubleValue());
             }
-            autoSize(caisse, 11);
+            autoSize(caisse, 12);
 
             Sheet journal = workbook.createSheet("Journal d'activité");
             addHeader(journal, header, "Date et heure", "Action", "Entité", "Référence", "Utilisateur", "Détails");
@@ -143,6 +172,8 @@ public class StatistiquesExportService {
                 summary.addCell(Long.toString(rapport.nombreVentes()));
                 summary.addCell(rapport.margeBrute().toPlainString());
                 document.add(summary);
+                document.add(new Paragraph(" "));
+                addBilanDepenses(document, section, rapport);
                 addMarginTables(document, section, rapport);
                 addCashTable(document, section, rapport.sessionsCaisse());
                 addJournalTable(document, section, rapport.journalActivites());
@@ -161,7 +192,12 @@ public class StatistiquesExportService {
             {"Période au", rapport.fin().toString()},
             {"Chiffre d'affaires", rapport.chiffreAffaires().toPlainString()},
             {"Nombre de ventes", Long.toString(rapport.nombreVentes())},
-            {"Marge brute", rapport.margeBrute().toPlainString()}
+            {"Marge brute", rapport.margeBrute().toPlainString()},
+            {"Achats (bons réceptionnés)", rapport.bilanDepenses().achats().toPlainString()},
+            {"Autres dépenses (sorties de caisse)", rapport.bilanDepenses().autresDepenses().toPlainString()},
+            {"Total des dépenses", rapport.bilanDepenses().totalDepenses().toPlainString()},
+            {"Résultat (chiffre d'affaires − dépenses)", rapport.bilanDepenses().resultat().toPlainString()},
+            {"Entrées de fonds (hors chiffre d'affaires)", rapport.bilanDepenses().entreesDeFonds().toPlainString()}
         };
         for (int i = 0; i < values.length; i++) {
             Row row = sheet.createRow(debut + i + 1);
@@ -169,6 +205,43 @@ public class StatistiquesExportService {
             row.createCell(1).setCellValue(values[i][1]);
         }
         autoSize(sheet, 2);
+    }
+
+    private void addBilanDepenses(Document document, Font section, RapportStatistiquesResponse rapport) throws DocumentException {
+        BilanDepensesResponse bilan = rapport.bilanDepenses();
+        document.add(com.gesstock.gesstock.common.export.ExportSupport.paragraphe("Dépenses et résultat", section, 6));
+        PdfPTable resume = new PdfPTable(5);
+        resume.setWidthPercentage(100);
+        addPdfHeader(resume, "Chiffre d'affaires", "Achats", "Autres dépenses", "Résultat", "Entrées de fonds");
+        resume.addCell(com.gesstock.gesstock.common.export.ExportSupport.montant(rapport.chiffreAffaires()));
+        resume.addCell(com.gesstock.gesstock.common.export.ExportSupport.montant(bilan.achats()));
+        resume.addCell(com.gesstock.gesstock.common.export.ExportSupport.montant(bilan.autresDepenses()));
+        resume.addCell(com.gesstock.gesstock.common.export.ExportSupport.montant(bilan.resultat()));
+        resume.addCell(com.gesstock.gesstock.common.export.ExportSupport.montant(bilan.entreesDeFonds()));
+        document.add(resume);
+        document.add(new Paragraph("Résultat = chiffre d'affaires − achats − autres dépenses. Les achats sont les bons d'approvisionnement réceptionnés ; les autres dépenses sont les sorties de caisse saisies à la main. Les entrées de fonds ne sont pas du chiffre d'affaires."));
+        if (!bilan.bonsRecus().isEmpty() || !bilan.depenses().isEmpty()) {
+            PdfPTable detail = new PdfPTable(5);
+            detail.setWidthPercentage(100);
+            addPdfHeader(detail, "Type", "Date et heure", "Référence ou motif", "Fournisseur ou bénéficiaire", "Montant");
+            for (AchatRapportResponse bon : bilan.bonsRecus()) {
+                detail.addCell("Achat");
+                detail.addCell(bon.recuLe() == null ? "" : bon.recuLe().format(DATE_TIME));
+                detail.addCell(bon.numero());
+                detail.addCell(bon.fournisseur());
+                detail.addCell(com.gesstock.gesstock.common.export.ExportSupport.montant(bon.montant()));
+            }
+            for (DepenseRapportResponse depense : bilan.depenses()) {
+                detail.addCell("Sortie de caisse");
+                detail.addCell(depense.date().format(DATE_TIME));
+                detail.addCell(depense.motif());
+                detail.addCell(depense.beneficiaire());
+                detail.addCell(com.gesstock.gesstock.common.export.ExportSupport.montant(depense.montant()));
+            }
+            document.add(new Paragraph(" "));
+            document.add(detail);
+        }
+        document.add(new Paragraph(" "));
     }
 
     private void addMarginTables(Document document, Font section, RapportStatistiquesResponse rapport)

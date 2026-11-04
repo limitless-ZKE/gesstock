@@ -13,6 +13,9 @@ type DashboardStats = {
   nombreVentesJour: number;
   totalCreances: number;
   alertesStockCritique: number;
+  /** Stock disponible valorisé au prix de VENTE : quantité × prix de vente de chaque article. */
+  valeurStockRevente: number;
+  nombreArticlesDisponibles: number;
   ventes7Jours: DailyPoint[];
   topArticles: TopArticle[];
 };
@@ -75,6 +78,19 @@ export default function DashboardPage() {
             note={alertes > 0 ? "Au seuil d’alerte ou en rupture" : "Aucun article sous le seuil"}
             alerte={alertes > 0}
             lien={alertes > 0 ? { vers: "/articles", texte: "Voir le catalogue" } : undefined}
+          />
+        </div>
+        <div className="grid divide-y divide-slate-200 border-t border-slate-200 sm:grid-cols-2 sm:divide-x sm:divide-y-0">
+          <Chiffre
+            libelle="Valeur du stock à la revente"
+            valeur={valeur((s) => money.format(s.valeurStockRevente))}
+            note="Stock disponible × prix de vente"
+          />
+          <Chiffre
+            libelle="Articles disponibles"
+            valeur={valeur((s) => pluriel(s.nombreArticlesDisponibles, "article", "articles"))}
+            note="En stock, prêts à vendre"
+            lien={{ vers: "/articles", texte: "Voir le stock" }}
           />
         </div>
       </section>

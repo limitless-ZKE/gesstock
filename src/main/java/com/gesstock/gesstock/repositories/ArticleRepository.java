@@ -31,6 +31,13 @@ public interface ArticleRepository extends JpaRepository<Article, Long> {
     @Query("select coalesce(sum(a.cmp * a.quantite), 0) from Article a")
     java.math.BigDecimal valeurTotaleStock();
 
+    /** Valeur du stock disponible AU PRIX DE REVENTE : quantité × prix de vente (ce que le stock rapporterait s'il était vendu). */
+    @Query("select coalesce(sum(a.prix * a.quantite), 0) from Article a")
+    java.math.BigDecimal valeurStockAuPrixDeRevente();
+
+    @Query("select count(a) from Article a where a.quantite > 0")
+    long compterArticlesDisponibles();
+
     @Query("select count(a) from Article a where a.quantite <= a.seuilAlerte")
     long compterArticlesSousSeuilAlerte();
 }

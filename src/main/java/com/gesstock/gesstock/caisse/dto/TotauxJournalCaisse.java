@@ -14,6 +14,7 @@ public record TotauxJournalCaisse(
     BigDecimal fondsDeCaisse,
     BigDecimal encaissementsEspeces,
     BigDecimal reglementsClientsEspeces,
+    BigDecimal entreesDeFonds,
     BigDecimal sorties,
     BigDecimal soldeTheorique,
     BigDecimal especesComptees,

@@ -38,4 +38,16 @@ public class MouvementCaisseRestController {
             .buildAndExpand(response.id()).toUri();
         return ResponseEntity.created(location).body(response);
     }
+
+    /** Un apport de fonds dans la caisse du jour : réservé aux responsables (ADMIN, MANAGER) par SecurityConfig. */
+    @PostMapping("/entrees")
+    public ResponseEntity<MouvementCaisseResponse> enregistrerEntree(
+        @Valid @RequestBody MouvementCaisseRequest request,
+        @AuthenticationPrincipal UserDetails principal
+    ) {
+        MouvementCaisseResponse response = mouvementService.enregistrerEntree(request, principal.getUsername());
+        URI location = ServletUriComponentsBuilder.fromCurrentRequest().path("/{id}")
+            .buildAndExpand(response.id()).toUri();
+        return ResponseEntity.created(location).body(response);
+    }
 }

@@ -7,6 +7,8 @@ import {
   ChevronLeft,
   ChevronRight,
   CirclePlus,
+  FileSpreadsheet,
+  FileText,
   Layers3,
   LoaderCircle,
   Pencil,
@@ -18,10 +20,11 @@ import {
   X,
 } from "lucide-react";
 import { api } from "../services/api";
-import { apiErrorMessage as errorMessage } from "../services/apiError";
+import { apiErrorMessage as errorMessage, lireErreurDeFichier } from "../services/apiError";
 import { money } from "../lib/format";
 import Indicateur from "../components/Indicateur";
 import { formatQuantite } from "../lib/quantite";
+import { telecharger } from "../lib/telechargement";
 
 type Category = { id: number; nom: string; description: string | null; active: boolean; parentId: number | null };
 type Unit = { id: number; code: string; libelle: string };
@@ -85,7 +88,10 @@ export default function ArticlesPage() {
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
-  const [stockFilter, setStockFilter] = useState<"all" | "low" | "out">("all");
+  const [stockFilter, setStockFilter] = useState<"all" | "available" | "low" | "out">("all");
+  // Liste imprimable : avec le stock, ou liste simple (référence, désignation, unité, prix de vente).
+  const [listeAvecStock, setListeAvecStock] = useState(true);
+  const [exportEnCours, setExportEnCours] = useState<"excel" | "pdf" | null>(null);
   const [sortKey, setSortKey] = useState<keyof Article>("designation");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [page, setPage] = useState(1);
@@ -135,6 +141,7 @@ export default function ArticlesPage() {
     return articles
       .filter((article) => categoryFilter === "all" || String(article.categorieId ?? "") === categoryFilter)
       .filter((article) => stockFilter === "all"
+        || (stockFilter === "available" && article.quantiteStock > 0)
         || (stockFilter === "low" && article.quantiteStock > 0 && article.quantiteStock <= article.seuilAlerteStock)
         || (stockFilter === "out" && article.quantiteStock <= 0))
       .filter((article) => !query
@@ -255,6 +262,24 @@ export default function ArticlesPage() {
       notify(errorMessage(categoryError, "Création de catégorie impossible."), true);
     } finally {
       setSavingCategory(false);
+    }
+  }
+
+  /** Exporte la liste des articles selon les filtres de l'écran (niveau de stock, catégorie), classée par catégorie. */
+  async function exporterListe(format: "excel" | "pdf") {
+    setExportEnCours(format);
+    try {
+      const stock = { all: "tous", available: "disponible", low: "bas", out: "rupture" }[stockFilter];
+      const { data } = await api.get<Blob>(`/articles/export/${format}`, {
+        params: { stock, avecStock: listeAvecStock, ...(categoryFilter === "all" ? {} : { categorieId: categoryFilter }) },
+        responseType: "blob",
+      });
+      const nom = `gesstock-articles-${{ all: "tous", available: "disponible", low: "stock-bas", out: "rupture" }[stockFilter]}${listeAvecStock ? "" : "-simple"}`;
+      await telecharger(data, `${nom}.${format === "excel" ? "xlsx" : "pdf"}`);
+    } catch (raison) {
+      notify(errorMessage(await lireErreurDeFichier(raison), `L’export ${format === "excel" ? "Excel" : "PDF"} a échoué.`), true);
+    } finally {
+      setExportEnCours(null);
     }
   }
 
@@ -386,8 +411,9 @@ export default function ArticlesPage() {
 
       {notice && <Notice error={noticeError} onClose={() => setNotice("")}>{notice}</Notice>}
 
-      <section className="grid gap-3 sm:grid-cols-3">
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <SummaryCard label="Références" value={articles.length} />
+        <SummaryCard label="Disponibles" value={articles.filter((item) => item.quantiteStock > 0).length} />
         <SummaryCard label="Stock bas" value={articles.filter((item) => item.quantiteStock > 0 && item.quantiteStock <= item.seuilAlerteStock).length} />
         <SummaryCard label="En rupture" value={articles.filter((item) => item.quantiteStock <= 0).length} />
       </section>
@@ -404,9 +430,31 @@ export default function ArticlesPage() {
           </select>
           <select className="input-field md:w-48" value={stockFilter} onChange={(event) => setStockFilter(event.target.value as typeof stockFilter)}>
             <option value="all">Tous les niveaux</option>
+            <option value="available">Stock disponible</option>
             <option value="low">Stock bas</option>
             <option value="out">Rupture</option>
           </select>
+        </div>
+        <div className="flex flex-col gap-2 border-b border-slate-100 bg-slate-50/60 px-4 py-3 text-xs text-slate-600 md:flex-row md:items-center md:justify-between md:px-5">
+          <p>
+            <span className="font-semibold text-slate-700">Imprimer ou exporter la liste</span>, classée par catégorie, selon les filtres
+            ci-dessus ({{ all: "tous les niveaux", available: "stock disponible", low: "stock bas", out: "rupture" }[stockFilter]},
+            {" "}{categoryFilter === "all" ? "toutes les catégories" : categories.find((category) => String(category.id) === categoryFilter)?.nom ?? "catégorie choisie"}).
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="flex items-center gap-1.5 font-semibold text-slate-700">
+              <input type="checkbox" checked={listeAvecStock} onChange={(event) => setListeAvecStock(event.target.checked)} />
+              Avec le stock
+            </label>
+            <button type="button" disabled={exportEnCours !== null} onClick={() => void exporterListe("excel")} className="button-secondary h-9">
+              {exportEnCours === "excel" ? <LoaderCircle size={14} className="animate-spin" /> : <FileSpreadsheet size={14} />}
+              {exportEnCours === "excel" ? "Préparation…" : "Excel"}
+            </button>
+            <button type="button" disabled={exportEnCours !== null} onClick={() => void exporterListe("pdf")} className="button-secondary h-9">
+              {exportEnCours === "pdf" ? <LoaderCircle size={14} className="animate-spin" /> : <FileText size={14} />}
+              {exportEnCours === "pdf" ? "Préparation…" : "PDF (imprimer)"}
+            </button>
+          </div>
         </div>
         {error && <div className="m-4"><Notice error>{error}<button className="ml-2 underline" onClick={() => void loadData()}>Réessayer</button></Notice></div>}
         <div className="overflow-x-auto">

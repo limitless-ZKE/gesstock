@@ -42,7 +42,7 @@ et image Docker. Les actions d'autres éditeurs que GitHub sont épinglées sur 
 
 - Backend : `src/main/java/com/gesstock/gesstock/` — un paquet par domaine : `articles`, `ventes`, `caisse`, `clients`,
   `fournisseurs`, `approvisionnements`, `inventaires`, `stock`, `statistiques`, `entreprise`, `promotions`, `journal`,
-  `security`, `config`, `interfaceweb` (sert l'interface embarquée). Migrations Flyway `V1` à `V16` dans
+  `security`, `config`, `interfaceweb` (sert l'interface embarquée). Migrations Flyway `V1` à `V17` dans
   `src/main/resources/db/migration` ; Hibernate ne fait que valider le schéma (entité modifiée = migration obligatoire).
 - Frontend : `frontend/src/pages` (un écran par route, tests à côté), `components`, `services` (appels API), `auth`, `entreprise`.
   Caisse : `CaissePage`, `ChampClient` (recherche client), `QuantiteSaisie` (quantité saisie au clavier, virgule acceptée).
@@ -68,6 +68,12 @@ et image Docker. Les actions d'autres éditeurs que GitHub sont épinglées sur 
 - Approvisionnement : article cherché par son nom ; prix d'achat et de revente pré-remplis (derniers prix connus) ; le prix de
   revente devient le prix de vente à la RÉCEPTION ; un bon se corrige aussi après réception (stock, coût moyen, prix et dette
   fournisseur suivent ; refusé si déjà vendu, si déjà payé au-delà du nouveau total, ou s'il y a un retour fournisseur).
+- Réception d'un bon : case « payer en espèces de la caisse » cochée par défaut (sortie automatique du total, bon payé) ; décochée, dette
+  fournisseur comme avant ; le bon compte comme ACHAT dans les statistiques dans les deux cas. Entrées de fonds en caisse : ADMIN et
+  MANAGER seulement, jamais du chiffre d'affaires. Statistiques : chiffre d'affaires tel quel, achats, autres dépenses (sorties de caisse
+  MANUELLES seulement), résultat = CA − achats − autres dépenses, entrées de fonds à part.
+- Stock disponible (filtre + export PDF/Excel), valeur du stock à la revente au tableau de bord, liste des articles par catégorie
+  (avec ou sans stock, sans prix d'achat).
 - Coût moyen pondéré. Compte fournisseur complet (dettes, paiements, avoirs imputés d'office).
 - Inventaire sans seuil : MANAGER/ADMIN valident, le validateur n'est pas l'ouvreur ; tout le stock ou une catégorie.
 - Vente à crédit possible (pas pour un client de passage). Journal d'un caissier : **ses lignes seulement**

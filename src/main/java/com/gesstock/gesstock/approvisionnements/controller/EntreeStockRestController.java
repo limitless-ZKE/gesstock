@@ -2,6 +2,7 @@ package com.gesstock.gesstock.approvisionnements.controller;
 
 import com.gesstock.gesstock.approvisionnements.dto.ApprovisionnementRequest;
 import com.gesstock.gesstock.approvisionnements.dto.ApprovisionnementResponse;
+import com.gesstock.gesstock.approvisionnements.dto.ReceptionRequest;
 import com.gesstock.gesstock.approvisionnements.service.EntreeStockService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -61,8 +62,9 @@ public class EntreeStockRestController {
     @PostMapping("/{id}/validation")
     public ApprovisionnementResponse valider(
         @PathVariable Long id,
+        @RequestBody(required = false) ReceptionRequest reception,
         @AuthenticationPrincipal UserDetails principal
     ) {
-        return entreeStockService.valider(id, principal.getUsername());
+        return entreeStockService.valider(id, principal.getUsername(), reception != null && reception.payerEnEspeces());
     }
 }

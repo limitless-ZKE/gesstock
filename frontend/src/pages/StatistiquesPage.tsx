@@ -54,12 +54,27 @@ type JournalActivity = {
   dateActivite: string;
   utilisateur: string | null;
 };
+type Achat = { id: number; numero: string; recuLe: string | null; fournisseur: string; montant: number };
+type Depense = { id: number; date: string; motif: string; beneficiaire: string; effectuePar: string; montant: number };
+/** Ce que l'argent de la période est devenu : le chiffre d'affaires reste affiché tel quel, les dépenses s'en retranchent dans le résultat. */
+type Bilan = {
+  achats: number;
+  nombreBonsRecus: number;
+  autresDepenses: number;
+  nombreDepenses: number;
+  totalDepenses: number;
+  resultat: number;
+  entreesDeFonds: number;
+  bonsRecus: Achat[];
+  depenses: Depense[];
+};
 type Report = {
   debut: string;
   fin: string;
   chiffreAffaires: number;
   nombreVentes: number;
   margeBrute: number;
+  bilanDepenses: Bilan;
   margesParCategorie: CategoryMargin[];
   margesParArticle: ArticleMargin[];
   sessionsCaisse: CashSession[];
@@ -123,6 +138,31 @@ export default function StatistiquesPage() {
     </section>
 
     {report && <>
+      <section aria-label="Dépenses et résultat" className="space-y-3">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <Indicateur libelle="Achats" valeur={money.format(report.bilanDepenses.achats)} note={`${report.bilanDepenses.nombreBonsRecus} bon(s) d’approvisionnement réceptionné(s)`} />
+          <Indicateur libelle="Autres dépenses" valeur={money.format(report.bilanDepenses.autresDepenses)} note={`${report.bilanDepenses.nombreDepenses} sortie(s) de caisse saisie(s)`} />
+          <Indicateur libelle="Résultat" valeur={money.format(report.bilanDepenses.resultat)} note="Chiffre d’affaires − achats − autres dépenses" accent alerte={report.bilanDepenses.resultat < 0} />
+          <Indicateur libelle="Entrées de fonds" valeur={money.format(report.bilanDepenses.entreesDeFonds)} note="Argent ajouté en caisse, hors chiffre d’affaires" />
+        </div>
+        <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-slate-100 p-5">
+            <h2 className="font-bold text-slate-900">Dépenses de la période</h2>
+            <p className="mt-1 text-xs text-slate-500">Total {money.format(report.bilanDepenses.totalDepenses)} : les achats sont les bons d’approvisionnement réceptionnés ; les autres dépenses sont les sorties de caisse saisies à la main. Le paiement d’un fournisseur n’est pas recompté.</p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[720px] text-left">
+              <thead className="bg-slate-50 text-xs font-semibold text-slate-600"><tr><th className="px-5 py-3">Type</th><th className="px-4 py-3">Date</th><th className="px-4 py-3">Référence ou motif</th><th className="px-4 py-3">Fournisseur ou bénéficiaire</th><th className="px-5 py-3 text-right">Montant</th></tr></thead>
+              <tbody className="divide-y divide-slate-100">
+                {report.bilanDepenses.bonsRecus.map((bon) => <tr key={`bon-${bon.id}`}><td className="px-5 py-3 text-xs font-semibold text-slate-700">Achat</td><td className="px-4 py-3 text-xs text-slate-600">{dateTimeLabel(bon.recuLe)}</td><td className="px-4 py-3 text-xs text-slate-700">Bon {bon.numero}</td><td className="px-4 py-3 text-xs text-slate-600">{bon.fournisseur}</td><td className="px-5 py-3 text-right text-xs font-bold text-rose-700">−{money.format(bon.montant)}</td></tr>)}
+                {report.bilanDepenses.depenses.map((depense) => <tr key={`depense-${depense.id}`}><td className="px-5 py-3 text-xs font-semibold text-slate-700">Sortie de caisse</td><td className="px-4 py-3 text-xs text-slate-600">{dateTimeLabel(depense.date)}</td><td className="px-4 py-3 text-xs text-slate-700">{depense.motif}</td><td className="px-4 py-3 text-xs text-slate-600">{depense.beneficiaire}</td><td className="px-5 py-3 text-right text-xs font-bold text-rose-700">−{money.format(depense.montant)}</td></tr>)}
+                {report.bilanDepenses.bonsRecus.length + report.bilanDepenses.depenses.length === 0 && <tr><td colSpan={5} className="h-24 text-center text-xs text-slate-400">Aucune dépense sur cette période.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+
       <section className="grid gap-5 xl:grid-cols-2">
         <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"><div className="mb-5"><h2 className="font-bold text-slate-900">Rentabilité par catégorie</h2><p className="mt-1 text-xs text-slate-500">Marge brute estimée · {dateLabel(report.debut)} – {dateLabel(report.fin)}</p></div>
           {report.margesParCategorie.length ? <div className="space-y-4">{report.margesParCategorie.map((item) => <div key={item.categorieId ?? "uncategorized"}><div className="mb-1.5 flex justify-between gap-3 text-xs"><span className="truncate font-semibold text-slate-700">{item.categorie}</span><span className={`shrink-0 font-bold ${item.margeBrute < 0 ? "text-rose-600" : "text-emerald-700"}`}>{money.format(item.margeBrute)}</span></div><div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className={`h-full rounded-full ${item.margeBrute < 0 ? "bg-rose-400" : "bg-emerald-500"}`} style={{ width: `${Math.min(100, Math.max(0, maxCategoryMargin > 0 ? item.margeBrute / maxCategoryMargin * 100 : 0))}%` }} /></div><p className="mt-1 text-xs text-slate-400">CA {money.format(item.chiffreAffaires)} · coût {money.format(item.coutAchat)}</p></div>)}</div> : <Empty>No sales in this range.</Empty>}
