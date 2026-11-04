@@ -209,15 +209,15 @@ public class StatistiquesExportService {
 
     private void addBilanDepenses(Document document, Font section, RapportStatistiquesResponse rapport) throws DocumentException {
         BilanDepensesResponse bilan = rapport.bilanDepenses();
-        document.add(new Paragraph("Dépenses et résultat", section));
+        document.add(com.gesstock.gesstock.common.export.ExportSupport.paragraphe("Dépenses et résultat", section, 6));
         PdfPTable resume = new PdfPTable(5);
         resume.setWidthPercentage(100);
         addPdfHeader(resume, "Chiffre d'affaires", "Achats", "Autres dépenses", "Résultat", "Entrées de fonds");
-        resume.addCell(rapport.chiffreAffaires().toPlainString());
-        resume.addCell(bilan.achats().toPlainString());
-        resume.addCell(bilan.autresDepenses().toPlainString());
-        resume.addCell(bilan.resultat().toPlainString());
-        resume.addCell(bilan.entreesDeFonds().toPlainString());
+        resume.addCell(com.gesstock.gesstock.common.export.ExportSupport.montant(rapport.chiffreAffaires()));
+        resume.addCell(com.gesstock.gesstock.common.export.ExportSupport.montant(bilan.achats()));
+        resume.addCell(com.gesstock.gesstock.common.export.ExportSupport.montant(bilan.autresDepenses()));
+        resume.addCell(com.gesstock.gesstock.common.export.ExportSupport.montant(bilan.resultat()));
+        resume.addCell(com.gesstock.gesstock.common.export.ExportSupport.montant(bilan.entreesDeFonds()));
         document.add(resume);
         document.add(new Paragraph("Résultat = chiffre d'affaires − achats − autres dépenses. Les achats sont les bons d'approvisionnement réceptionnés ; les autres dépenses sont les sorties de caisse saisies à la main. Les entrées de fonds ne sont pas du chiffre d'affaires."));
         if (!bilan.bonsRecus().isEmpty() || !bilan.depenses().isEmpty()) {
@@ -229,14 +229,14 @@ public class StatistiquesExportService {
                 detail.addCell(bon.recuLe() == null ? "" : bon.recuLe().format(DATE_TIME));
                 detail.addCell(bon.numero());
                 detail.addCell(bon.fournisseur());
-                detail.addCell(bon.montant().toPlainString());
+                detail.addCell(com.gesstock.gesstock.common.export.ExportSupport.montant(bon.montant()));
             }
             for (DepenseRapportResponse depense : bilan.depenses()) {
                 detail.addCell("Sortie de caisse");
                 detail.addCell(depense.date().format(DATE_TIME));
                 detail.addCell(depense.motif());
                 detail.addCell(depense.beneficiaire());
-                detail.addCell(depense.montant().toPlainString());
+                detail.addCell(com.gesstock.gesstock.common.export.ExportSupport.montant(depense.montant()));
             }
             document.add(new Paragraph(" "));
             document.add(detail);
