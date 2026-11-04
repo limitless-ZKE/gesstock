@@ -4,5 +4,6 @@ public enum TypeEcritureCaisse {
     OUVERTURE,
     VENTE,
     REGLEMENT,
-    SORTIE
+    SORTIE,
+    ENTREE_FONDS
 }

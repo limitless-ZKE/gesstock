@@ -46,6 +46,7 @@ public final class OperationsConnues {
         connue("OUVERTURE", "SESSION_CAISSE", "Ouverture de la caisse", Famille.CAISSE),
         connue("CLOTURE", "SESSION_CAISSE", "Clôture de la caisse", Famille.CAISSE),
         connue("SORTIE_CAISSE", "SESSION_CAISSE", "Sortie de caisse", Famille.CAISSE),
+        connue("ENTREE_FONDS", "SESSION_CAISSE", "Entrée de fonds en caisse", Famille.CAISSE),
 
         connue("REGLEMENT", "DETTE_CLIENT", "Règlement de dette client", Famille.CLIENTS),
         connue("CREATION", "CLIENT", "Client créé", Famille.CLIENTS),

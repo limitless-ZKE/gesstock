@@ -16,6 +16,7 @@ public record SessionCaisseResponse(
     BigDecimal montantCloture,
     BigDecimal encaissementsEspeces,
     BigDecimal reglementsClientsEspeces,
+    BigDecimal entreesDeFonds,
     BigDecimal sortiesCaisse,
     BigDecimal soldeTheorique,
     BigDecimal ecartCloture,

@@ -1,8 +1,13 @@
 package com.gesstock.gesstock.statistiques.service;
 
+import com.gesstock.gesstock.entities.Approvisionnement;
+import com.gesstock.gesstock.entities.LigneApprovisionnement;
 import com.gesstock.gesstock.entities.ModeReglement;
+import com.gesstock.gesstock.entities.OrigineMouvementCaisse;
+import com.gesstock.gesstock.entities.TypeMouvementCaisse;
 import com.gesstock.gesstock.entities.StatutVente;
 import com.gesstock.gesstock.entities.JournalActivite;
+import com.gesstock.gesstock.repositories.ApprovisionnementRepository;
 import com.gesstock.gesstock.repositories.ArticleRepository;
 import com.gesstock.gesstock.repositories.DetteClientRepository;
 import com.gesstock.gesstock.repositories.JournalActiviteRepository;
@@ -11,7 +16,11 @@ import com.gesstock.gesstock.repositories.ReglementClientRepository;
 import com.gesstock.gesstock.repositories.SessionCaisseRepository;
 import com.gesstock.gesstock.repositories.VenteRepository;
 import com.gesstock.gesstock.journal.dto.JournalActiviteResponse;
+import com.gesstock.gesstock.statistiques.dto.AchatRapportResponse;
 import com.gesstock.gesstock.statistiques.dto.ArticleTopVentesResponse;
+import com.gesstock.gesstock.statistiques.dto.BilanDepensesResponse;
+import com.gesstock.gesstock.statistiques.dto.DepenseRapportResponse;
+import com.gesstock.gesstock.stock.Quantites;
 import com.gesstock.gesstock.statistiques.dto.DashboardStatistiquesResponse;
 import com.gesstock.gesstock.statistiques.dto.MargeArticleResponse;
 import com.gesstock.gesstock.statistiques.dto.MargeCategorieResponse;
@@ -43,6 +52,7 @@ public class StatistiquesService {
     private final JournalActiviteRepository journalRepository;
     private final MouvementCaisseRepository mouvementCaisseRepository;
     private final ReglementClientRepository reglementRepository;
+    private final ApprovisionnementRepository approvisionnementRepository;
 
     public StatistiquesService(
         VenteRepository venteRepository,
@@ -51,7 +61,8 @@ public class StatistiquesService {
         SessionCaisseRepository sessionCaisseRepository,
         JournalActiviteRepository journalRepository,
         MouvementCaisseRepository mouvementCaisseRepository,
-        ReglementClientRepository reglementRepository
+        ReglementClientRepository reglementRepository,
+        ApprovisionnementRepository approvisionnementRepository
     ) {
         this.venteRepository = venteRepository;
         this.articleRepository = articleRepository;
@@ -60,6 +71,7 @@ public class StatistiquesService {
         this.journalRepository = journalRepository;
         this.mouvementCaisseRepository = mouvementCaisseRepository;
         this.reglementRepository = reglementRepository;
+        this.approvisionnementRepository = approvisionnementRepository;
     }
 
     public DashboardStatistiquesResponse dashboard() {
@@ -102,6 +114,8 @@ public class StatistiquesService {
             venteRepository.compterVentesEntre(StatutVente.VALIDEE, debutJour, finJour),
             valeurOuZero(detteRepository.calculerEncoursGlobal()),
             articleRepository.compterArticlesSousSeuilAlerte(),
+            valeurOuZero(articleRepository.valeurStockAuPrixDeRevente()),
+            articleRepository.compterArticlesDisponibles(),
             tendances,
             topArticles
         );
@@ -152,6 +166,7 @@ public class StatistiquesService {
                 valeurOuZero(venteRepository.chiffreAffairesSession(session.getId(), StatutVente.VALIDEE)),
                 valeurOuZero(venteRepository.encaissementsSession(session.getId(), StatutVente.VALIDEE)),
                 valeurOuZero(reglementRepository.totalParSessionEtMode(session.getId(), ModeReglement.ESPECES)),
+                valeurOuZero(mouvementCaisseRepository.totalEntrees(session.getId())),
                 valeurOuZero(mouvementCaisseRepository.totalSorties(session.getId())),
                 session.getMontantCloture(),
                 venteRepository.compterVentesSession(session.getId(), StatutVente.VALIDEE),
@@ -176,11 +191,41 @@ public class StatistiquesService {
             chiffreAffairesTtc,
             venteRepository.compterVentesEntre(StatutVente.VALIDEE, debutDateTime, finDateTime),
             chiffreAffairesLignes.subtract(coutTotal),
+            bilanDepenses(chiffreAffairesTtc, debutDateTime, finDateTime),
             margesCategories,
             margesArticles,
             sessions,
             journal
         );
+    }
+
+    /**
+     * Achats (bons réceptionnés), autres dépenses (sorties de caisse saisies à la main) et résultat. Le chiffre d'affaires est
+     * donné tel quel ; les dépenses ne le modifient pas, elles s'en retranchent dans le résultat.
+     */
+    private BilanDepensesResponse bilanDepenses(BigDecimal chiffreAffaires, LocalDateTime debut, LocalDateTime fin) {
+        List<AchatRapportResponse> bons = new ArrayList<>();
+        BigDecimal achats = BigDecimal.ZERO;
+        for (Approvisionnement bon : approvisionnementRepository.recusEntre(debut, fin)) {
+            BigDecimal montant = BigDecimal.ZERO;
+            for (LigneApprovisionnement ligne : bon.getLignes()) {
+                montant = montant.add(Quantites.montant(ligne.getPrixUnitaire(), ligne.getQuantite()));
+            }
+            achats = achats.add(montant);
+            bons.add(new AchatRapportResponse(bon.getId(), bon.getNumero(), bon.getRecuLe(),
+                bon.getFournisseur() == null ? "" : bon.getFournisseur().getNom(), montant));
+        }
+        List<DepenseRapportResponse> depenses = mouvementCaisseRepository
+            .entre(TypeMouvementCaisse.SORTIE, OrigineMouvementCaisse.MANUEL, debut, fin).stream()
+            .map(mouvement -> new DepenseRapportResponse(mouvement.getId(), mouvement.getDateMouvement(), mouvement.getMotif(),
+                mouvement.getBeneficiaire(), mouvement.getEffectuePar().getUsername(), mouvement.getMontant()))
+            .toList();
+        BigDecimal autres = depenses.stream().map(DepenseRapportResponse::montant).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal total = achats.add(autres);
+        BigDecimal entrees = valeurOuZero(mouvementCaisseRepository.totalEntre(
+            TypeMouvementCaisse.ENTREE, OrigineMouvementCaisse.MANUEL, debut, fin));
+        return new BilanDepensesResponse(achats, bons.size(), autres, depenses.size(), total,
+            chiffreAffaires.subtract(total), entrees, bons, depenses);
     }
 
     public SyntheseStatistiquesResponse synthese(LocalDate journee) {

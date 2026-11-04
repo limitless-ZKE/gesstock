@@ -88,6 +88,10 @@ export default function ApprovisionnementsPage() {
   const [draftLines, setDraftLines] = useState<DraftLine[]>([blankLine()]);
   const [saving, setSaving] = useState(false);
   const [busySupplyId, setBusySupplyId] = useState<number | null>(null);
+  // Bon en cours de réception : la fenêtre demande si le total sort aussitôt de la caisse (coché par défaut).
+  const [receiving, setReceiving] = useState<Supply | null>(null);
+  const [payCash, setPayCash] = useState(true);
+  const [receiveError, setReceiveError] = useState("");
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [notice, setNotice] = useState("");
   const [noticeError, setNoticeError] = useState(false);
@@ -223,17 +227,27 @@ export default function ApprovisionnementsPage() {
     }
   }
 
+  function startReceive(supply: Supply) {
+    setReceiveError("");
+    setPayCash(true);
+    setReceiving(supply);
+  }
+
+  /** Réceptionne le bon ; payé en espèces de la caisse, le total sort de la caisse du jour (sortie automatique, bon payé). */
   async function receiveSupply(supply: Supply) {
-    if (!window.confirm(`Confirmer la réception du bon ${supply.numero} ? Cette opération mettra les quantités en stock à jour.`)) return;
     setBusySupplyId(supply.id);
+    setReceiveError("");
     try {
-      await api.post(`/approvisionnements/${supply.id}/validation`);
-      setNotice(`Le bon ${supply.numero} a été réceptionné. Les stocks ont été mis à jour.`);
+      await api.post(`/approvisionnements/${supply.id}/validation`, { payerEnEspeces: payCash });
+      setReceiving(null);
+      setNotice(payCash
+        ? `Le bon ${supply.numero} a été réceptionné et payé en espèces de la caisse (${money.format(supply.montantTotal)}). Les stocks ont été mis à jour.`
+        : `Le bon ${supply.numero} a été réceptionné : une dette envers le fournisseur reste à régler. Les stocks ont été mis à jour.`);
       setNoticeError(false);
       await loadData();
     } catch (error) {
-      setNotice(errorMessage(error, `La réception du bon ${supply.numero} a échoué.`));
-      setNoticeError(true);
+      // Refusée (caisse fermée, espèces insuffisantes…) : rien n'a changé, la fenêtre reste ouverte avec le message du serveur.
+      setReceiveError(errorMessage(error, `La réception du bon ${supply.numero} a échoué.`));
     } finally {
       setBusySupplyId(null);
     }
@@ -319,7 +333,7 @@ export default function ApprovisionnementsPage() {
                       expanded={expandedId === supply.id}
                       busy={busySupplyId === supply.id}
                       onToggle={() => setExpandedId((current) => current === supply.id ? null : supply.id)}
-                      onReceive={() => void receiveSupply(supply)}
+                      onReceive={() => startReceive(supply)}
                       onDelete={() => void deleteDraft(supply)}
                       onEdit={() => openEdit(supply)}
                     />
@@ -365,6 +379,37 @@ export default function ApprovisionnementsPage() {
               </div>
               <div className="flex justify-end gap-2 border-t border-slate-100 pt-4"><button type="button" disabled={saving} onClick={() => setCreateOpen(false)} className="button-secondary">Annuler</button><button disabled={saving || suppliers.length === 0 || articles.length === 0} className="button-primary min-w-52">{saving ? <LoaderCircle size={15} className="animate-spin" /> : <PackagePlus size={16} />}{saving ? "Enregistrement…" : editing?.statut === "RECU" ? "Enregistrer la correction" : editing ? "Enregistrer le brouillon" : "Créer le brouillon"}</button></div>
             </form>
+          </section>
+        </div>
+      )}
+      {receiving && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/50 p-4" onMouseDown={(event) => { if (event.target === event.currentTarget && busySupplyId === null) setReceiving(null); }}>
+          <section role="dialog" aria-modal="true" aria-label={`Réceptionner le bon ${receiving.numero}`} className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl">
+            <div className="mb-4 flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">Réceptionner le bon {receiving.numero}</h2>
+                <p className="mt-1 text-xs text-slate-500">{receiving.fournisseur} · {receiving.lignes.length} ligne(s) · total <strong className="text-slate-800">{money.format(receiving.montantTotal)}</strong>. Les quantités entrent en stock et les prix de revente saisis sont appliqués.</p>
+              </div>
+              <button disabled={busySupplyId !== null} onClick={() => setReceiving(null)} className="icon-button" aria-label="Fermer"><X size={16} /></button>
+            </div>
+            {receiveError && <div role="alert" className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-800">{receiveError}</div>}
+            <label className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700">
+              <input type="checkbox" className="mt-0.5" checked={payCash} onChange={(event) => setPayCash(event.target.checked)} />
+              <span>
+                <span className="block font-bold text-slate-900">Payer en espèces de la caisse</span>
+                {payCash
+                  ? <>Le total du bon ({money.format(receiving.montantTotal)}) sort tout de suite de la caisse du jour : une sortie est enregistrée, le bon est payé et il n’y a plus de dette envers le fournisseur. La caisse doit être ouverte et contenir assez d’espèces.</>
+                  : <>Rien ne sort de la caisse : une dette envers le fournisseur est créée, à régler plus tard (espèces, virement…) depuis « Fournisseurs ».</>}
+              </span>
+            </label>
+            <p className="mt-3 text-xs text-slate-500">Dans les deux cas, le bon compte comme un achat dans les statistiques.</p>
+            <div className="mt-5 flex justify-end gap-2 border-t border-slate-100 pt-4">
+              <button type="button" disabled={busySupplyId !== null} onClick={() => setReceiving(null)} className="button-secondary">Annuler</button>
+              <button disabled={busySupplyId !== null} onClick={() => void receiveSupply(receiving)} className="button-primary">
+                {busySupplyId === receiving.id ? <LoaderCircle size={14} className="animate-spin" /> : <ArrowDownToLine size={14} />}
+                {busySupplyId === receiving.id ? "Réception…" : "Confirmer la réception"}
+              </button>
+            </div>
           </section>
         </div>
       )}

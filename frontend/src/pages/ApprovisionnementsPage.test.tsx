@@ -2,6 +2,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../services/api";
+import { erreurHttp } from "../test/axios";
 import ApprovisionnementsPage from "./ApprovisionnementsPage";
 
 vi.mock("../services/api", () => ({ api: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() } }));
@@ -12,6 +13,12 @@ const ARTICLES = [
   { id: 3, reference: "BOI-003", designation: "Jus de bissap", prixAchat: 900, prixVente: 1200, quantiteStock: 0, uniteMesure: null },
 ];
 const FOURNISSEURS = [{ id: 9, nom: "Brasseries du Sud", telephone: null, email: null, adresse: null }];
+const BON_A_RECEVOIR = {
+  id: 51, numero: "APP-51", dateApprovisionnement: "2026-11-02", statut: "BROUILLON", fournisseurId: 9, fournisseur: "Brasseries du Sud",
+  montantTotal: 30000,
+  lignes: [{ id: 511, articleId: 2, referenceArticle: "BOI-002", designationArticle: "Eau minérale 1,5 L", quantite: 12, prixUnitaire: 2500,
+    montantLigne: 30000, prixVente: null }],
+};
 const BON_RECU = {
   id: 50, numero: "APP-50", dateApprovisionnement: "2026-11-01", statut: "RECU", fournisseurId: 9, fournisseur: "Brasseries du Sud",
   montantTotal: 60000,
@@ -24,7 +31,7 @@ beforeEach(() => {
   vi.mocked(api.post).mockReset();
   vi.mocked(api.put).mockReset();
   vi.mocked(api.get).mockImplementation(async (url: string) => {
-    if (url === "/approvisionnements") return { data: [BON_RECU] };
+    if (url === "/approvisionnements") return { data: [BON_RECU, BON_A_RECEVOIR] };
     if (url === "/fournisseurs") return { data: FOURNISSEURS };
     if (url === "/articles") return { data: ARTICLES };
     throw new Error(`appel inattendu : ${url}`);
@@ -85,6 +92,50 @@ describe("bon d'approvisionnement", () => {
       fournisseurId: 9,
       lignes: [{ articleId: 1, quantite: 2.5, prixUnitaire: 6000, prixVente: 8000 }],
     })));
+  });
+
+  it("la réception propose de payer en espèces de la caisse, case cochée par défaut", async () => {
+    const utilisateur = userEvent.setup();
+    render(<ApprovisionnementsPage />);
+    await screen.findByText("APP-51");
+    await utilisateur.click(screen.getByRole("button", { name: "Valider réception" }));
+
+    const fenetre = screen.getByRole("dialog", { name: "Réceptionner le bon APP-51" });
+    expect(within(fenetre).getByRole("checkbox", { name: /Payer en espèces de la caisse/ })).toBeChecked();
+    expect(fenetre).toHaveTextContent("plus de dette envers le fournisseur");
+    await utilisateur.click(within(fenetre).getByRole("button", { name: "Confirmer la réception" }));
+
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith("/approvisionnements/51/validation", { payerEnEspeces: true }));
+    expect(await screen.findByText(/réceptionné et payé en espèces de la caisse/)).toBeInTheDocument();
+  });
+
+  it("décochée, la réception garde la dette du fournisseur", async () => {
+    const utilisateur = userEvent.setup();
+    render(<ApprovisionnementsPage />);
+    await screen.findByText("APP-51");
+    await utilisateur.click(screen.getByRole("button", { name: "Valider réception" }));
+    const fenetre = screen.getByRole("dialog", { name: "Réceptionner le bon APP-51" });
+
+    await utilisateur.click(within(fenetre).getByRole("checkbox", { name: /Payer en espèces de la caisse/ }));
+    expect(fenetre).toHaveTextContent("une dette envers le fournisseur est créée");
+    await utilisateur.click(within(fenetre).getByRole("button", { name: "Confirmer la réception" }));
+
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith("/approvisionnements/51/validation", { payerEnEspeces: false }));
+    expect(await screen.findByText(/une dette envers le fournisseur reste à régler/)).toBeInTheDocument();
+  });
+
+  it("si la caisse ne peut pas payer, le message du serveur reste dans la fenêtre et rien n'est enregistré", async () => {
+    vi.mocked(api.post).mockRejectedValue(erreurHttp(409, { detail: "Paiement en espèces impossible : La sortie dépasse le solde théorique disponible de 1000. Ajoutez une entrée de fonds (responsable) ou décochez « Payer en espèces de la caisse ».", code: "CONFLIT" }));
+    const utilisateur = userEvent.setup();
+    render(<ApprovisionnementsPage />);
+    await screen.findByText("APP-51");
+    await utilisateur.click(screen.getByRole("button", { name: "Valider réception" }));
+    const fenetre = screen.getByRole("dialog", { name: "Réceptionner le bon APP-51" });
+
+    await utilisateur.click(within(fenetre).getByRole("button", { name: "Confirmer la réception" }));
+
+    expect(await within(fenetre).findByRole("alert")).toHaveTextContent("Paiement en espèces impossible");
+    expect(screen.getByRole("dialog", { name: "Réceptionner le bon APP-51" })).toBeInTheDocument();
   });
 
   it("corrige un bon déjà réceptionné après confirmation", async () => {

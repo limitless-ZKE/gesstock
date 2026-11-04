@@ -755,7 +755,7 @@ function CashSessionPanel({
           <form onSubmit={onClose} className="flex flex-col gap-2 sm:flex-row sm:items-end">
             <div className="border-l-4 border-emerald-600 pl-3 text-sm">
               <p className="font-semibold text-slate-900">Solde théorique : {currency.format(session.soldeTheorique)}</p>
-              <p className="text-slate-500">Espèces des ventes + règlements − sorties</p>
+              <p className="text-slate-500">Espèces des ventes + règlements + entrées de fonds − sorties</p>
             </div>
             <label className="block">
               <span className="mb-1.5 block text-sm font-semibold text-slate-700">Espèces comptées (XOF)</span>

@@ -81,6 +81,15 @@ public final class ExportSupport {
         return document;
     }
 
+    /** Document A4 en portrait (listes étroites, comme une liste d'articles), mêmes marges et même pied de page. */
+    public static Document documentPortrait(OutputStream sortie, String titreDuPied) throws DocumentException {
+        Document document = new Document(PageSize.A4, 28, 28, 28, 36);
+        PdfWriter ecrivain = PdfWriter.getInstance(document, sortie);
+        ecrivain.setPageEvent(new PiedDePage(titreDuPied));
+        document.open();
+        return document;
+    }
+
     /** Un paragraphe suivi d'un espace : sans lui, un titre colle (et est rogné par) le tableau qui le suit. */
     public static Paragraph paragraphe(String texte, Font police, float espaceApres) {
         Paragraph paragraphe = new Paragraph(texte, police);

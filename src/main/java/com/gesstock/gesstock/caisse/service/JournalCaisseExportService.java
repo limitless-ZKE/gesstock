@@ -82,21 +82,21 @@ public class JournalCaisseExportService {
 
     private static void recapitulatifPdf(Document document, JournalCaisseResponse journal) throws DocumentException {
         document.add(ExportSupport.paragraphe("Récapitulatif de la période", ExportSupport.gras(11), 5));
-        TableauPdf tableau = TableauPdf.creer(new float[] {1f, 1.7f, 1.2f, 1.3f, 1.3f, 1.1f, 1.4f, 1.3f, 1.1f},
-            new boolean[] {false, false, true, true, true, true, true, true, true},
-            "Journée", "Caissier", "Fond de caisse", "Ventes espèces", "Règlements espèces", "Sorties", "Solde théorique", "Espèces comptées", "Écart");
+        TableauPdf tableau = TableauPdf.creer(new float[] {0.95f, 1.5f, 1.1f, 1.2f, 1.2f, 1.1f, 1f, 1.3f, 1.2f, 1f},
+            new boolean[] {false, false, true, true, true, true, true, true, true, true},
+            "Journée", "Caissier", "Fond de caisse", "Ventes espèces", "Règlements espèces", "Entrées de fonds", "Sorties", "Solde théorique", "Espèces comptées", "Écart");
         for (JournalSessionCaisse session : journal.sessions()) {
             tableau.ligne(ExportSupport.jour(session.journee()), session.ouvertePar() == null ? "" : session.ouvertePar(),
                 ExportSupport.montant(session.fondDeCaisse()), ExportSupport.montant(session.encaissementsEspeces()),
-                ExportSupport.montant(session.reglementsClientsEspeces()), ExportSupport.montant(session.sorties()),
-                ExportSupport.montant(session.soldeTheorique()),
+                ExportSupport.montant(session.reglementsClientsEspeces()), ExportSupport.montant(session.entreesDeFonds()),
+                ExportSupport.montant(session.sorties()), ExportSupport.montant(session.soldeTheorique()),
                 session.montantCloture() == null ? "non clôturée" : ExportSupport.montant(session.montantCloture()),
                 session.ecart() == null ? "—" : ExportSupport.montant(session.ecart()));
         }
         TotauxJournalCaisse totaux = journal.totaux();
         tableau.sousTotal("Total", totaux.nombreSessions() + " journées", ExportSupport.montant(totaux.fondsDeCaisse()),
             ExportSupport.montant(totaux.encaissementsEspeces()), ExportSupport.montant(totaux.reglementsClientsEspeces()),
-            ExportSupport.montant(totaux.sorties()), ExportSupport.montant(totaux.soldeTheorique()),
+            ExportSupport.montant(totaux.entreesDeFonds()), ExportSupport.montant(totaux.sorties()), ExportSupport.montant(totaux.soldeTheorique()),
             ExportSupport.montant(totaux.especesComptees()), ExportSupport.montant(totaux.ecarts()));
         document.add(tableau.table());
         if (totaux.sessionsNonCloturees() > 0) {
@@ -126,7 +126,7 @@ public class JournalCaisseExportService {
                 ecriture.sortie() == null ? "" : ExportSupport.montant(ecriture.sortie()),
                 ExportSupport.montant(ecriture.solde()));
         }
-        tableau.sousTotal("", "", "Solde théorique des espèces", "", "", ExportSupport.montant(session.encaissementsEspeces().add(session.reglementsClientsEspeces()).add(session.fondDeCaisse())),
+        tableau.sousTotal("", "", "Solde théorique des espèces", "", "", ExportSupport.montant(session.encaissementsEspeces().add(session.reglementsClientsEspeces()).add(session.entreesDeFonds()).add(session.fondDeCaisse())),
             ExportSupport.montant(session.sorties()), ExportSupport.montant(session.soldeTheorique()));
         if (session.montantCloture() != null) {
             tableau.sousTotal("", "", "Espèces comptées à la clôture", "", "", "", "", ExportSupport.montant(session.montantCloture()));
@@ -160,6 +160,7 @@ public class JournalCaisseExportService {
             case VENTE -> "Vente";
             case REGLEMENT -> "Règlement";
             case SORTIE -> "Sortie";
+            case ENTREE_FONDS -> "Entrée de fonds";
         };
     }
 
@@ -207,7 +208,7 @@ public class JournalCaisseExportService {
             recap.createRow(ligne++).createCell(0).setCellValue(ExportSupport.periode(debut, fin));
             ligne++;
             String[] colonnes = {"Journée", "Session", "Ouverte par", "Clôturée par", "Statut", "Fond de caisse", "Ventes", "Ventes espèces",
-                "Règlements clients (espèces)", "Sorties", "Solde théorique", "Espèces comptées", "Écart", "Hors espèces", "Ventes à crédit", "Ventes annulées"};
+                "Règlements clients (espèces)", "Sorties", "Solde théorique", "Espèces comptées", "Écart", "Hors espèces", "Ventes à crédit", "Ventes annulées", "Entrées de fonds"};
             Row enteteLigne = recap.createRow(ligne++);
             for (int i = 0; i < colonnes.length; i++) {
                 enteteLigne.createCell(i).setCellValue(colonnes[i]);
@@ -233,6 +234,7 @@ public class JournalCaisseExportService {
                 row.createCell(13).setCellValue(horsEspeces(session));
                 montant(row, 14, session.ventesACredit(), entier, decimal);
                 row.createCell(15).setCellValue(session.nombreVentesAnnulees());
+                montant(row, 16, session.entreesDeFonds(), entier, decimal);
             }
             TotauxJournalCaisse totaux = journal.totaux();
             Row total = recap.createRow(ligne);
@@ -255,6 +257,9 @@ public class JournalCaisseExportService {
                 cellule.setCellStyle(totalEntier);
             }
             total.createCell(15).setCellValue(totaux.nombreVentesAnnulees());
+            var totalEntrees = total.createCell(16);
+            totalEntrees.setCellValue(totaux.entreesDeFonds().doubleValue());
+            totalEntrees.setCellStyle(totalEntier);
             for (int i = 0; i < colonnes.length; i++) recap.autoSizeColumn(i);
 
             Sheet ecritures = classeur.createSheet("Écritures");

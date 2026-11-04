@@ -10,6 +10,7 @@ import lombok.NoArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Entity
@@ -43,6 +44,9 @@ public class Approvisionnement {
     @Enumerated(EnumType.STRING)
     @Column(length = 20)
     private StatutApprovisionnement statut = StatutApprovisionnement.RECU;
+
+    /** Date et heure de la réception (null tant que le bon est un brouillon) : c'est ce jour-là que l'achat compte. */
+    private LocalDateTime recuLe;
 
     @ManyToOne
     @JoinColumn(name = "session_caisse_id")

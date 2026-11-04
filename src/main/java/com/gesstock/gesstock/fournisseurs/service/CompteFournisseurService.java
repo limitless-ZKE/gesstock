@@ -202,6 +202,19 @@ public class CompteFournisseurService {
         return total.setScale(ECHELLE_MONETAIRE, RoundingMode.UNNECESSARY);
     }
 
+    /**
+     * Paie en espèces de la caisse ce qui reste dû sur la dette d'un bon qui vient d'être réceptionné (après imputation des
+     * avoirs). Un bon de valeur nulle, ou déjà couvert par des avoirs, n'a rien à payer.
+     */
+    public void payerEnEspecesALaReception(Approvisionnement bon, String username) {
+        Optional<DetteFournisseur> dette = detteRepository.findByApprovisionnementIdForUpdate(bon.getId());
+        if (dette.isEmpty() || dette.get().solde().signum() <= 0) {
+            return;
+        }
+        payer(dette.get().getId(), new ReglementFournisseurRequest(dette.get().solde(), ModeReglement.ESPECES,
+            "Réception du bon " + bon.getNumero()), username);
+    }
+
     public ReglementFournisseurResponse payer(Long detteId, ReglementFournisseurRequest request, String username) {
         Long fournisseurId = detteRepository.findFournisseurId(detteId)
             .orElseThrow(() -> new RessourceIntrouvableException("Dette fournisseur introuvable: " + detteId));
@@ -230,7 +243,8 @@ public class CompteFournisseurService {
         if (request.modeReglement() == ModeReglement.ESPECES) {
             // L'argent quitte la caisse : sortie tracée (session ouverte et solde suffisant exigés par la caisse elle-même).
             MouvementCaisseResponse sortie = mouvementCaisseService.enregistrer(new MouvementCaisseRequest(
-                "Règlement fournisseur : bon " + dette.getApprovisionnement().getNumero(), fournisseur.getNom(), montant), username);
+                "Règlement fournisseur : bon " + dette.getApprovisionnement().getNumero(), fournisseur.getNom(), montant), username,
+                com.gesstock.gesstock.entities.OrigineMouvementCaisse.REGLEMENT_FOURNISSEUR);
             reglement.setMouvementCaisse(mouvementCaisseRepository.getReferenceById(sortie.id()));
         }
         dette.imputer(montant);

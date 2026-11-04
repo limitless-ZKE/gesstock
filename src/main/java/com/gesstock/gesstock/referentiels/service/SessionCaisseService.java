@@ -155,14 +155,15 @@ public class SessionCaisseService {
         BigDecimal reglementsEspeces = valeurOuZero(reglementRepository.totalParSessionEtMode(
             session.getId(), ModeReglement.ESPECES));
         BigDecimal sorties = valeurOuZero(mouvementRepository.totalSorties(session.getId()));
+        BigDecimal entrees = valeurOuZero(mouvementRepository.totalEntrees(session.getId()));
         BigDecimal soldeTheorique = session.getFondDeCaisse().add(encaissements)
-            .add(reglementsEspeces).subtract(sorties);
+            .add(reglementsEspeces).add(entrees).subtract(sorties);
         BigDecimal ecart = session.getMontantCloture() == null
             ? null : session.getMontantCloture().subtract(soldeTheorique);
         return new SessionCaisseResponse(
             session.getId(), session.getCode(), session.getJournee(), session.getOuverteLe(),
             session.getFermeeLe(), session.getFondDeCaisse(), session.getMontantCloture(),
-            encaissements, reglementsEspeces, sorties, soldeTheorique, ecart, session.getStatut(),
+            encaissements, reglementsEspeces, entrees, sorties, soldeTheorique, ecart, session.getStatut(),
             session.getOuvertePar().getId(), session.getOuvertePar().getUsername(),
             session.getFermeePar() == null ? null : session.getFermeePar().getId(),
             session.getFermeePar() == null ? null : session.getFermeePar().getUsername(),
