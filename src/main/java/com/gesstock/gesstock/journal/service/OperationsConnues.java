@@ -73,6 +73,7 @@ public final class OperationsConnues {
         connue("CREATION", "ARTICLE", "Article créé", Famille.CATALOGUE),
         connue("MODIFICATION", "ARTICLE", "Article modifié", Famille.CATALOGUE),
         connue("SUPPRESSION", "ARTICLE", "Article supprimé", Famille.CATALOGUE),
+        connue("IMPORT", "ARTICLE", "Import d'articles depuis un fichier", Famille.CATALOGUE),
         connue("CREATION", "CATEGORIE", "Catégorie créée", Famille.CATALOGUE),
         connue("MODIFICATION", "CATEGORIE", "Catégorie modifiée", Famille.CATALOGUE),
         connue("SUPPRESSION", "CATEGORIE", "Catégorie supprimée", Famille.CATALOGUE),

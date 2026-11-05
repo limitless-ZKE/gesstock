@@ -7,17 +7,22 @@
 # A lancer via installer-demarrage-automatique.cmd (administrateur). Peut etre relance sans risque : il remplace l'installation
 # precedente, arrete le GesStock en cours et le relance (pratique apres une mise a jour de gesstock.jar).
 #   -Simulation    : affiche ce qui serait fait, sans rien modifier (ne demande pas les droits administrateur)
-#   -Desinstaller  : retire la tache, le raccourci et la regle du pare-feu (la base et les fichiers restent)
+#   -Desinstaller  : retire la tache, le raccourci et la regle du pare-feu (la base et les fichiers restent) ; la sauvegarde
+#                    automatique quotidienne reste en place : elle ne depend pas du serveur
+#   -HeureSauvegarde : heure de la sauvegarde quotidienne de la base (13:00 par defaut ; si le PC est eteint a cette heure, elle
+#                    se fait des qu'il est rallume)
 # Texte volontairement sans accents : ce fichier est lu par PowerShell 5.1 sans connaitre son encodage.
 param(
     [switch]$Simulation,
-    [switch]$Desinstaller
+    [switch]$Desinstaller,
+    [string]$HeureSauvegarde = '13:00'
 )
 
 $ErrorActionPreference = 'Stop'
 $outils = $PSScriptRoot
 $dossier = Split-Path -Parent $outils
 $tacheServeur = 'GesStock - Serveur'
+$tacheSauvegarde = 'GesStock - Sauvegarde'
 $regleParefeu = 'GesStock (reseau local)'
 $raccourci = Join-Path ([Environment]::GetFolderPath('CommonStartup')) 'GesStock - ouvrir le navigateur.lnk'
 
@@ -84,6 +89,7 @@ if ($Desinstaller) {
     Faire "Suppression de la regle du pare-feu '$regleParefeu'" { Remove-NetFirewallRule -DisplayName $regleParefeu -ErrorAction SilentlyContinue }
     Ecrire ''
     Ecrire 'Le demarrage automatique est retire. Votre base de donnees et vos fichiers n''ont pas ete touches.' 'Green'
+    Ecrire 'La sauvegarde automatique quotidienne de la base reste active (tache "GesStock - Sauvegarde").' 'Green'
     Ecrire 'Pour lancer GesStock a la main : demarrer.cmd. Pour le remettre en automatique : installer-demarrage-automatique.cmd.' 'Green'
     exit 0
 }
@@ -137,6 +143,19 @@ $compteSysteme = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceA
 Faire "Tache planifiee '$tacheServeur' : GesStock demarre avec Windows, sans fenetre (compte SYSTEM, relance en cas d'arret)" {
     Register-ScheduledTask -TaskName $tacheServeur -Action $actionServeur -Trigger $declencheur -Settings $reglagesServeur `
         -Principal $compteSysteme -Description 'Serveur GesStock (demarre avec Windows, relance automatique)' -Force | Out-Null
+}
+
+# Sauvegarde : chaque jour a l'heure choisie, sans fenetre (compte SYSTEM), la base est sauvegardee dans le dossier "sauvegardes"
+# (les 30 plus recentes sont gardees, une copie peut partir vers une cle USB). Si le PC etait eteint a cette heure, la sauvegarde se fait
+# des qu'il est rallume ; sauvegarder-la-base.cmd attend alors que MySQL soit pret.
+$sauvegarde = Join-Path $dossier 'sauvegarder-la-base.cmd'
+$actionSauvegarde = New-ScheduledTaskAction -Execute 'cmd.exe' -Argument ('/c ""' + $sauvegarde + '" silencieux"') -WorkingDirectory $dossier
+$declencheurSauvegarde = New-ScheduledTaskTrigger -Daily -At $HeureSauvegarde
+$reglagesSauvegarde = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable `
+    -ExecutionTimeLimit (New-TimeSpan -Hours 1) -MultipleInstances IgnoreNew
+Faire "Tache planifiee '$tacheSauvegarde' : la base est sauvegardee chaque jour a $HeureSauvegarde, sans fenetre (les 30 plus recentes sont gardees)" {
+    Register-ScheduledTask -TaskName $tacheSauvegarde -Action $actionSauvegarde -Trigger $declencheurSauvegarde -Settings $reglagesSauvegarde `
+        -Principal $compteSysteme -Description 'Sauvegarde quotidienne de la base de GesStock' -Force | Out-Null
 }
 
 # Navigateur : a l'ouverture de session de n'importe quel utilisateur, un petit script invisible attend que GesStock reponde,
@@ -195,6 +214,8 @@ if (-not $pret) {
 
 Ecrire ''
 Ecrire "GesStock fonctionne et demarrera tout seul avec ce PC, sans aucune fenetre :  http://localhost:$port" 'Green'
+Ecrire "La base est aussi sauvegardee toute seule chaque jour a $HeureSauvegarde (dossier sauvegardes). Pour copier chaque sauvegarde sur une cle USB :" 'Green'
+Ecrire '  double-cliquez sur choisir-la-copie-des-sauvegardes.cmd' 'Green'
 $adresses = @(Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue | Where-Object { $_.IPAddress -notmatch '^(127\.|169\.254\.)' })
 foreach ($adresse in $adresses) { Ecrire "  Depuis les autres postes du reseau :  http://$($adresse.IPAddress):$port" 'Green' }
 Ecrire ''

@@ -6,7 +6,9 @@ Ce dossier contient :
   base-de-lancement.sql     la base de données prête à l'emploi : toutes les tables et le compte administrateur
   importer-la-base.cmd      met la base dans MySQL (une seule fois)
   demarrer.cmd              lance GesStock
-  sauvegarder-la-base.cmd   sauvegarde la base (avant chaque mise à jour, et chaque semaine)
+  sauvegarder-la-base.cmd   sauvegarde la base (avant chaque mise à jour ; elle se fait aussi toute seule chaque jour)
+  choisir-la-copie-des-sauvegardes.cmd   envoie une copie de chaque sauvegarde sur une clé USB ou un autre disque
+  restaurer-une-sauvegarde.cmd           remet la base dans l'état d'une sauvegarde (après une panne ou une erreur)
 
 Ce qu'il faut déjà avoir sur le serveur : Java 17 et WampServer (icône verte, MySQL 8.4).
 
@@ -33,7 +35,7 @@ DÉMARRAGE AUTOMATIQUE (recommandé chez un client)
 -------------------------------------------------
 Sans cela, GesStock s'arrête quand le PC s'éteint et il faut double-cliquer à nouveau sur demarrer.cmd. Avec le démarrage
 automatique, GesStock se lance tout seul avec Windows, sans aucune fenêtre ni message, et le navigateur s'ouvre sur la page de
-connexion quand GesStock est prêt.
+connexion quand GesStock est prêt. Il installe aussi la SAUVEGARDE AUTOMATIQUE quotidienne de la base (voir plus bas).
 
 1. Vérifiez d'abord que tout marche avec demarrer.cmd (les 4 gestes ci-dessus), puis fermez la fenêtre de demarrer.cmd.
 2. Double-cliquez sur  installer-demarrage-automatique.cmd , répondez "Oui" à la demande de Windows, puis attendez le message
@@ -47,10 +49,27 @@ connexion quand GesStock est prêt.
 
 SAUVEGARDER LA BASE
 -------------------
-Double-cliquez sur  sauvegarder-la-base.cmd  (WampServer démarré, icône verte ; GesStock peut rester allumé).
+Automatiquement : une fois le démarrage automatique installé (voir plus haut), la base est sauvegardée TOUTE SEULE chaque jour
+à 13 h, sans fenêtre. Si le PC est éteint à cette heure, la sauvegarde se fait dès qu'il est rallumé. Les 30 sauvegardes les plus
+récentes sont gardées, les plus anciennes sont effacées. Le résultat de chacune est noté dans
+sauvegardes\journal-sauvegardes.txt (une ligne ECHEC y signale un problème : regardez que WampServer est bien démarré).
+
+À la main : double-cliquez sur  sauvegarder-la-base.cmd  (WampServer démarré, icône verte ; GesStock peut rester allumé).
 Un fichier daté est créé dans le sous-dossier "sauvegardes", par exemple  sauvegardes\{{NOM_BASE}}-2026-11-05_18-30.sql .
-Faites-le au moins une fois par semaine, et TOUJOURS avant une mise à jour. Copiez de temps en temps ce dossier sur une
-clé USB : une sauvegarde restée sur le même PC est perdue avec lui.
+Faites-le TOUJOURS avant une mise à jour.
+
+Sur une clé USB : une sauvegarde restée sur le même PC est perdue avec lui (panne du disque, vol, incendie). Branchez une clé
+USB, double-cliquez sur  choisir-la-copie-des-sauvegardes.cmd  et tapez le dossier de la clé, par exemple  E:\GesStock-Sauvegardes .
+Chaque sauvegarde y sera copiée automatiquement (la clé doit rester branchée ; si elle est absente, la sauvegarde reste sur le
+PC et le journal des sauvegardes le dit).
+
+
+RESTAURER UNE SAUVEGARDE
+------------------------
+À faire après une panne, une erreur de manipulation ou un disque remplacé : double-cliquez sur  restaurer-une-sauvegarde.cmd ,
+répondez "Oui" à la demande de Windows, choisissez le numéro de la sauvegarde, puis tapez RESTAURER. Le programme arrête GesStock,
+fait d'abord une copie de l'état actuel (sauvegardes\avant-restauration-....sql), remet la base dans l'état choisi et relance GesStock.
+Tout ce qui a été enregistré APRÈS la sauvegarde choisie est retiré de GesStock : choisissez la plus récente sauf raison contraire.
 
 
 METTRE À JOUR GESSTOCK (nouvelle version du programme)
@@ -86,7 +105,8 @@ installer-demarrage-automatique.cmd si le démarrage automatique est installé).
 
 À SAVOIR
 --------
-- Il n'y a pas de sauvegarde automatique : pensez à sauvegarder-la-base.cmd (voir plus haut).
+- La sauvegarde automatique n'existe qu'avec le démarrage automatique installé ; sans lui, pensez à sauvegarder-la-base.cmd (au
+  moins une fois par semaine). Dans tous les cas, faites copier les sauvegardes sur une clé USB (voir plus haut).
 - Sans le démarrage automatique, après un redémarrage du PC il faut double-cliquer à nouveau sur demarrer.cmd.
 - Les messages de GesStock sont dans le sous-dossier "journaux" (créé au premier démarrage).
 - En cas de problème, envoyez une photo de l'écran et le fichier journaux\gesstock.log.

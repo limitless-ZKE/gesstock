@@ -83,3 +83,33 @@ describe("statistiques : dépenses et résultat", () => {
     expect(normaliser(bilan.getByText("Résultat").parentElement?.textContent ?? "")).toContain("-200");
   });
 });
+
+describe("statistiques : marge par produit", () => {
+  it("affiche le taux de marge sur le prix de vente, et « Coût à vérifier » plutôt qu'un faux 100 %", async () => {
+    vi.mocked(api.get).mockResolvedValue({ data: { ...RAPPORT, margesParArticle: [
+      { articleId: 1, reference: "EAU-1", designation: "Eau minérale", quantiteVendue: 2, chiffreAffaires: 1000, coutAchat: 600, margeBrute: 400 },
+      { articleId: 2, reference: "SIR-1", designation: "Sirop maison", quantiteVendue: 1, chiffreAffaires: 500, coutAchat: 0, margeBrute: 500 },
+    ] } });
+    render(<StatistiquesPage />);
+
+    const tableau = within((await screen.findByText("Rentabilité détaillée par produit")).closest("section")!);
+    expect(tableau.getByText("Marge %")).toBeInTheDocument();
+    expect(tableau.getByText("Eau minérale").closest("tr")).toHaveTextContent("40 %");
+    const sirop = tableau.getByText("Sirop maison").closest("tr")!;
+    expect(within(sirop).getByText("Coût à vérifier")).toBeInTheDocument();
+    expect(sirop).not.toHaveTextContent("100 %");
+    expect(screen.getByText(/Certains articles vendus n’ont pas de coût d’achat/)).toBeInTheDocument();
+  });
+});
+
+describe("statistiques : marge sans article à coût manquant", () => {
+  it("n'affiche pas d'alerte quand tous les articles vendus ont un coût", async () => {
+    vi.mocked(api.get).mockResolvedValue({ data: { ...RAPPORT, margesParArticle: [
+      { articleId: 1, reference: "EAU-1", designation: "Eau minérale", quantiteVendue: 2, chiffreAffaires: 1000, coutAchat: 600, margeBrute: 400 },
+    ] } });
+    render(<StatistiquesPage />);
+
+    await screen.findByText("Rentabilité détaillée par produit");
+    expect(screen.queryByText(/Certains articles vendus n’ont pas de coût d’achat/)).not.toBeInTheDocument();
+  });
+});

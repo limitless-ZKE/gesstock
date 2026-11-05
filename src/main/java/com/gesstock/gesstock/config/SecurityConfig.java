@@ -124,6 +124,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/auth/**").authenticated()
                 .requestMatchers("/api/referentiels/utilisateurs/**", "/api/referentiels/roles/**").hasRole(ADMIN)
 
+                // Import d'articles (et le catalogue modifiable qui porte les prix d'achat) : réservé au stock, y compris en lecture.
+                .requestMatchers("/api/articles/import/**").hasAnyRole(ADMIN, MANAGER, GESTIONNAIRE)
                 // Catalogue : lecture pour tous les métiers (la caisse en a besoin), écriture pour le stock.
                 .requestMatchers(GET, "/api/articles/**", "/api/referentiels/unites-mesure/**")
                     .hasAnyRole(ADMIN, MANAGER, GESTIONNAIRE, CAISSIER)
