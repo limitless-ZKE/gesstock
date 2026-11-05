@@ -76,9 +76,11 @@ public class VerificationServeurTest {
 
     @Test
     public void personneNeRepond() throws IOException {
-        String adresse = serveurQuiRepond(200, "");
-        serveur.close();
-        serveur = null;
-        assertEquals(VerificationServeur.Resultat.INJOIGNABLE, VerificationServeur.verifier(adresse, 2000));
+        // Un serveur qui accepte la connexion mais ne répond jamais : le délai est dépassé, l'adresse est « injoignable ».
+        // Fermer un port puis s'y connecter serait une course contre le système, qui peut le réattribuer à autre chose entre-temps
+        // (échec isolé constaté en CI le 2026-11-05) : ici le port reste occupé par ce test jusqu'à la fin.
+        serveur = new ServerSocket(0, 10, InetAddress.getLoopbackAddress());
+        String adresse = "http://127.0.0.1:" + serveur.getLocalPort() + "/";
+        assertEquals(VerificationServeur.Resultat.INJOIGNABLE, VerificationServeur.verifier(adresse, 1000));
     }
 }
