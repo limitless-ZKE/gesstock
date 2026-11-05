@@ -62,7 +62,7 @@ public class StatistiquesExportService {
             addSummary(synthese, rapport, header, debut);
 
             Sheet categories = workbook.createSheet("Marges par catégorie");
-            addHeader(categories, header, "Catégorie", "Chiffre d'affaires", "Coût d'achat", "Marge brute");
+            addHeader(categories, header, "Catégorie", "Chiffre d'affaires", "Coût d'achat", "Marge brute", "Marge (% du prix de vente)");
             int rowNumber = 1;
             for (MargeCategorieResponse marge : rapport.margesParCategorie()) {
                 Row row = categories.createRow(rowNumber++);
@@ -70,11 +70,12 @@ public class StatistiquesExportService {
                 row.createCell(1).setCellValue(marge.chiffreAffaires().doubleValue());
                 row.createCell(2).setCellValue(marge.coutAchat().doubleValue());
                 row.createCell(3).setCellValue(marge.margeBrute().doubleValue());
+                ecrireTaux(row, 4, TauxDeMarge.de(marge.chiffreAffaires(), marge.coutAchat()));
             }
-            autoSize(categories, 4);
+            autoSize(categories, 5);
 
             Sheet articles = workbook.createSheet("Marges par produit");
-            addHeader(articles, header, "Référence", "Produit", "Quantité vendue", "Chiffre d'affaires", "Coût d'achat", "Marge brute");
+            addHeader(articles, header, "Référence", "Produit", "Quantité vendue", "Chiffre d'affaires", "Coût d'achat", "Marge brute", "Marge (% du prix de vente)");
             rowNumber = 1;
             for (MargeArticleResponse marge : rapport.margesParArticle()) {
                 Row row = articles.createRow(rowNumber++);
@@ -84,8 +85,9 @@ public class StatistiquesExportService {
                 row.createCell(3).setCellValue(marge.chiffreAffaires().doubleValue());
                 row.createCell(4).setCellValue(marge.coutAchat().doubleValue());
                 row.createCell(5).setCellValue(marge.margeBrute().doubleValue());
+                ecrireTaux(row, 6, TauxDeMarge.de(marge.chiffreAffaires(), marge.coutAchat()));
             }
-            autoSize(articles, 6);
+            autoSize(articles, 7);
 
             Sheet depenses = workbook.createSheet("Dépenses");
             BilanDepensesResponse bilan = rapport.bilanDepenses();
@@ -247,27 +249,29 @@ public class StatistiquesExportService {
     private void addMarginTables(Document document, Font section, RapportStatistiquesResponse rapport)
         throws DocumentException {
         document.add(new Paragraph("Marges par catégorie", section));
-        PdfPTable categories = new PdfPTable(4);
+        PdfPTable categories = new PdfPTable(5);
         categories.setWidthPercentage(100);
-        addPdfHeader(categories, "Catégorie", "Chiffre d'affaires", "Coût", "Marge");
+        addPdfHeader(categories, "Catégorie", "Chiffre d'affaires", "Coût", "Marge", "Marge %");
         for (MargeCategorieResponse marge : rapport.margesParCategorie()) {
             categories.addCell(marge.categorie());
             categories.addCell(marge.chiffreAffaires().toPlainString());
             categories.addCell(marge.coutAchat().toPlainString());
             categories.addCell(marge.margeBrute().toPlainString());
+            categories.addCell(TauxDeMarge.texte(TauxDeMarge.de(marge.chiffreAffaires(), marge.coutAchat())));
         }
         document.add(categories);
         document.add(new Paragraph(" "));
         document.add(new Paragraph("Marges par produit", section));
-        PdfPTable articles = new PdfPTable(5);
+        PdfPTable articles = new PdfPTable(6);
         articles.setWidthPercentage(100);
-        addPdfHeader(articles, "Référence", "Produit", "Quantité", "Chiffre d'affaires", "Marge");
+        addPdfHeader(articles, "Référence", "Produit", "Quantité", "Chiffre d'affaires", "Marge", "Marge %");
         for (MargeArticleResponse marge : rapport.margesParArticle()) {
             articles.addCell(marge.reference());
             articles.addCell(marge.designation());
             articles.addCell(com.gesstock.gesstock.stock.Quantites.texte(marge.quantiteVendue()));
             articles.addCell(marge.chiffreAffaires().toPlainString());
             articles.addCell(marge.margeBrute().toPlainString());
+            articles.addCell(TauxDeMarge.texte(TauxDeMarge.de(marge.chiffreAffaires(), marge.coutAchat())));
         }
         document.add(articles);
         document.add(new Paragraph(" "));
@@ -324,6 +328,11 @@ public class StatistiquesExportService {
 
     private void addPdfHeader(PdfPTable table, String... labels) {
         for (String label : labels) table.addCell(new Phrase(label));
+    }
+
+    /** Le taux de marge en pourcentage ; cellule laissée vide quand le coût est inconnu (voir {@link TauxDeMarge}). */
+    private static void ecrireTaux(Row row, int colonne, java.math.BigDecimal taux) {
+        if (taux != null) row.createCell(colonne).setCellValue(taux.doubleValue());
     }
 
     private void autoSize(Sheet sheet, int columns) {

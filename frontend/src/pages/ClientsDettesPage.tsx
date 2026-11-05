@@ -28,8 +28,10 @@ import { apiErrorMessage as errorMessage } from "../services/apiError";
 import EnTeteDocument from "../components/EnTeteDocument";
 import { imprimer } from "../lib/impression";
 import { money as currency } from "../lib/format";
+import BoutonsExportListe from "../components/BoutonsExportListe";
 import Indicateur from "../components/Indicateur";
 import ZoneImpression from "../components/ZoneImpression";
+import { dettesParClient, FILTRES_CLIENTS, retenirClient, trieParDette, type DetteClientResume, type FiltreClient } from "../lib/dettesClients";
 import { formatQuantite } from "../lib/quantite";
 
 type Client = { id: number; nom: string; email: string | null; telephone: string | null; adresse: string | null; nombreAchats: number };
@@ -144,6 +146,9 @@ export default function ClientsDettesPage() {
   const [notice, setNotice] = useState("");
   const [noticeError, setNoticeError] = useState(false);
   const [tab, setTab] = useState<"clients" | "proformas" | "debts">("clients");
+  // Le filtre de dette des clients : le même pour l'écran et pour la liste imprimée.
+  const [clientFilter, setClientFilter] = useState<FiltreClient>("all");
+  const [exportError, setExportError] = useState("");
   const [search, setSearch] = useState("");
   const [clientModal, setClientModal] = useState<Client | "new" | null>(null);
   const [clientForm, setClientForm] = useState<ClientForm>(blankClient);
@@ -210,11 +215,14 @@ export default function ClientsDettesPage() {
 
   const totalDue = useMemo(() => debts.reduce((sum, debt) => sum + Math.max(0, debt.solde), 0), [debts]);
   const unpaidDebtCount = debts.filter((debt) => debt.solde > 0 && debt.statut !== "ANNULEE").length;
+  const debtByClient = useMemo(() => dettesParClient(debts, today), [debts]);
   const filteredClients = clients.filter((client) => {
     const query = search.trim().toLocaleLowerCase("fr");
-    return !query || [client.nom, client.email, client.telephone, client.adresse]
-      .some((value) => value?.toLocaleLowerCase("fr").includes(query));
-  });
+    return retenirClient(clientFilter, debtByClient.get(client.id)) && (!query || [client.nom, client.email, client.telephone, client.adresse]
+      .some((value) => value?.toLocaleLowerCase("fr").includes(query)));
+  }).sort((left, right) => trieParDette(clientFilter)
+    ? (debtByClient.get(right.id)?.du ?? 0) - (debtByClient.get(left.id)?.du ?? 0) || left.nom.localeCompare(right.nom, "fr", { sensitivity: "base" })
+    : 0);
   const filteredProformas = proformas.filter((proforma) => {
     const query = search.trim().toLocaleLowerCase("fr");
     return !query || proforma.numero.toLocaleLowerCase("fr").includes(query)
@@ -528,9 +536,21 @@ export default function ClientsDettesPage() {
           </div>
           <label className="relative block w-full md:max-w-xs"><Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input className="input-field pl-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={tab === "clients" ? "Rechercher un client…" : tab === "proformas" ? "Rechercher un proforma…" : "Client ou numéro de vente…"} /></label>
         </div>
+        {tab === "clients" && <div className="flex flex-col gap-2 border-b border-slate-100 bg-slate-50/60 px-4 py-3 text-xs text-slate-600 md:flex-row md:items-center md:justify-between md:px-5">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <select aria-label="Dette des clients" className="input-field h-9 sm:w-60" value={clientFilter} onChange={(event) => setClientFilter(event.target.value as FiltreClient)}>
+              {(Object.keys(FILTRES_CLIENTS) as FiltreClient[]).map((cle) => <option key={cle} value={cle}>{FILTRES_CLIENTS[cle].libelle}</option>)}
+            </select>
+            <p><span className="font-semibold text-slate-700">Imprimer ou exporter la liste</span> selon ce filtre{search.trim() ? ` et la recherche « ${search.trim()} »` : ""}.</p>
+          </div>
+          <BoutonsExportListe chemin="/clients/export" nomDuFichier={FILTRES_CLIENTS[clientFilter].nomDuFichier}
+            parametres={{ filtre: FILTRES_CLIENTS[clientFilter].filtre, jours: FILTRES_CLIENTS[clientFilter].jours, recherche: search.trim() }}
+            desactive={loading} onErreur={(message) => setExportError(message ?? "")} />
+        </div>}
+        {exportError && <div role="alert" className="m-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-800">{exportError}</div>}
         {loadError && <div role="alert" className="m-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-800">{loadError}<button onClick={() => void loadData()} className="ml-2 underline">Réessayer</button></div>}
         <div className="overflow-x-auto">
-          {tab === "clients" && <ClientsTable clients={filteredClients} loading={loading} onDetail={openClientDetail} onEdit={openClientForm} onDelete={(client) => void deleteClient(client)} />}
+          {tab === "clients" && <ClientsTable clients={filteredClients} debtByClient={debtByClient} loading={loading} onDetail={openClientDetail} onEdit={openClientForm} onDelete={(client) => void deleteClient(client)} />}
           {tab === "proformas" && <ProformasTable proformas={filteredProformas} loading={loading} busyId={busyProformaId} convertCreditId={convertCreditId} onConvertCredit={setConvertCreditId} onEdit={openProformaForm} onStatus={(proforma, status) => void updateProformaStatus(proforma, status)} onConvert={(proforma) => void convertProforma(proforma, convertCreditId === proforma.id)} onDelete={(proforma) => void deleteProforma(proforma)} />}
           {tab === "debts" && <DebtsTable debts={filteredDebts} loading={loading} onPay={(debt) => void openPaymentForm(debt)} />}
         </div>
@@ -643,10 +663,10 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
   return <button onClick={onClick} className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold transition ${active ? "bg-white text-emerald-700 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}>{children}</button>;
 }
 
-function ClientsTable({ clients, loading, onDetail, onEdit, onDelete }: { clients: Client[]; loading: boolean; onDetail: (client: Client) => void; onEdit: (client: Client) => void; onDelete: (client: Client) => void }) {
-  return <table className="w-full min-w-[760px] text-left">
-    <thead className="bg-slate-50/80 text-xs font-semibold text-slate-600"><tr><th className="px-5 py-3">Client</th><th className="px-4 py-3">Téléphone</th><th className="px-4 py-3">Adresse</th><th className="px-4 py-3">Achats validés</th><th className="px-5 py-3 text-right">Actions</th></tr></thead>
-    <tbody className="divide-y divide-slate-100">{loading ? <LoadingRow cols={5} /> : clients.length ? clients.map((client) => <tr key={client.id} className="hover:bg-slate-50/70"><td className="px-5 py-3.5"><button onClick={() => onDetail(client)} className="flex items-center gap-2.5 text-left"><span><span className="block text-xs font-bold text-slate-800">{client.nom}</span><span className="mt-1 block text-xs text-slate-400">{client.email || "E-mail non renseigné"}</span></span></button></td><td className="px-4 py-3.5 text-xs text-slate-600">{client.telephone || "—"}</td><td className="max-w-56 truncate px-4 py-3.5 text-xs text-slate-600">{client.adresse || "—"}</td><td className="px-4 py-3.5 text-xs font-semibold text-slate-700">{client.nombreAchats}</td><td className="px-5 py-3.5"><div className="flex justify-end gap-1"><button onClick={() => onDetail(client)} title="Historique et fiche client" className="icon-button text-slate-400 hover:text-emerald-700"><History size={15} /></button><button onClick={() => onEdit(client)} title="Modifier" className="icon-button text-slate-400 hover:text-emerald-700"><Pencil size={15} /></button><button onClick={() => onDelete(client)} title="Supprimer" className="icon-button text-slate-400 hover:bg-rose-50 hover:text-rose-600"><Trash2 size={15} /></button></div></td></tr>) : <EmptyRow cols={5} message="Aucun client trouvé." />}</tbody>
+function ClientsTable({ clients, debtByClient, loading, onDetail, onEdit, onDelete }: { clients: Client[]; debtByClient: Map<number, DetteClientResume>; loading: boolean; onDetail: (client: Client) => void; onEdit: (client: Client) => void; onDelete: (client: Client) => void }) {
+  return <table className="w-full min-w-[860px] text-left">
+    <thead className="bg-slate-50/80 text-xs font-semibold text-slate-600"><tr><th className="px-5 py-3">Client</th><th className="px-4 py-3">Téléphone</th><th className="px-4 py-3">Adresse</th><th className="px-4 py-3">Achats validés</th><th className="px-4 py-3">Dette en cours</th><th className="px-5 py-3 text-right">Actions</th></tr></thead>
+    <tbody className="divide-y divide-slate-100">{loading ? <LoadingRow cols={6} /> : clients.length ? clients.map((client) => <tr key={client.id} className="hover:bg-slate-50/70"><td className="px-5 py-3.5"><button onClick={() => onDetail(client)} className="flex items-center gap-2.5 text-left"><span><span className="block text-xs font-bold text-slate-800">{client.nom}</span><span className="mt-1 block text-xs text-slate-400">{client.email || "E-mail non renseigné"}</span></span></button></td><td className="px-4 py-3.5 text-xs text-slate-600">{client.telephone || "—"}</td><td className="max-w-56 truncate px-4 py-3.5 text-xs text-slate-600">{client.adresse || "—"}</td><td className="px-4 py-3.5 text-xs font-semibold text-slate-700">{client.nombreAchats}</td><td className="px-4 py-3.5">{debtByClient.get(client.id) ? <><p className="text-xs font-bold text-rose-700">{currency.format(debtByClient.get(client.id)?.du ?? 0)}</p><p className="mt-1 text-xs text-slate-400">depuis {debtByClient.get(client.id)?.jours} j</p></> : <span className="text-xs text-slate-400">—</span>}</td><td className="px-5 py-3.5"><div className="flex justify-end gap-1"><button onClick={() => onDetail(client)} title="Historique et fiche client" className="icon-button text-slate-400 hover:text-emerald-700"><History size={15} /></button><button onClick={() => onEdit(client)} title="Modifier" className="icon-button text-slate-400 hover:text-emerald-700"><Pencil size={15} /></button><button onClick={() => onDelete(client)} title="Supprimer" className="icon-button text-slate-400 hover:bg-rose-50 hover:text-rose-600"><Trash2 size={15} /></button></div></td></tr>) : <EmptyRow cols={6} message="Aucun client trouvé." />}</tbody>
   </table>;
 }
 

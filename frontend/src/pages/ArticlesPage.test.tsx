@@ -41,6 +41,48 @@ async function afficher() {
   return utilisateur;
 }
 
+describe("coût et marge", () => {
+  const AVEC_COUT_MANQUANT = [article(1, "Bière Flag", 12.5, 1, "Bières"), { ...article(5, "Sirop maison", 8, 2, "Jus"), prixAchat: 0, coutMoyen: 0 }];
+
+  beforeEach(() => {
+    vi.mocked(api.get).mockImplementation(async (url: string) => {
+      if (url === "/articles") return { data: AVEC_COUT_MANQUANT };
+      if (url === "/articles/categories") return { data: CATEGORIES };
+      if (url === "/referentiels/unites-mesure") return { data: [] };
+      throw new Error(`appel inattendu : ${url}`);
+    });
+  });
+
+  it("montre la marge et son taux, et signale un coût à 0 au lieu d'une marge fausse", async () => {
+    await afficher();
+
+    const ligneBiere = screen.getByText("Bière Flag").closest("tr")!;
+    expect(ligneBiere).toHaveTextContent(/400/);       // 1 000 − 600
+    expect(ligneBiere).toHaveTextContent("40 %");     // sur le prix de vente
+    const ligneSirop = screen.getByText("Sirop maison").closest("tr")!;
+    expect(within(ligneSirop).getByText("Coût à vérifier")).toBeInTheDocument();
+    expect(ligneSirop).not.toHaveTextContent("100 %");
+    expect(screen.getByText("Coût à vérifier", { selector: "p" }).parentElement).toHaveTextContent("1");
+  });
+
+  it("le filtre « Coût à vérifier » ne garde que les articles dont le prix d'achat n'a jamais été saisi", async () => {
+    const utilisateur = await afficher();
+
+    await utilisateur.selectOptions(screen.getByLabelText("Coût d’achat"), "missing");
+
+    expect(screen.getByText("Sirop maison")).toBeInTheDocument();
+    expect(screen.queryByText("Bière Flag")).not.toBeInTheDocument();
+  });
+
+  it("ouvre la fenêtre d'import des articles", async () => {
+    const utilisateur = await afficher();
+
+    await utilisateur.click(screen.getByRole("button", { name: /Importer/ }));
+
+    expect(screen.getByRole("dialog", { name: "Importer des articles" })).toBeInTheDocument();
+  });
+});
+
 describe("stock disponible", () => {
   it("compte les articles disponibles à côté du stock bas et des ruptures", async () => {
     await afficher();

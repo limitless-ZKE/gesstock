@@ -5,12 +5,13 @@ import {
   } from "lucide-react";
 import { api } from "../services/api";
 import { apiErrorMessage as messageFor } from "../services/apiError";
-import { money } from "../lib/format";
+import { formatPercent, money } from "../lib/format";
 import BoutonsExport from "../components/BoutonsExport";
 import EnTeteDocument from "../components/EnTeteDocument";
 import Indicateur from "../components/Indicateur";
 import SelecteurPeriode, { type Periode } from "../components/SelecteurPeriode";
 import { aujourdhui, debutDuMois } from "../lib/dates";
+import { tauxDeMarge } from "../lib/marge";
 import { formatQuantite } from "../lib/quantite";
 
 type CategoryMargin = {
@@ -174,7 +175,7 @@ export default function StatistiquesPage() {
 
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-100 p-5"><h2 className="font-bold text-slate-900">Rentabilité détaillée par produit</h2><p className="mt-1 text-xs text-slate-500">Chiffre d’affaires net HT, coût d’achat et marge estimée sur l’ensemble des articles vendus.</p></div>
-        <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left"><thead className="bg-slate-50 text-xs font-semibold text-slate-600"><tr><th className="px-5 py-3">Produit</th><th className="px-4 py-3">Quantité</th><th className="px-4 py-3">Chiffre d’affaires HT</th><th className="px-4 py-3">Coût d’achat</th><th className="px-5 py-3 text-right">Marge brute</th></tr></thead><tbody className="divide-y divide-slate-100">{[...report.margesParArticle].sort((a, b) => b.chiffreAffaires - a.chiffreAffaires).map((item) => <tr key={item.articleId} className="hover:bg-slate-50/70"><td className="px-5 py-3"><p className="text-xs font-bold text-slate-800">{item.designation}</p><p className="mt-1 text-xs text-slate-400">{item.reference}</p></td><td className="px-4 py-3 text-xs text-slate-600">{formatQuantite(item.quantiteVendue)}</td><td className="px-4 py-3 text-xs text-slate-600">{money.format(item.chiffreAffaires)}</td><td className="px-4 py-3 text-xs text-slate-600">{money.format(item.coutAchat)}</td><td className={`px-5 py-3 text-right text-xs font-bold ${item.margeBrute < 0 ? "text-rose-600" : "text-emerald-700"}`}>{money.format(item.margeBrute)}</td></tr>)}{report.margesParArticle.length === 0 && <tr><td colSpan={5} className="h-28 text-center text-xs text-slate-400">Aucun produit vendu sur la période sélectionnée.</td></tr>}</tbody></table></div>
+        <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left"><thead className="bg-slate-50 text-xs font-semibold text-slate-600"><tr><th className="px-5 py-3">Produit</th><th className="px-4 py-3">Quantité</th><th className="px-4 py-3">Chiffre d’affaires HT</th><th className="px-4 py-3">Coût d’achat</th><th className="px-5 py-3 text-right">Marge brute</th><th className="px-5 py-3 text-right" title="Part du prix de vente qui reste après le coût (sur 100 F encaissés)">Marge %</th></tr></thead><tbody className="divide-y divide-slate-100">{[...report.margesParArticle].sort((a, b) => b.chiffreAffaires - a.chiffreAffaires).map((item) => <tr key={item.articleId} className="hover:bg-slate-50/70"><td className="px-5 py-3"><p className="text-xs font-bold text-slate-800">{item.designation}</p><p className="mt-1 text-xs text-slate-400">{item.reference}</p></td><td className="px-4 py-3 text-xs text-slate-600">{formatQuantite(item.quantiteVendue)}</td><td className="px-4 py-3 text-xs text-slate-600">{money.format(item.chiffreAffaires)}</td><td className="px-4 py-3 text-xs text-slate-600">{money.format(item.coutAchat)}</td><td className={`px-5 py-3 text-right text-xs font-bold ${item.margeBrute < 0 ? "text-rose-600" : "text-emerald-700"}`}>{money.format(item.margeBrute)}</td><td className="px-5 py-3 text-right text-xs text-slate-600">{tauxDeMarge(item.chiffreAffaires, item.coutAchat) === null ? <span title="Le coût de cet article est à 0 : son prix d’achat n’a pas été saisi." className="font-semibold text-amber-700">Coût à vérifier</span> : `${formatPercent(tauxDeMarge(item.chiffreAffaires, item.coutAchat) ?? 0)} %`}</td></tr>)}{report.margesParArticle.length === 0 && <tr><td colSpan={6} className="h-28 text-center text-xs text-slate-400">Aucun produit vendu sur la période sélectionnée.</td></tr>}</tbody></table></div>
       </section>
 
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">

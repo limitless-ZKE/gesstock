@@ -17,11 +17,14 @@ import {
   Settings2,
   SlidersHorizontal,
   Trash2,
+  Upload,
   X,
 } from "lucide-react";
 import { api } from "../services/api";
 import { apiErrorMessage as errorMessage, lireErreurDeFichier } from "../services/apiError";
-import { money } from "../lib/format";
+import ImportArticlesModal from "../components/ImportArticlesModal";
+import { formatPercent, money } from "../lib/format";
+import { coutAVerifier, margeUnitaire, tauxDeMarge } from "../lib/marge";
 import Indicateur from "../components/Indicateur";
 import { formatQuantite } from "../lib/quantite";
 import { telecharger } from "../lib/telechargement";
@@ -92,9 +95,12 @@ export default function ArticlesPage() {
   // Liste imprimable : avec le stock, ou liste simple (référence, désignation, unité, prix de vente).
   const [listeAvecStock, setListeAvecStock] = useState(true);
   const [exportEnCours, setExportEnCours] = useState<"excel" | "pdf" | null>(null);
-  const [sortKey, setSortKey] = useState<keyof Article>("designation");
+  // « Coût à vérifier » : les articles dont le coût est resté à 0 (prix d'achat jamais saisi), pour lesquels le bénéfice serait faux.
+  const [costFilter, setCostFilter] = useState<"all" | "missing">("all");
+  const [sortKey, setSortKey] = useState<keyof Article | "marge">("designation");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [page, setPage] = useState(1);
+  const [importOpen, setImportOpen] = useState(false);
   const [articleModal, setArticleModal] = useState<Article | "new" | null>(null);
   const [articleForm, setArticleForm] = useState<ArticleForm>(blankArticle);
   const [savingArticle, setSavingArticle] = useState(false);
@@ -144,22 +150,23 @@ export default function ArticlesPage() {
         || (stockFilter === "available" && article.quantiteStock > 0)
         || (stockFilter === "low" && article.quantiteStock > 0 && article.quantiteStock <= article.seuilAlerteStock)
         || (stockFilter === "out" && article.quantiteStock <= 0))
+      .filter((article) => costFilter === "all" || coutAVerifier(article.coutMoyen))
       .filter((article) => !query
         || article.designation.toLocaleLowerCase("fr").includes(query)
         || article.reference.toLocaleLowerCase("fr").includes(query))
       .sort((left, right) => {
-        const a = left[sortKey];
-        const b = right[sortKey];
+        const a = sortKey === "marge" ? margeUnitaire(left.prixVente, left.coutMoyen) : left[sortKey];
+        const b = sortKey === "marge" ? margeUnitaire(right.prixVente, right.coutMoyen) : right[sortKey];
         const comparison = typeof a === "number" && typeof b === "number"
           ? a - b
           : String(a ?? "").localeCompare(String(b ?? ""), "fr", { numeric: true, sensitivity: "base" });
         return sortDirection === "asc" ? comparison : -comparison;
       });
-  }, [articles, categoryFilter, search, sortDirection, sortKey, stockFilter]);
+  }, [articles, categoryFilter, costFilter, search, sortDirection, sortKey, stockFilter]);
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const visibleArticles = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  useEffect(() => { setPage(1); }, [search, categoryFilter, stockFilter]);
+  useEffect(() => { setPage(1); }, [search, categoryFilter, stockFilter, costFilter]);
   useEffect(() => { if (page > pageCount) setPage(pageCount); }, [page, pageCount]);
 
   function notify(message: string, isError = false) {
@@ -391,7 +398,7 @@ export default function ArticlesPage() {
     });
   }
 
-  function changeSort(key: keyof Article) {
+  function changeSort(key: keyof Article | "marge") {
     if (sortKey === key) setSortDirection((current) => current === "asc" ? "desc" : "asc");
     else { setSortKey(key); setSortDirection("asc"); }
   }
@@ -404,6 +411,7 @@ export default function ArticlesPage() {
           <p className="mt-1.5 text-sm text-slate-500">Gérez les références, les catégories, les unités et les niveaux de stock.</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <button onClick={() => setImportOpen(true)} className="button-secondary"><Upload size={16} /> Importer</button>
           <button onClick={() => setCategoryModal(true)} className="button-secondary"><Layers3 size={16} /> Catégories & unités</button>
           <button onClick={() => startArticleEdit("new")} className="button-primary"><CirclePlus size={17} /> Nouvel article</button>
         </div>
@@ -411,11 +419,14 @@ export default function ArticlesPage() {
 
       {notice && <Notice error={noticeError} onClose={() => setNotice("")}>{notice}</Notice>}
 
-      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      {importOpen && <ImportArticlesModal onClose={() => setImportOpen(false)} onImported={(message) => { setImportOpen(false); notify(message); void loadData(); }} />}
+
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <SummaryCard label="Références" value={articles.length} />
         <SummaryCard label="Disponibles" value={articles.filter((item) => item.quantiteStock > 0).length} />
         <SummaryCard label="Stock bas" value={articles.filter((item) => item.quantiteStock > 0 && item.quantiteStock <= item.seuilAlerteStock).length} />
         <SummaryCard label="En rupture" value={articles.filter((item) => item.quantiteStock <= 0).length} />
+        <SummaryCard label="Coût à vérifier" value={articles.filter((item) => coutAVerifier(item.coutMoyen)).length} />
       </section>
 
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -433,6 +444,10 @@ export default function ArticlesPage() {
             <option value="available">Stock disponible</option>
             <option value="low">Stock bas</option>
             <option value="out">Rupture</option>
+          </select>
+          <select aria-label="Coût d’achat" className="input-field md:w-48" value={costFilter} onChange={(event) => setCostFilter(event.target.value as typeof costFilter)}>
+            <option value="all">Tous les coûts</option>
+            <option value="missing">Coût à vérifier (0)</option>
           </select>
         </div>
         <div className="flex flex-col gap-2 border-b border-slate-100 bg-slate-50/60 px-4 py-3 text-xs text-slate-600 md:flex-row md:items-center md:justify-between md:px-5">
@@ -458,21 +473,22 @@ export default function ArticlesPage() {
         </div>
         {error && <div className="m-4"><Notice error>{error}<button className="ml-2 underline" onClick={() => void loadData()}>Réessayer</button></Notice></div>}
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[900px] text-left">
+          <table className="w-full min-w-[1000px] text-left">
             <thead className="bg-slate-50/80 text-xs font-semibold text-slate-600">
               <tr>
                 <SortHeader label="Article" active={sortKey === "designation"} direction={sortDirection} onClick={() => changeSort("designation")} />
                 <SortHeader label="Catégorie" active={sortKey === "categorie"} direction={sortDirection} onClick={() => changeSort("categorie")} />
                 <SortHeader label="Dernier achat" active={sortKey === "prixAchat"} direction={sortDirection} onClick={() => changeSort("prixAchat")} />
                 <SortHeader label="Prix de vente" active={sortKey === "prixVente"} direction={sortDirection} onClick={() => changeSort("prixVente")} />
+                <SortHeader label="Marge" active={sortKey === "marge"} direction={sortDirection} onClick={() => changeSort("marge")} />
                 <SortHeader label="Stock" active={sortKey === "quantiteStock"} direction={sortDirection} onClick={() => changeSort("quantiteStock")} />
                 <th className="px-4 py-3">État</th>
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {loading ? <tr><td colSpan={7} className="h-48 text-center text-sm text-slate-400"><LoaderCircle className="mr-2 inline animate-spin" size={17} />Chargement du catalogue…</td></tr>
-                : visibleArticles.length === 0 ? <tr><td colSpan={7} className="h-48 text-center text-sm text-slate-400">Aucun article ne correspond à ces filtres.</td></tr>
+              {loading ? <tr><td colSpan={8} className="h-48 text-center text-sm text-slate-400"><LoaderCircle className="mr-2 inline animate-spin" size={17} />Chargement du catalogue…</td></tr>
+                : visibleArticles.length === 0 ? <tr><td colSpan={8} className="h-48 text-center text-sm text-slate-400">Aucun article ne correspond à ces filtres.</td></tr>
                   : visibleArticles.map((article) => {
                     const status = stockStatus(article);
                     return (
@@ -486,6 +502,14 @@ export default function ArticlesPage() {
                         <td className="px-4 py-3.5 text-xs text-slate-600">{article.categorie ?? "—"}</td>
                         <td className="px-4 py-3.5 text-xs text-slate-600"><p>{money.format(article.prixAchat)}</p><p title="Coût moyen pondéré : valeur du stock divisée par sa quantité, base des marges" className="mt-1 text-xs text-slate-400">CMP {money.format(article.coutMoyen)}</p></td>
                         <td className="px-4 py-3.5 text-xs font-bold text-slate-800">{money.format(article.prixVente)}</td>
+                        <td className="px-4 py-3.5">
+                          {coutAVerifier(article.coutMoyen)
+                            ? <span title="Le coût de cet article est à 0 : son bénéfice serait faux. Cliquez sur Modifier et saisissez son prix d’achat." className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-800"><AlertTriangle size={12} />Coût à vérifier</span>
+                            : <>
+                              <p className={`text-xs font-bold ${margeUnitaire(article.prixVente, article.coutMoyen) < 0 ? "text-rose-600" : "text-emerald-700"}`}>{money.format(margeUnitaire(article.prixVente, article.coutMoyen))}</p>
+                              <p title="Part du prix de vente qui reste après le coût (sur 100 F encaissés)" className="mt-1 text-xs text-slate-400">{formatPercent(tauxDeMarge(article.prixVente, article.coutMoyen) ?? 0)} %</p>
+                            </>}
+                        </td>
                         <td className="px-4 py-3.5"><p className="text-xs font-bold text-slate-800">{formatQuantite(article.quantiteStock)} <span className="font-normal text-slate-400">{article.uniteMesure ?? ""}</span></p><p className="mt-1 text-xs text-slate-400">Seuil : {article.seuilAlerteStock}</p></td>
                         <td className="px-4 py-3.5"><span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ${status.className}`}><span className={`size-1.5 rounded-full ${status.dot}`} />{status.label}</span></td>
                         <td className="px-4 py-3.5">
