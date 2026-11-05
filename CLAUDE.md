@@ -78,7 +78,10 @@ et image Docker. Les actions d'autres éditeurs que GitHub sont épinglées sur 
   articles à 0 puis les tarife à la main) ; les bons le pondèrent ensuite ; les ventes passées gardent leur coût mémorisé, sauf celles
   valorisées à 0, corrigées au prix d'achat actuel et marquées « coût estimé » (V18, décision de l'utilisateur, novembre 2026).
   Bon d'approvisionnement imprimable en PDF (sans prix de revente). Ticket imprimé une seule fois : `ZoneImpression`, jamais
-  `visibility: hidden` + `position: fixed` (le ticket se répète sur chaque page fabriquée par l'écran caché).
+  `visibility: hidden` + `position: fixed` (le ticket se répète sur chaque page fabriquée par l'écran caché). Écritures des tickets
+  agrandies de 10 % à la demande des clients (novembre 2026) : une seule valeur, `ECHELLE_TICKET` dans `lib/ticket.ts`.
+- Approvisionnements : classement des bons par période de date (aujourd'hui, semaine du lundi au dimanche, mois, mois dernier, dates précises) et par sens
+  (plus récent ou plus ancien d'abord) ; date du BON, total de la période hors bons annulés.
 - Marge d'un article = prix de vente − coût, taux **sur le prix de vente** ; « Coût à vérifier » quand le coût est à 0 (jamais de faux 100 %).
 - Import d'articles Excel/CSV (novembre 2026) : aperçu puis import **tout ou rien** ; référence existante = modifiée (cellule vide = inchangé), sinon créée ;
   catégories inconnues créées, unités inconnues refusées ; le stock d'un article existant ne change jamais par import (choix par défaut non confirmé).

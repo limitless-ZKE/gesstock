@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
+import { ECHELLE_TICKET } from "../lib/ticket";
 import ZoneImpression from "./ZoneImpression";
 
 describe("fenêtre d'impression d'un ticket", () => {
@@ -16,7 +17,17 @@ describe("fenêtre d'impression d'un ticket", () => {
     expect(regles).toContain("body > *:not(.zone-impression) { display: none !important; }");
     expect(regles).not.toContain("visibility");
     expect(regles).not.toContain("position: fixed");
-    expect(regles).toContain("#ticket { width: 72mm;");
+    expect(regles).toContain(`#ticket { width: calc(72mm / ${ECHELLE_TICKET});`);
+  });
+
+  it("agrandit le ticket de 10 % sans changer la largeur du papier", () => {
+    render(<ZoneImpression cible="ticket" largeurMm={72}><p id="ticket">Ticket</p></ZoneImpression>);
+    const regles = document.querySelector(".zone-impression style")!.textContent!;
+
+    expect(ECHELLE_TICKET).toBe(1.1);
+    expect(regles).toContain("#ticket { zoom: 1.1; }");                                  // à l'écran comme à l'impression
+    expect(regles).toContain("width: calc(72mm / 1.1)");                                  // 72 mm / 1,1 × zoom 1,1 = 72 mm sur le papier
+    expect(regles).toContain("max-width: calc(72mm / 1.1)");
   });
 
   it("marque la page pendant que le ticket est affiché, et la libère à la fermeture", () => {

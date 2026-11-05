@@ -21,7 +21,9 @@ import {
 } from "lucide-react";
 import { api } from "../services/api";
 import { apiErrorMessage as errorMessage, lireErreurDeFichier } from "../services/apiError";
+import { aujourdhui } from "../lib/dates";
 import { money } from "../lib/format";
+import { bornesDePeriode, CHOIX_PERIODES, dansLesBornes, libelleBornes, type ChoixPeriode } from "../lib/periodes";
 import { telecharger } from "../lib/telechargement";
 import ChampArticle from "../components/ChampArticle";
 import Indicateur from "../components/Indicateur";
@@ -78,6 +80,11 @@ export default function ApprovisionnementsPage() {
   const [search, setSearch] = useState("");
   const [supplierFilter, setSupplierFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  // Classer les bons par date : une période (aujourd'hui, ce mois, dates précises…) et le sens du classement.
+  const [periodChoice, setPeriodChoice] = useState<ChoixPeriode>("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [sortOrder, setSortOrder] = useState<"recent" | "ancien">("recent");
   const [createOpen, setCreateOpen] = useState(false);
   // Bon en cours de modification (brouillon ou déjà réceptionné) ; null pour un nouveau bon.
   const [editing, setEditing] = useState<Supply | null>(null);
@@ -120,17 +127,24 @@ export default function ApprovisionnementsPage() {
 
   useEffect(() => { void loadData(); }, []);
 
+  const periodBounds = useMemo(() => bornesDePeriode(periodChoice, aujourdhui(), dateFrom, dateTo), [periodChoice, dateFrom, dateTo]);
   const visible = useMemo(() => {
     const query = search.trim().toLocaleLowerCase("fr");
-    return supplies.filter((supply) =>
+    const filtered = supplies.filter((supply) =>
       (supplierFilter === "all" || String(supply.fournisseurId) === supplierFilter)
       && (statusFilter === "all" || supply.statut === statusFilter)
+      && dansLesBornes(supply.dateApprovisionnement, periodBounds)
       && (!query || supply.numero.toLocaleLowerCase("fr").includes(query)
         || supply.fournisseur.toLocaleLowerCase("fr").includes(query)
         || supply.lignes.some((line) => line.designationArticle.toLocaleLowerCase("fr").includes(query)
           || line.referenceArticle.toLocaleLowerCase("fr").includes(query)))
     );
-  }, [search, supplierFilter, statusFilter, supplies]);
+    // classés par la date du bon, puis par création (le plus récent ou le plus ancien d'abord)
+    const sens = sortOrder === "recent" ? -1 : 1;
+    return filtered.sort((a, b) => sens * (a.dateApprovisionnement.localeCompare(b.dateApprovisionnement) || a.id - b.id));
+  }, [search, supplierFilter, statusFilter, periodBounds, sortOrder, supplies]);
+  // Total des bons affichés, sans les bons annulés (leur marchandise n'est jamais entrée).
+  const visibleTotal = useMemo(() => visible.filter((supply) => supply.statut !== "ANNULE").reduce((sum, supply) => sum + supply.montantTotal, 0), [visible]);
 
   const orderTotal = useMemo(() => draftLines.reduce((sum, line) => {
     const quantity = Number(line.quantite) || 0;
@@ -338,6 +352,24 @@ export default function ApprovisionnementsPage() {
           <select value={supplierFilter} onChange={(event) => setSupplierFilter(event.target.value)} className="input-field md:w-56"><option value="all">Tous les fournisseurs</option>{suppliers.map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.nom}</option>)}</select>
           <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="input-field md:w-48"><option value="all">Tous les statuts</option><option value="BROUILLON">À réceptionner</option><option value="RECU">Réceptionnés</option><option value="ANNULE">Annulés</option></select>
         </div>
+        <div className="flex flex-col gap-3 border-b border-slate-100 bg-slate-50/60 px-4 py-3 sm:flex-row sm:flex-wrap sm:items-end md:px-5">
+          <label className="flex flex-col text-xs font-semibold text-slate-600">Période des bons
+            <select aria-label="Période des bons" value={periodChoice} onChange={(event) => setPeriodChoice(event.target.value as ChoixPeriode)} className="input-field mt-1 sm:w-52">
+              {CHOIX_PERIODES.map((choix) => <option key={choix.valeur} value={choix.valeur}>{choix.libelle}</option>)}
+            </select>
+          </label>
+          {periodChoice === "custom" && <>
+            <label className="flex flex-col text-xs font-semibold text-slate-600">Du<input type="date" aria-label="Du" value={dateFrom} max={dateTo || undefined} onChange={(event) => setDateFrom(event.target.value)} className="input-field mt-1 sm:w-44" /></label>
+            <label className="flex flex-col text-xs font-semibold text-slate-600">Au<input type="date" aria-label="Au" value={dateTo} min={dateFrom || undefined} onChange={(event) => setDateTo(event.target.value)} className="input-field mt-1 sm:w-44" /></label>
+          </>}
+          <label className="flex flex-col text-xs font-semibold text-slate-600">Classer
+            <select aria-label="Classer les bons" value={sortOrder} onChange={(event) => setSortOrder(event.target.value as typeof sortOrder)} className="input-field mt-1 sm:w-64">
+              <option value="recent">Du plus récent au plus ancien</option>
+              <option value="ancien">Du plus ancien au plus récent</option>
+            </select>
+          </label>
+          {libelleBornes(periodBounds) && <p className="text-xs font-semibold text-slate-600 sm:ml-auto">{libelleBornes(periodBounds)}</p>}
+        </div>
         {loadError && <div className="m-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-800">{loadError}<button onClick={() => void loadData()} className="ml-2 underline">Réessayer</button></div>}
         <div className="overflow-x-auto">
           <table className="w-full min-w-[850px] text-left">
@@ -362,7 +394,7 @@ export default function ApprovisionnementsPage() {
             </tbody>
           </table>
         </div>
-        <div className="flex items-center justify-between border-t border-slate-100 px-5 py-3"><p className="text-xs text-slate-500">{visible.length} bon(s)</p><p className="text-xs text-slate-400">Le stock change uniquement à la validation de réception.</p></div>
+        <div className="flex items-center justify-between border-t border-slate-100 px-5 py-3"><p className="text-xs text-slate-500">{visible.length} bon(s) · total {money.format(visibleTotal)} <span className="text-slate-400">(hors bons annulés)</span></p><p className="text-xs text-slate-400">Le stock change uniquement à la validation de réception.</p></div>
       </section>
 
       {createOpen && (

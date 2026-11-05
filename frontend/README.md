@@ -82,6 +82,10 @@ l'impression tout le reste de la page disparaît (`display: none`). Ne jamais im
 `position: fixed` : l'écran caché garde sa place, fabrique des pages en plus, et le ticket fixe se répète sur chacune (le reçu sortait
 deux fois ; mesuré dans Edge : 2 pages avant, 1 après).
 
+Les écritures d'un ticket sont agrandies de 10 % (`ECHELLE_TICKET`, `lib/ticket.ts`) par un `zoom` CSS sur le ticket, à l'écran comme au papier. La largeur du
+papier ne bouge pas : la largeur en millimètres est divisée par l'échelle (`calc(72mm / 1.1)`), donc 72 mm une fois agrandie (mesuré dans Edge) ; les lignes
+longues passent plus tôt à la ligne, et la marge intérieure est de 3 mm au lieu de 4 pour compenser. Pour changer la taille, ne modifier que `ECHELLE_TICKET`.
+
 ## Choix volontairement différés
 
 Pas de bibliothèque de cache de données (TanStack Query) : chaque page charge ses données avec `useEffect` + axios. Pas de saut
