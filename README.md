@@ -113,6 +113,22 @@ Seuls ces quatre rôles existent. Les anciens rôles `VENDEUR` et `USER` sont fu
   ajouté), les prix et la dette du fournisseur suivent, avec mouvements de stock et journal. C'est refusé si la marchandise à
   retirer a déjà été vendue, si le nouveau total est inférieur à ce qui a déjà été payé au fournisseur, ou si un retour au
   fournisseur a été préparé sur le bon.
+- **Coût et marge à l'écran des Articles, « Marge % » aux statistiques** : colonne « Marge » (prix de vente − coût, et le taux **sur le prix de vente** : sur
+  100 F encaissés, combien restent), repère et filtre « Coût à vérifier » pour un coût à 0 (prix d'achat jamais saisi) ; le taux n'existe pas sans coût (jamais
+  un faux 100 %). Même colonne à l'écran des statistiques, au PDF et à l'Excel du rapport, par produit et par catégorie (`TauxDeMarge`, `lib/marge.ts`).
+- **Import d'articles Excel / CSV** (`/api/articles/import`, ADMIN, MANAGER, GESTIONNAIRE, même la lecture du modèle) : `GET /modele` (modèle vide avec mode d'emploi,
+  ou `?avecArticles=true` : le catalogue actuel dans le même format, à modifier puis réimporter), `POST /apercu` (ce qui serait fait, ligne par ligne :
+  NOUVEAU, MODIFIE, IDENTIQUE, ERREUR, avertissements, catégories à créer, colonnes ignorées), `POST` (l'import, **tout ou rien** : une erreur et rien n'est
+  enregistré). Excel (`.xlsx`, `.xls`) ou CSV (UTF-8 ou Windows-1252, séparateur `;` `,` ou tabulation, détecté). Les titres se reconnaissent sans accents ni majuscules
+  (« Prix d'achat », `prix_achat`…) ; « Référence » et « Désignation » sont obligatoires. Une référence qui existe déjà est **modifiée** (cellule vide = inchangé),
+  sinon **créée** (cellule vide = 0). Les nombres s'écrivent comme dans un tableur français (`1 500,50`, `1500.5`, `1 500 F`). Les catégories inconnues sont créées ;
+  une unité inconnue est une erreur. Le **stock d'un article existant ne change jamais** par import (avertissement), celui d'un nouvel article est son stock de
+  départ (mouvement `STOCK_INITIAL`). Un prix d'achat modifié devient le coût du stock en rayon, comme dans la fiche. Passe par `ArticleCatalogueService` (mêmes
+  règles, mêmes lignes de journal) plus une ligne « Import d'articles » ; 2 000 lignes au plus.
+- **Listes à imprimer** (PDF et Excel, `ListeImprimable`) : `GET /api/fournisseurs/export/pdf|excel?filtre=tous|avec-dette|sans-dette&recherche=` (ADMIN, MANAGER,
+  GESTIONNAIRE) avec ce qu'on leur doit ; `GET /api/clients/export/pdf|excel?filtre=tous|avec-dette|sans-dette|dette-ancienne&jours=30&recherche=` (tous les métiers qui
+  voient les clients) avec la dette en cours et la date de la plus ancienne dette non réglée. Les filtres de dette trient du plus gros au plus petit. L'écran applique le
+  même filtre (`lib/dettesClients.ts`) et envoie les mêmes paramètres : le document porte exactement ce que l'écran montre.
 - **Bon d'approvisionnement imprimable** (`GET /api/approvisionnements/{id}/export/pdf`, ADMIN, MANAGER et GESTIONNAIRE) : PDF avec
   l'en-tête de l'entreprise, le fournisseur, l'état du bon (brouillon, reçu le…), les lignes (quantité, prix d'achat, montant), le
   total et trois cases de signature. Le prix de revente n'y figure jamais. Bouton « Imprimer le bon » sur chaque ligne de la liste.
@@ -338,8 +354,17 @@ Le serveur a seulement besoin de Java 17 et de WampServer : on copie le dossier,
   `demarrer.cmd silencieux` qui ne fait jamais de pause), un raccourci du dossier Démarrage de tous les utilisateurs qui lance `outils\ouvrir-navigateur.vbs`
   (invisible : il attend que GesStock réponde sur le port lu dans `demarrer.cmd`, puis ouvre le navigateur par défaut sur la page de connexion ; au bout de 7 minutes
   sans réponse il l'ouvre quand même), et la règle de pare-feu du réseau local (indispensable : lancé par Windows, GesStock n'affiche pas la question « autoriser
-  l'accès ? »). `outils\arreter.cmd` arrête GesStock avant une mise à jour ; `outils\desactiver-demarrage-automatique.cmd` retire tout. Pas de sauvegarde planifiée
-  (c'est le rôle du kit complet).
+  l'accès ? »). `outils\arreter.cmd` arrête GesStock avant une mise à jour ; `outils\desactiver-demarrage-automatique.cmd` retire le démarrage automatique (pas la sauvegarde).
+- **Sauvegarde automatique** : le même installeur enregistre la tâche « GesStock - Sauvegarde » (chaque jour à 13:00, `-HeureSauvegarde` pour changer ; compte
+  `SYSTEM`, sans fenêtre ; si le PC était éteint, elle se fait dès qu'il est rallumé). Elle lance `sauvegarder-la-base.cmd silencieux` : pas de question ni de
+  pause, jusqu'à 5 minutes d'attente que MySQL soit prêt, fichier vérifié (« Dump completed »), puis `outils\sauvegarde-suite.ps1` garde les **30 plus récentes**,
+  envoie une copie vers le dossier écrit dans `copie-des-sauvegardes.txt` (choisi par `choisir-la-copie-des-sauvegardes.cmd` : clé USB, autre disque ; une clé absente
+  n'invalide jamais la sauvegarde) et note chaque résultat dans `sauvegardes\journal-sauvegardes.txt` (300 lignes). `restaurer-une-sauvegarde.cmd`
+  (administrateur, `outils\restaurer.ps1`) liste les sauvegardes, exige qu'on tape `RESTAURER`, arrête GesStock, fait d'abord une copie de l'état actuel
+  (`sauvegardes\avant-restauration-….sql`, et s'arrête si elle échoue), restaure, vérifie les comptes, relance. Essayé sur une base jetable : sauvegarde silencieuse,
+  rotation 36 → 30 sans toucher aux `avant-restauration`, copie vers un dossier avec espaces, lecteur absent, restauration (refus d'un fichier tronqué, copie de
+  sécurité), tâche planifiée réelle (utilisateur courant) lancée et supprimée, `-Simulation`. **Non essayé** : l'enregistrement sous `SYSTEM` (droits administrateur)
+  et la restauration avec arrêt réel de GesStock.
 - **Mettre à jour un dossier déjà livré** sans toucher à sa base : `preparer-livraison-simple.cmd -MettreAJour -Destination <dossier>` copie le nouveau `gesstock.jar`
   et les scripts, et relit dans son `demarrer.cmd` le port, la base, le compte, le mot de passe MySQL, le fuseau et la TVA (aucun Java ni WampServer requis).
 - Vérifié de bout en bout avec d'autres noms de base, de compte et de port : import, refus de réimporter, démarrage en 56 s, connexion de l'administrateur dans

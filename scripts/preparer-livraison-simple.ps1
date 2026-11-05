@@ -37,8 +37,9 @@ $racine = Split-Path -Parent $PSScriptRoot
 # Les fichiers du dossier livre, relativement au dossier : modeles dans scripts\livraison-simple\ (memes chemins).
 $fichiersLivres = @(
     'demarrer.cmd', 'importer-la-base.cmd', 'sauvegarder-la-base.cmd', 'installer-demarrage-automatique.cmd', 'LISEZ-MOI.txt',
+    'choisir-la-copie-des-sauvegardes.cmd', 'restaurer-une-sauvegarde.cmd',
     'outils\arreter.cmd', 'outils\arreter.ps1', 'outils\demarrage-automatique.ps1', 'outils\desactiver-demarrage-automatique.cmd',
-    'outils\ouvrir-navigateur.vbs'
+    'outils\ouvrir-navigateur.vbs', 'outils\sauvegarde-suite.ps1', 'outils\restaurer.ps1'
 )
 
 function Nouveau-MotDePasse([int]$longueur) {

@@ -79,6 +79,13 @@ et image Docker. Les actions d'autres éditeurs que GitHub sont épinglées sur 
   valorisées à 0, corrigées au prix d'achat actuel et marquées « coût estimé » (V18, décision de l'utilisateur, novembre 2026).
   Bon d'approvisionnement imprimable en PDF (sans prix de revente). Ticket imprimé une seule fois : `ZoneImpression`, jamais
   `visibility: hidden` + `position: fixed` (le ticket se répète sur chaque page fabriquée par l'écran caché).
+- Marge d'un article = prix de vente − coût, taux **sur le prix de vente** ; « Coût à vérifier » quand le coût est à 0 (jamais de faux 100 %).
+- Import d'articles Excel/CSV (novembre 2026) : aperçu puis import **tout ou rien** ; référence existante = modifiée (cellule vide = inchangé), sinon créée ;
+  catégories inconnues créées, unités inconnues refusées ; le stock d'un article existant ne change jamais par import (choix par défaut non confirmé).
+- Listes à imprimer (PDF/Excel) : fournisseurs (tous, avec dette, sans dette) ; clients (tous, avec dette, sans dette, dette de plus de 30/60/90 jours, du plus gros
+  débiteur au plus petit) : filtres proposés par moi à la demande de l'utilisateur (« propose-moi »), ouverts à tous les métiers qui voient les clients.
+- Sauvegarde automatique (livraison simple) : chaque jour à 13 h, sans fenêtre, 30 sauvegardes gardées, copie facultative sur une clé USB
+  (`choisir-la-copie-des-sauvegardes.cmd`), `restaurer-une-sauvegarde.cmd` avec copie de sécurité d'abord. Installée par `installer-demarrage-automatique.cmd`.
 - Compte fournisseur complet (dettes, paiements, avoirs imputés d'office).
 - Inventaire sans seuil : MANAGER/ADMIN valident, le validateur n'est pas l'ouvreur ; tout le stock ou une catégorie.
 - Vente à crédit possible (pas pour un client de passage). Journal d'un caissier : **ses lignes seulement**
@@ -118,9 +125,9 @@ un dossier avec `gesstock.jar`, une base de lancement toute prête (tables + uti
 ## Limites connues
 
 Image Docker construite par la CI mais jamais démarrée ; pas d'analyse CodeQL (refusée sur un dépôt privé de compte
-personnel) ; pas d'import d'articles CSV/Excel ; pas de HTTPS ; pas de conformité « logiciel de caisse certifié » (à
+personnel) ; pas de HTTPS ; pas de conformité « logiciel de caisse certifié » (à
 vérifier pays par pays) ; MySQL 8.4 seul testé ; listes non paginées (proformas, dettes, approvisionnements, clients,
-retours) ; pas de sauvegarde planifiée dans la livraison simple.
+retours) ; la sauvegarde automatique (tâche SYSTEM, restauration avec arrêt réel de GesStock) n'a jamais été essayée en administrateur ni chez le client.
 
 ## Pièges d'outillage (Windows, PowerShell / Git Bash)
 
