@@ -200,3 +200,73 @@ describe("bon d'approvisionnement", () => {
     expect(await screen.findByText(/a été corrigé/)).toBeInTheDocument();
   });
 });
+
+describe("classer les bons par période de date", () => {
+  const BON_ANCIEN = { ...BON_RECU, id: 40, numero: "APP-40", dateApprovisionnement: "2026-09-15", montantTotal: 5000, lignes: [] };
+
+  beforeEach(() => {
+    vi.mocked(api.get).mockImplementation(async (url: string) => {
+      if (url === "/approvisionnements") return { data: [BON_RECU, BON_A_RECEVOIR, BON_ANCIEN] };
+      if (url === "/fournisseurs") return { data: FOURNISSEURS };
+      if (url === "/articles") return { data: ARTICLES };
+      throw new Error(`appel inattendu : ${url}`);
+    });
+  });
+
+  const ordreDesBons = () => screen.getAllByText(/^APP-\d+$/).map((cellule) => cellule.textContent);
+
+  async function afficher() {
+    const utilisateur = userEvent.setup();
+    render(<ApprovisionnementsPage />);
+    await screen.findByText("APP-50");
+    return utilisateur;
+  }
+
+  it("classe du plus récent au plus ancien, ou l'inverse", async () => {
+    const utilisateur = await afficher();
+    expect(ordreDesBons()).toEqual(["APP-51", "APP-50", "APP-40"]);
+
+    await utilisateur.selectOptions(screen.getByLabelText("Classer les bons"), "ancien");
+
+    expect(ordreDesBons()).toEqual(["APP-40", "APP-50", "APP-51"]);
+  });
+
+  it("ne garde que les bons de la période choisie à la main, avec leur total", async () => {
+    const utilisateur = await afficher();
+    expect(screen.queryByLabelText("Du")).not.toBeInTheDocument();
+
+    await utilisateur.selectOptions(screen.getByLabelText("Période des bons"), "custom");
+    await utilisateur.type(screen.getByLabelText("Du"), "2026-11-02");
+
+    expect(ordreDesBons()).toEqual(["APP-51"]);
+    expect(screen.getByText(/1 bon\(s\) · total/)).toBeInTheDocument();
+    expect(screen.getByText("À partir du 02/11/2026")).toBeInTheDocument();
+
+    await utilisateur.type(screen.getByLabelText("Au"), "2026-11-02");
+    expect(ordreDesBons()).toEqual(["APP-51"]);
+    await utilisateur.clear(screen.getByLabelText("Du"));
+    await utilisateur.type(screen.getByLabelText("Du"), "2026-09-01");
+    expect(ordreDesBons()).toEqual(["APP-51", "APP-50", "APP-40"]);   // du 1er septembre au 2 novembre : les trois bons
+    expect(screen.getByText("Du 01/09/2026 au 02/11/2026")).toBeInTheDocument();
+  });
+
+  it("propose ce mois et le mois dernier selon la date du jour", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 10, 5, 10, 0, 0));   // le 5 novembre 2026
+    try {
+      const utilisateur = await afficher();
+
+      await utilisateur.selectOptions(screen.getByLabelText("Période des bons"), "month");
+      expect(ordreDesBons()).toEqual(["APP-51", "APP-50"]);
+      expect(screen.getByText("Du 01/11/2026 au 30/11/2026")).toBeInTheDocument();
+
+      await utilisateur.selectOptions(screen.getByLabelText("Période des bons"), "lastMonth");
+      expect(screen.getByText("Aucun bon ne correspond à ces filtres.")).toBeInTheDocument();
+
+      await utilisateur.selectOptions(screen.getByLabelText("Période des bons"), "all");
+      expect(ordreDesBons()).toEqual(["APP-51", "APP-50", "APP-40"]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

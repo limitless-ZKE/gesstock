@@ -1,5 +1,6 @@
 import { useEffect, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { ECHELLE_TICKET } from "../lib/ticket";
 
 type ZoneImpressionProps = {
   /** Identifiant de l'élément à imprimer (le ticket) à l'intérieur de la fenêtre. */
@@ -27,10 +28,11 @@ export default function ZoneImpression({ cible, largeurMm, className = "z-[60]",
   return createPortal(
     <div className={`zone-impression fixed inset-0 grid place-items-center overflow-y-auto bg-slate-950/50 p-4 print:static print:block print:overflow-visible print:bg-white print:p-0 ${className}`}>
       {children}
-      <style>{`@media print {
+      <style>{`.zone-impression #${cible} { zoom: ${ECHELLE_TICKET}; }
+      @media print {
         html.impression-ticket body > *:not(.zone-impression) { display: none !important; }
         html.impression-ticket body { min-height: 0 !important; }
-        html.impression-ticket #${cible} { width: ${largeurMm}mm; max-width: ${largeurMm}mm; margin: 0; padding: 4mm; color: #000 !important; background: #fff !important; box-shadow: none; }
+        html.impression-ticket #${cible} { width: calc(${largeurMm}mm / ${ECHELLE_TICKET}); max-width: calc(${largeurMm}mm / ${ECHELLE_TICKET}); margin: 0; padding: 3mm; color: #000 !important; background: #fff !important; box-shadow: none; }
         @page { size: 80mm auto; margin: 3mm; }
       }`}</style>
     </div>,
