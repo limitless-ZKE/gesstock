@@ -98,5 +98,18 @@ describe("statistiques : marge par produit", () => {
     const sirop = tableau.getByText("Sirop maison").closest("tr")!;
     expect(within(sirop).getByText("Coût à vérifier")).toBeInTheDocument();
     expect(sirop).not.toHaveTextContent("100 %");
+    expect(screen.getByText(/Certains articles vendus n’ont pas de coût d’achat/)).toBeInTheDocument();
+  });
+});
+
+describe("statistiques : marge sans article à coût manquant", () => {
+  it("n'affiche pas d'alerte quand tous les articles vendus ont un coût", async () => {
+    vi.mocked(api.get).mockResolvedValue({ data: { ...RAPPORT, margesParArticle: [
+      { articleId: 1, reference: "EAU-1", designation: "Eau minérale", quantiteVendue: 2, chiffreAffaires: 1000, coutAchat: 600, margeBrute: 400 },
+    ] } });
+    render(<StatistiquesPage />);
+
+    await screen.findByText("Rentabilité détaillée par produit");
+    expect(screen.queryByText(/Certains articles vendus n’ont pas de coût d’achat/)).not.toBeInTheDocument();
   });
 });

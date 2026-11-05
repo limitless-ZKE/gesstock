@@ -120,6 +120,8 @@ class ImportArticlesTests {
         assertThat(erreur.erreurs()).anyMatch(message -> message.contains("désignation est vide"))
             .anyMatch(message -> message.contains("L'unité « Caisse » n'existe pas"))
             .anyMatch(message -> message.contains("« Prix d'achat » : « abc » n'est pas un nombre"));
+        assertThat(erreur.avertissements()).as("une ligne refusée ne porte que ses erreurs").isEmpty();
+        assertThat(erreur.changements()).isEmpty();
 
         assertThat(articleRepository.count()).as("l'aperçu n'enregistre rien").isEqualTo(articles);
         assertThat(categorieRepository.findByNomIgnoreCase("Boissons")).isEmpty();

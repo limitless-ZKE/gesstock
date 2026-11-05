@@ -182,7 +182,9 @@ final class AnalyseurImportArticles {
                     seuilFinal, stockFinal, categorieId, categorieACreer, uniteId));
             }
             if (!avertissements.isEmpty() && erreurs.isEmpty()) avecAvertissement++;
-            lignes.add(new LigneApercu(brute.numero(), reference, designationFinale, statut, changements, avertissements, erreurs));
+            // une ligne refusée n'a pas à porter en plus des avertissements : l'erreur à corriger est la seule chose à lire
+            lignes.add(new LigneApercu(brute.numero(), reference, designationFinale, statut, erreurs.isEmpty() ? changements : List.of(),
+                erreurs.isEmpty() ? avertissements : List.of(), erreurs));
         }
 
         ApercuImport apercu = new ApercuImport(lignes.size(), nouveaux, modifies, identiques, enErreur, avecAvertissement,
