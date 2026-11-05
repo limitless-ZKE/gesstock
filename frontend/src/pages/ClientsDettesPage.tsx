@@ -29,6 +29,7 @@ import EnTeteDocument from "../components/EnTeteDocument";
 import { imprimer } from "../lib/impression";
 import { money as currency } from "../lib/format";
 import Indicateur from "../components/Indicateur";
+import ZoneImpression from "../components/ZoneImpression";
 import { formatQuantite } from "../lib/quantite";
 
 type Client = { id: number; nom: string; email: string | null; telephone: string | null; adresse: string | null; nombreAchats: number };
@@ -614,7 +615,7 @@ export default function ClientsDettesPage() {
       </form>
     </Modal>}
 
-    {receipt && <div className="fixed inset-0 z-[70] grid place-items-center overflow-y-auto bg-slate-950/50 p-4 print:static print:block print:bg-white print:p-0">
+    {receipt && <ZoneImpression cible="client-payment-receipt" largeurMm={80} className="z-[70]">
       <section id="client-payment-receipt" className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl print:max-w-none print:rounded-none print:p-0 print:shadow-none">
         <div className="mb-5 flex items-center justify-between print:hidden"><div><h2 className="mt-1 text-lg font-bold text-slate-900">Reçu de règlement</h2></div><button onClick={() => setReceipt(null)} className="icon-button" aria-label="Fermer"><X size={16} /></button></div>
         <div className="border-y border-dashed border-slate-300 py-5 text-center"><EnTeteDocument variante="ticket" /><p className="mt-2 text-xs text-slate-500">REÇU DE VERSEMENT CLIENT</p><p className="mt-4 text-2xl font-extrabold text-slate-900">{currency.format(receipt.payment.montant)}</p></div>
@@ -622,8 +623,7 @@ export default function ClientsDettesPage() {
         <p className="border-t border-dashed border-slate-300 pt-4 text-center text-xs text-slate-500">Merci. Conservez ce reçu comme justificatif de paiement.</p>
         <div className="mt-5 flex gap-2 print:hidden"><button onClick={() => void imprimer(document.getElementById("client-payment-receipt"))} className="button-primary flex-1"><Printer size={15} /> Imprimer le reçu</button><button onClick={() => setReceipt(null)} className="button-secondary">Terminer</button></div>
       </section>
-      <style>{`@media print { body * { visibility: hidden !important; } #client-payment-receipt, #client-payment-receipt * { visibility: visible !important; } #client-payment-receipt { position: fixed; inset: 0 auto auto 0; width: 80mm; max-width: 80mm; padding: 4mm; color: #000 !important; background: #fff !important; } @page { size: 80mm auto; margin: 3mm; } }`}</style>
-    </div>}
+    </ZoneImpression>}
   </>;
 }
 

@@ -4,6 +4,7 @@ import { formatPercent, moneyPrecise as money } from "../lib/format";
 import { imprimer } from "../lib/impression";
 import { formatQuantite } from "../lib/quantite";
 import EnTeteDocument from "./EnTeteDocument";
+import ZoneImpression from "./ZoneImpression";
 
 export type ReceiptPaymentMode = "ESPECES" | "MOBILE_MONEY" | "CARTE" | "VIREMENT" | "CHEQUE" | "AUTRE";
 
@@ -86,8 +87,8 @@ export default function ReceiptModal({ sale, onClose, duplicata = false }: Recei
   // Message de fin de ticket choisi par l'entreprise ; avant le chargement de ses informations, le message d'usage.
   const piedDePage = entreprise ? entreprise.piedDePage : "Merci de votre visite !";
   return (
-    <div className="fixed inset-0 z-[60] grid place-items-center overflow-y-auto bg-slate-950/50 p-4">
-      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+    <ZoneImpression cible="sales-receipt" largeurMm={72}>
+      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl print:max-w-none print:rounded-none print:p-0 print:shadow-none">
         <div className="mb-5 flex items-center justify-between print:hidden">
           <div className="flex items-center gap-2 text-emerald-700">
             <CheckCircle2 size={20} />
@@ -161,8 +162,7 @@ export default function ReceiptModal({ sale, onClose, duplicata = false }: Recei
           <button onClick={() => void imprimer(document.getElementById("sales-receipt"))} className="flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 text-sm font-bold text-white hover:bg-emerald-700"><Printer size={16} /> Imprimer</button>
         </div>
       </div>
-      <style>{`@media print { body * { visibility: hidden !important; } #sales-receipt, #sales-receipt * { visibility: visible !important; } #sales-receipt { position: fixed; inset: 0 auto auto 0; width: 72mm; max-width: 72mm; padding: 4mm; color: #000 !important; background: #fff !important; } @page { size: 80mm auto; margin: 3mm; } }`}</style>
-    </div>
+    </ZoneImpression>
   );
 }
 

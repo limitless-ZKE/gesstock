@@ -13,14 +13,16 @@ import {
   PackagePlus,
   Pencil,
   Plus,
+  Printer,
   Search,
   Trash2,
   Truck,
   X,
 } from "lucide-react";
 import { api } from "../services/api";
-import { apiErrorMessage as errorMessage } from "../services/apiError";
+import { apiErrorMessage as errorMessage, lireErreurDeFichier } from "../services/apiError";
 import { money } from "../lib/format";
+import { telecharger } from "../lib/telechargement";
 import ChampArticle from "../components/ChampArticle";
 import Indicateur from "../components/Indicateur";
 import { formatQuantite } from "../lib/quantite";
@@ -88,6 +90,7 @@ export default function ApprovisionnementsPage() {
   const [draftLines, setDraftLines] = useState<DraftLine[]>([blankLine()]);
   const [saving, setSaving] = useState(false);
   const [busySupplyId, setBusySupplyId] = useState<number | null>(null);
+  const [printingId, setPrintingId] = useState<number | null>(null);
   // Bon en cours de réception : la fenêtre demande si le total sort aussitôt de la caisse (coché par défaut).
   const [receiving, setReceiving] = useState<Supply | null>(null);
   const [payCash, setPayCash] = useState(true);
@@ -253,6 +256,22 @@ export default function ApprovisionnementsPage() {
     }
   }
 
+  /** Le bon en PDF (fournisseur, lignes, prix d'achat, total, cases de signature) : le fichier est enregistré, puis on l'imprime. */
+  async function printSupply(supply: Supply) {
+    setPrintingId(supply.id);
+    try {
+      const { data } = await api.get<Blob>(`/approvisionnements/${supply.id}/export/pdf`, { responseType: "blob" });
+      await telecharger(data, `gesstock-bon-${supply.numero.replace(/[^A-Za-z0-9._-]/g, "-")}.pdf`);
+      setNotice(`Le bon ${supply.numero} est prêt en PDF : ouvrez le fichier enregistré pour l’imprimer.`);
+      setNoticeError(false);
+    } catch (error) {
+      setNotice(errorMessage(await lireErreurDeFichier(error), `L’impression du bon ${supply.numero} a échoué.`));
+      setNoticeError(true);
+    } finally {
+      setPrintingId(null);
+    }
+  }
+
   async function deleteDraft(supply: Supply) {
     if (!window.confirm(`Supprimer le brouillon ${supply.numero} ?`)) return;
     setBusySupplyId(supply.id);
@@ -332,6 +351,8 @@ export default function ApprovisionnementsPage() {
                       supply={supply}
                       expanded={expandedId === supply.id}
                       busy={busySupplyId === supply.id}
+                      printing={printingId === supply.id}
+                      onPrint={() => void printSupply(supply)}
                       onToggle={() => setExpandedId((current) => current === supply.id ? null : supply.id)}
                       onReceive={() => startReceive(supply)}
                       onDelete={() => void deleteDraft(supply)}
@@ -428,7 +449,7 @@ function Metric({ title, count }: { title: string; count: number | string }) {
   return <Indicateur libelle={title} valeur={count} />;
 }
 
-function SupplyRows({ supply, expanded, busy, onToggle, onReceive, onDelete, onEdit }: { supply: Supply; expanded: boolean; busy: boolean; onToggle: () => void; onReceive: () => void; onDelete: () => void; onEdit: () => void }) {
+function SupplyRows({ supply, expanded, busy, printing, onToggle, onReceive, onDelete, onEdit, onPrint }: { supply: Supply; expanded: boolean; busy: boolean; printing: boolean; onToggle: () => void; onReceive: () => void; onDelete: () => void; onEdit: () => void; onPrint: () => void }) {
   const status = supply.statut === "RECU"
     ? { text: "Réceptionné", style: "bg-emerald-50 text-emerald-700", dot: "bg-emerald-500" }
     : supply.statut === "ANNULE"
@@ -442,7 +463,7 @@ function SupplyRows({ supply, expanded, busy, onToggle, onReceive, onDelete, onE
       <td className="px-4 py-3.5 text-xs text-slate-600">{formatQuantite(supply.lignes.reduce((sum, line) => sum + line.quantite, 0))} unité(s)</td>
       <td className="px-4 py-3.5 text-xs font-bold text-slate-800">{money.format(supply.montantTotal)}</td>
       <td className="px-4 py-3.5"><span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ${status.style}`}><span className={`size-1.5 rounded-full ${status.dot}`} />{status.text}</span></td>
-      <td className="px-5 py-3.5"><div className="flex justify-end gap-2">{supply.statut !== "ANNULE" && <button disabled={busy} onClick={onEdit} title={supply.statut === "RECU" ? "Corriger le bon réceptionné" : "Modifier le brouillon"} aria-label={`Modifier le bon ${supply.numero}`} className="icon-button text-slate-500 hover:bg-emerald-50 hover:text-emerald-700"><Pencil size={15} /></button>}{supply.statut === "BROUILLON" && <><button disabled={busy} onClick={onDelete} title="Supprimer le brouillon" className="icon-button text-slate-400 hover:bg-rose-50 hover:text-rose-600"><Trash2 size={15} /></button><button disabled={busy} onClick={onReceive} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50">{busy ? <LoaderCircle size={13} className="animate-spin" /> : <ArrowDownToLine size={13} />}{busy ? "Réception…" : "Valider réception"}</button></>}</div></td>
+      <td className="px-5 py-3.5"><div className="flex justify-end gap-2"><button disabled={printing} onClick={onPrint} title="Imprimer le bon (PDF)" aria-label={`Imprimer le bon ${supply.numero}`} className="icon-button text-slate-500 hover:bg-emerald-50 hover:text-emerald-700">{printing ? <LoaderCircle size={15} className="animate-spin" /> : <Printer size={15} />}</button>{supply.statut !== "ANNULE" && <button disabled={busy} onClick={onEdit} title={supply.statut === "RECU" ? "Corriger le bon réceptionné" : "Modifier le brouillon"} aria-label={`Modifier le bon ${supply.numero}`} className="icon-button text-slate-500 hover:bg-emerald-50 hover:text-emerald-700"><Pencil size={15} /></button>}{supply.statut === "BROUILLON" && <><button disabled={busy} onClick={onDelete} title="Supprimer le brouillon" className="icon-button text-slate-400 hover:bg-rose-50 hover:text-rose-600"><Trash2 size={15} /></button><button disabled={busy} onClick={onReceive} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50">{busy ? <LoaderCircle size={13} className="animate-spin" /> : <ArrowDownToLine size={13} />}{busy ? "Réception…" : "Valider réception"}</button></>}</div></td>
     </tr>
     {expanded && <tr className="bg-slate-50/60"><td colSpan={7} className="px-5 py-4"><div className="overflow-hidden rounded-xl border border-slate-200 bg-white"><table className="w-full text-left"><thead className="bg-slate-50 text-xs font-semibold text-slate-600"><tr><th className="px-3 py-2">Article</th><th className="px-3 py-2">Quantité</th><th className="px-3 py-2">Prix d’achat</th><th className="px-3 py-2">Prix de revente</th><th className="px-3 py-2 text-right">Total ligne</th></tr></thead><tbody className="divide-y divide-slate-100">{supply.lignes.map((line) => <tr key={line.id ?? `${supply.id}-${line.articleId}`}><td className="px-3 py-2.5"><p className="text-xs font-semibold text-slate-700">{line.designationArticle}</p><p className="mt-0.5 text-xs text-slate-400">{line.referenceArticle}</p></td><td className="px-3 py-2.5 text-xs text-slate-600">{formatQuantite(line.quantite)}</td><td className="px-3 py-2.5 text-xs text-slate-600">{money.format(line.prixUnitaire)}</td><td className="px-3 py-2.5 text-xs text-slate-600">{line.prixVente === null ? "—" : money.format(line.prixVente)}</td><td className="px-3 py-2.5 text-right text-xs font-bold text-slate-800">{money.format(line.montantLigne)}</td></tr>)}</tbody></table></div></td></tr>}
   </>;

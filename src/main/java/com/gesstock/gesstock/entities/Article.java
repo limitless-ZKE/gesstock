@@ -36,7 +36,8 @@ public class Article {
 
     /**
      * Coût moyen pondéré (CMP) : la valeur du stock divisée par sa quantité. Il sert aux marges et à la valeur du stock ;
-     * {@code prixAchat} reste le DERNIER prix d'achat saisi, à titre informatif. Il ne change que par une entrée en stock.
+     * {@code prixAchat} reste le DERNIER prix d'achat saisi. Le CMP change par une entrée en stock (pondération) ou quand on
+     * corrige le prix d'achat dans la fiche de l'article (il prend alors ce prix pour tout le stock en rayon).
      */
     @NotNull
     @DecimalMin("0.0")

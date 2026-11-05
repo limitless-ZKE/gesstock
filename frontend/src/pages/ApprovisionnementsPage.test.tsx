@@ -3,9 +3,11 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../services/api";
 import { erreurHttp } from "../test/axios";
+import { telecharger } from "../lib/telechargement";
 import ApprovisionnementsPage from "./ApprovisionnementsPage";
 
 vi.mock("../services/api", () => ({ api: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() } }));
+vi.mock("../lib/telechargement", () => ({ telecharger: vi.fn() }));
 
 const ARTICLES = [
   { id: 1, reference: "BOI-001", designation: "Bière Flag 65 cl", prixAchat: 6000, prixVente: 7500, quantiteStock: 12.5, uniteMesure: "casier" },
@@ -136,6 +138,43 @@ describe("bon d'approvisionnement", () => {
 
     expect(await within(fenetre).findByRole("alert")).toHaveTextContent("Paiement en espèces impossible");
     expect(screen.getByRole("dialog", { name: "Réceptionner le bon APP-51" })).toBeInTheDocument();
+  });
+
+  it("imprime un bon en PDF, qu'il soit déjà réceptionné ou encore à réceptionner", async () => {
+    const pdf = new Blob(["%PDF-1.4"], { type: "application/pdf" });
+    vi.mocked(api.get).mockImplementation(async (url: string) => {
+      if (url === "/approvisionnements") return { data: [BON_RECU, BON_A_RECEVOIR] };
+      if (url === "/fournisseurs") return { data: FOURNISSEURS };
+      if (url === "/articles") return { data: ARTICLES };
+      if (url.endsWith("/export/pdf")) return { data: pdf };
+      throw new Error(`appel inattendu : ${url}`);
+    });
+    const utilisateur = userEvent.setup();
+    render(<ApprovisionnementsPage />);
+
+    await utilisateur.click(await screen.findByRole("button", { name: "Imprimer le bon APP-50" }));
+    await waitFor(() => expect(telecharger).toHaveBeenCalledWith(pdf, "gesstock-bon-APP-50.pdf"));
+    expect(api.get).toHaveBeenCalledWith("/approvisionnements/50/export/pdf", { responseType: "blob" });
+    expect(await screen.findByText(/Le bon APP-50 est prêt en PDF/)).toBeInTheDocument();
+
+    await utilisateur.click(screen.getByRole("button", { name: "Imprimer le bon APP-51" }));
+    await waitFor(() => expect(telecharger).toHaveBeenCalledWith(pdf, "gesstock-bon-APP-51.pdf"));
+  });
+
+  it("affiche le message du serveur quand l'impression du bon échoue", async () => {
+    vi.mocked(api.get).mockImplementation(async (url: string) => {
+      if (url === "/approvisionnements") return { data: [BON_RECU] };
+      if (url === "/fournisseurs") return { data: FOURNISSEURS };
+      if (url === "/articles") return { data: ARTICLES };
+      throw erreurHttp(404, { message: "Approvisionnement introuvable: 50" });
+    });
+    const utilisateur = userEvent.setup();
+    render(<ApprovisionnementsPage />);
+
+    await utilisateur.click(await screen.findByRole("button", { name: "Imprimer le bon APP-50" }));
+
+    expect(await screen.findByText(/L’impression du bon APP-50 a échoué|Approvisionnement introuvable/)).toBeInTheDocument();
+    expect(telecharger).not.toHaveBeenCalled();
   });
 
   it("corrige un bon déjà réceptionné après confirmation", async () => {
