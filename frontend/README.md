@@ -77,6 +77,11 @@ millimètres à l'impression. `imprimer()` (`lib/impression.ts`) attend le charg
 jamais bloquer plus de 3 secondes. Pour un nouveau document (facture, bon de livraison) : poser `<EnTeteDocument variante="a4" />` en tête
 et imprimer avec `imprimer(zone)`.
 
+Un **ticket** (reçu de vente, reçu de règlement) s'affiche dans `ZoneImpression` : la fenêtre est rendue directement dans `body`, et à
+l'impression tout le reste de la page disparaît (`display: none`). Ne jamais imprimer un ticket avec `visibility: hidden` +
+`position: fixed` : l'écran caché garde sa place, fabrique des pages en plus, et le ticket fixe se répète sur chacune (le reçu sortait
+deux fois ; mesuré dans Edge : 2 pages avant, 1 après).
+
 ## Choix volontairement différés
 
 Pas de bibliothèque de cache de données (TanStack Query) : chaque page charge ses données avec `useEffect` + axios. Pas de saut

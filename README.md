@@ -113,6 +113,17 @@ Seuls ces quatre rôles existent. Les anciens rôles `VENDEUR` et `USER` sont fu
   ajouté), les prix et la dette du fournisseur suivent, avec mouvements de stock et journal. C'est refusé si la marchandise à
   retirer a déjà été vendue, si le nouveau total est inférieur à ce qui a déjà été payé au fournisseur, ou si un retour au
   fournisseur a été préparé sur le bon.
+- **Bon d'approvisionnement imprimable** (`GET /api/approvisionnements/{id}/export/pdf`, ADMIN, MANAGER et GESTIONNAIRE) : PDF avec
+  l'en-tête de l'entreprise, le fournisseur, l'état du bon (brouillon, reçu le…), les lignes (quantité, prix d'achat, montant), le
+  total et trois cases de signature. Le prix de revente n'y figure jamais. Bouton « Imprimer le bon » sur chaque ligne de la liste.
+- **Coût d'un article modifié dans sa fiche** : changer le prix d'achat dans la fiche d'un article fixe le coût (`cmp`) de tout le stock
+  en rayon à ce prix (noté au journal) ; les bons d'approvisionnement le font ensuite évoluer par pondération, et les ventes passées
+  gardent le coût mémorisé le jour de la vente. Le bénéfice par article (écran Statistiques, « Rentabilité détaillée par produit »,
+  PDF et Excel du rapport) s'appuie sur ce coût. Modifier autre chose que le prix d'achat ne touche pas au coût, sauf un coût resté
+  à 0 alors qu'un prix d'achat existe.
+- **Impression d'un ticket** (`ZoneImpression`) : le ticket (reçu de vente, reçu de règlement) est rendu hors de l'application ; à
+  l'impression tout le reste de la page est retiré (`display: none`). L'ancien réglage (`visibility: hidden` + `position: fixed`)
+  gardait la place de l'écran caché, fabriquait des pages en plus et répétait le ticket sur chacune : le reçu sortait deux fois.
 - **Réception payée en espèces de la caisse** (`POST /api/approvisionnements/{id}/validation`, corps facultatif
   `{ "payerEnEspeces": true }`) : la fenêtre de réception propose une case cochée par défaut ; cochée, le reste dû du bon sort aussitôt
   de la caisse du jour par le mécanisme du paiement fournisseur en espèces (sortie de caisse d'origine `REGLEMENT_FOURNISSEUR`, dette
@@ -396,6 +407,9 @@ Le contrôle de santé de Docker interroge `http://127.0.0.1:8081/actuator/healt
 - `V17__entrees_de_fonds_et_depenses.sql` : mouvements de caisse `ENTREE` en plus de `SORTIE`, colonne `origine` (les anciens mouvements
   sont classés : lien vers un règlement fournisseur, ou motif d'un remboursement de vente annulée, sinon MANUEL) ; date de réception
   `recu_le` des bons (les bons déjà réceptionnés prennent la date de leur bon).
+- `V18__cout_des_articles_tarifes_a_la_main.sql` : rattrape les articles chargés avec un prix d'achat à 0 puis tarifés à la main dans
+  leur fiche (coût `cmp` resté à 0 : bénéfice = chiffre d'affaires). Le coût prend le prix d'achat enregistré ; les lignes de vente
+  passées valorisées à 0 prennent ce prix, marquées `cout_estime` ; une ligne qui porte un vrai coût n'est jamais touchée.
 - Une migration déjà appliquée ne se modifie jamais : toute évolution du schéma est un nouveau fichier
   `V<n>__description.sql`.
 - Une base créée à la main par `ddl-auto=update` n'est **pas** reprise automatiquement (`V3` échouerait : colonne

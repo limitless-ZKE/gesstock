@@ -65,7 +65,7 @@ class MigrationsMysqlIT {
 
         try (ConfigurableApplicationContext contexte = demarrer(base, "--spring.flyway.baseline-on-migrate=false")) {
             JdbcTemplate jdbc = contexte.getBean(JdbcTemplate.class);
-            assertThat(versionsAppliquees(jdbc)).containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17");
+            assertThat(versionsAppliquees(jdbc)).containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18");
             assertThat(migrationsEnEchec(jdbc)).isZero();
             assertThat(derives(contexte, base)).as("enum Java absents de la base").isEmpty();
 
@@ -167,6 +167,41 @@ class MigrationsMysqlIT {
         }
     }
 
+    /** V18 : le coût des articles chargés à 0 puis tarifés à la main est rattrapé, celui qui a un vrai historique est intouchable. */
+    @Test
+    void miseAJourDepuisLaVersion17_aligneLeCoutDesArticlesTarifesALaMainSansToucherAuxVraisCouts() {
+        String base = nouvelleBase();
+        migrerJusqua(base, "17");
+        JdbcTemplate jdbc = jdbc(base);
+        // article chargé à 0 puis tarifé dans sa fiche (prix d'achat 600, coût resté à 0) ; article dont un bon a fait évoluer le coût
+        // (dernier prix 700, coût 650) ; article réellement sans coût (prix d'achat 0)
+        jdbc.update("INSERT INTO article (prix, prix_achat, cmp, quantite, seuil_alerte, reference, nom) VALUES "
+            + "(1000, 600, 0, 10, 2, 'T-MAIN', 'Tarifé à la main'), (900, 700, 650, 10, 2, 'T-BON', 'Réceptionné'), (500, 0, 0, 10, 2, 'T-ZERO', 'Sans coût')");
+        jdbc.update("INSERT INTO vente (code, venteacredit, version, statut, date_vente) VALUES ('VTE-IT-18', 0, 0, 'VALIDEE', NOW())");
+        Long venteId = jdbc.queryForObject("SELECT id FROM vente WHERE code = 'VTE-IT-18'", Long.class);
+        String ligne = "INSERT INTO lignes_vente (vente_id, article_id, quantite, prix_unitaire, montant_ligne, cout_unitaire, cout_estime) "
+            + "SELECT ?, id, 2, prix, prix * 2, ?, 0 FROM article WHERE reference = ?";
+        jdbc.update(ligne, venteId, 0, "T-MAIN");
+        jdbc.update(ligne, venteId, 650, "T-BON");
+        jdbc.update(ligne, venteId, 0, "T-ZERO");
+
+        migrerJusqua(base, null);
+
+        String cmp = "SELECT cmp FROM article WHERE reference = ?";
+        assertThat(jdbc.queryForObject(cmp, java.math.BigDecimal.class, "T-MAIN")).as("coût rattrapé sur le prix d'achat").isEqualByComparingTo("600");
+        assertThat(jdbc.queryForObject(cmp, java.math.BigDecimal.class, "T-BON")).as("coût issu d'un bon : intouchable").isEqualByComparingTo("650");
+        assertThat(jdbc.queryForObject(cmp, java.math.BigDecimal.class, "T-ZERO")).as("pas de prix d'achat : reste à 0").isEqualByComparingTo("0");
+
+        String coutVendu = "SELECT l.cout_unitaire FROM lignes_vente l JOIN article a ON a.id = l.article_id WHERE a.reference = ?";
+        String estime = "SELECT l.cout_estime FROM lignes_vente l JOIN article a ON a.id = l.article_id WHERE a.reference = ?";
+        assertThat(jdbc.queryForObject(coutVendu, java.math.BigDecimal.class, "T-MAIN")).as("vente passée à coût 0 corrigée").isEqualByComparingTo("600");
+        assertThat(jdbc.queryForObject(estime, Boolean.class, "T-MAIN")).as("...et signalée comme estimée").isTrue();
+        assertThat(jdbc.queryForObject(coutVendu, java.math.BigDecimal.class, "T-BON")).as("vrai coût mémorisé : intouchable").isEqualByComparingTo("650");
+        assertThat(jdbc.queryForObject(estime, Boolean.class, "T-BON")).isFalse();
+        assertThat(jdbc.queryForObject(coutVendu, java.math.BigDecimal.class, "T-ZERO")).isEqualByComparingTo("0");
+        assertThat(jdbc.queryForObject(estime, Boolean.class, "T-ZERO")).isFalse();
+    }
+
     /**
      * Une base de développement créée par Hibernate (ddl-auto=update) n'a pas d'historique Flyway mais contient déjà
      * les colonnes des migrations récentes. La reprendre « en version 1 » rejoue donc des migrations déjà appliquées et échoue ;
@@ -187,7 +222,7 @@ class MigrationsMysqlIT {
         try (ConfigurableApplicationContext contexte = demarrer(base,
             "--spring.flyway.baseline-on-migrate=true", "--spring.flyway.baseline-version=3")) {
             JdbcTemplate jdbc = contexte.getBean(JdbcTemplate.class);
-            assertThat(versionsAppliquees(jdbc)).containsExactly("3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17");
+            assertThat(versionsAppliquees(jdbc)).containsExactly("3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18");
             assertThat(migrationsEnEchec(jdbc)).isZero();
         }
     }

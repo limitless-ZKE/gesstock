@@ -124,10 +124,20 @@ public class ArticleCatalogueService {
         int seuil = article.getSeuilAlerte();
         String categorie = article.getCategorie() == null ? "aucune" : article.getCategorie().getNom();
         remplir(article, request, false);
+        // Le prix d'achat tapé dans la fiche vaut pour le stock en rayon : il devient le coût de l'article, donc celui de ses
+        // prochaines ventes (la marge ne regarde que le coût). Les bons d'approvisionnement le font ensuite évoluer par pondération.
+        // Un coût resté à 0 alors qu'un prix d'achat existe (articles chargés à 0 puis tarifés à la main) est rattrapé de même.
+        boolean coutAligne = differents(prixAchat, article.getPrixAchat())
+            || (article.getCmp().signum() == 0 && article.getPrixAchat().signum() > 0);
+        if (coutAligne) {
+            article.setCmp(article.getPrixAchat());
+        }
         noter(changements, "référence", reference, article.getReference());
         noter(changements, "désignation", designation, article.getDesignation());
         if (differents(prix, article.getPrix())) changements.add("prix de vente " + texte(prix) + " → " + texte(article.getPrix()));
-        if (differents(prixAchat, article.getPrixAchat())) changements.add("prix d'achat " + texte(prixAchat) + " → " + texte(article.getPrixAchat()));
+        if (differents(prixAchat, article.getPrixAchat())) {
+            changements.add("prix d'achat " + texte(prixAchat) + " → " + texte(article.getPrixAchat()) + " (coût du stock en rayon aligné)");
+        }
         if (seuil != article.getSeuilAlerte()) changements.add("seuil d'alerte " + seuil + " → " + article.getSeuilAlerte());
         noter(changements, "catégorie", categorie, article.getCategorie() == null ? "aucune" : article.getCategorie().getNom());
         Article enregistre = articleRepository.save(article);

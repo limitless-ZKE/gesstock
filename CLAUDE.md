@@ -42,7 +42,7 @@ et image Docker. Les actions d'autres éditeurs que GitHub sont épinglées sur 
 
 - Backend : `src/main/java/com/gesstock/gesstock/` — un paquet par domaine : `articles`, `ventes`, `caisse`, `clients`,
   `fournisseurs`, `approvisionnements`, `inventaires`, `stock`, `statistiques`, `entreprise`, `promotions`, `journal`,
-  `security`, `config`, `interfaceweb` (sert l'interface embarquée). Migrations Flyway `V1` à `V17` dans
+  `security`, `config`, `interfaceweb` (sert l'interface embarquée). Migrations Flyway `V1` à `V18` dans
   `src/main/resources/db/migration` ; Hibernate ne fait que valider le schéma (entité modifiée = migration obligatoire).
 - Frontend : `frontend/src/pages` (un écran par route, tests à côté), `components`, `services` (appels API), `auth`, `entreprise`.
   Caisse : `CaissePage`, `ChampClient` (recherche client), `QuantiteSaisie` (quantité saisie au clavier, virgule acceptée).
@@ -74,7 +74,12 @@ et image Docker. Les actions d'autres éditeurs que GitHub sont épinglées sur 
   MANUELLES seulement), résultat = CA − achats − autres dépenses, entrées de fonds à part.
 - Stock disponible (filtre + export PDF/Excel), valeur du stock à la revente au tableau de bord, liste des articles par catégorie
   (avec ou sans stock, sans prix d'achat).
-- Coût moyen pondéré. Compte fournisseur complet (dettes, paiements, avoirs imputés d'office).
+- Coût moyen pondéré. Le prix d'achat tapé dans la fiche d'un article fixe le coût de tout son stock en rayon (le client charge ses
+  articles à 0 puis les tarife à la main) ; les bons le pondèrent ensuite ; les ventes passées gardent leur coût mémorisé, sauf celles
+  valorisées à 0, corrigées au prix d'achat actuel et marquées « coût estimé » (V18, décision de l'utilisateur, novembre 2026).
+  Bon d'approvisionnement imprimable en PDF (sans prix de revente). Ticket imprimé une seule fois : `ZoneImpression`, jamais
+  `visibility: hidden` + `position: fixed` (le ticket se répète sur chaque page fabriquée par l'écran caché).
+- Compte fournisseur complet (dettes, paiements, avoirs imputés d'office).
 - Inventaire sans seuil : MANAGER/ADMIN valident, le validateur n'est pas l'ouvreur ; tout le stock ou une catégorie.
 - Vente à crédit possible (pas pour un client de passage). Journal d'un caissier : **ses lignes seulement**
   (ses ventes, ses encaissements, ses sorties) avec « espèces à remettre » ; ni fond de caisse, ni solde, ni écart.
