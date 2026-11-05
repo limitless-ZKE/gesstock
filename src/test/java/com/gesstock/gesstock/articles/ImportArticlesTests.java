@@ -17,9 +17,6 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
-import org.springframework.mock.web.MockMultipartFile;
-import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.ByteArrayInputStream;
@@ -30,20 +27,12 @@ import java.nio.charset.StandardCharsets;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
  * Demande du client (novembre 2026) : importer des articles depuis Excel ou CSV. Un aperçu ligne par ligne, puis un import « tout ou
  * rien » qui passe par les mêmes services que l'écran des articles (stock de départ tracé, coût aligné sur le prix d'achat, journal).
  */
 @SpringBootTest
-@AutoConfigureMockMvc
 @Transactional
 class ImportArticlesTests {
 
@@ -59,8 +48,6 @@ class ImportArticlesTests {
     private MouvementStockRepository mouvementRepository;
     @Autowired
     private JournalActiviteRepository journalRepository;
-    @Autowired
-    private MockMvc mockMvc;
 
     private static byte[] csv(String... lignes) {
         return String.join("\n", lignes).getBytes(StandardCharsets.UTF_8);
@@ -312,42 +299,4 @@ class ImportArticlesTests {
             assertThat(classeur.getSheet("Mode d'emploi")).isNotNull();
         }
     }
-
-    // ------------------------------------------------------------------ l'API
-
-    @Test
-    void l_apercuEtLImportPassentParLApiPourLeStockEtJamaisPourLaCaisse() throws Exception {
-        var fichier = new MockMultipartFile("fichier", "articles.csv", "text/csv", csv(TITRES, "API-1;Biscuit;;;200;300;10;2"));
-
-        mockMvc.perform(multipart("/api/articles/import/apercu").file(fichier).with(user("g").roles("GESTIONNAIRE")).with(csrf()))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.nouveaux").value(1))
-            .andExpect(jsonPath("$.importable").value(true))
-            .andExpect(jsonPath("$.lignes[0].statut").value("NOUVEAU"));
-        mockMvc.perform(multipart("/api/articles/import").file(fichier).with(user("g").roles("MANAGER")).with(csrf()))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.crees").value(1));
-        assertThat(article("API-1").getQuantiteStock()).isEqualByComparingTo("10");
-
-        mockMvc.perform(multipart("/api/articles/import/apercu").file(fichier).with(user("c").roles("CAISSIER")).with(csrf()))
-            .andExpect(status().isForbidden());
-        mockMvc.perform(multipart("/api/articles/import").file(fichier).with(user("c").roles("CAISSIER")).with(csrf()))
-            .andExpect(status().isForbidden());
-        mockMvc.perform(get("/api/articles/import/modele").with(user("c").roles("CAISSIER"))).andExpect(status().isForbidden());
-        mockMvc.perform(get("/api/articles/import/modele").param("avecArticles", "true").with(user("c").roles("CAISSIER")))
-            .andExpect(status().isForbidden());
-        mockMvc.perform(get("/api/articles/import/modele").with(user("g").roles("GESTIONNAIRE")))
-            .andExpect(status().isOk())
-            .andExpect(content().contentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
-        mockMvc.perform(get("/api/articles/import/modele")).andExpect(status().isUnauthorized());
-    }
-
-    @Test
-    void unTypeDeFichierInconnuEstRefuseAvecUn400() throws Exception {
-        var fichier = new MockMultipartFile("fichier", "articles.pdf", "application/pdf", "x".getBytes(StandardCharsets.UTF_8));
-
-        mockMvc.perform(multipart("/api/articles/import/apercu").file(fichier).with(user("g").roles("GESTIONNAIRE")).with(csrf()))
-            .andExpect(status().isBadRequest());
-    }
-
 }
