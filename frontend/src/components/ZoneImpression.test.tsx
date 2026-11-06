@@ -25,8 +25,8 @@ describe("fenêtre d'impression d'un ticket", () => {
     render(<ZoneImpression cible="ticket"><p id="ticket">Ticket</p></ZoneImpression>);
 
     expect(regles()).toContain("@page { size: 80mm auto; margin: 0; }");
-    expect(regles()).toMatch(/#ticket \{[^}]*width: 100%; max-width: none; margin: 0;/);
-    expect(regles()).not.toMatch(/width: calc\(\d+mm/);
+    expect(regles()).toMatch(/#ticket \{[^}]*width: 100%; max-width: calc\(80mm \/ 1\.25\); margin: 0;/);   // 80 mm au plus : jamais étalé sur une feuille A4
+    expect(regles()).not.toMatch(/[^-]width: calc\(\d+mm/);   // pas de largeur fixe en mm (seul le plafond max-width en a une)
     expect(regles()).toContain(`padding: ${MARGE_INTERIEURE_MM}mm;`);
   });
 

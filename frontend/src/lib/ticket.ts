@@ -12,3 +12,9 @@ export const ECHELLE_TICKET = 1.25;
 
 /** Marge entre le bord du papier et le texte, en millimètres AVANT agrandissement (2 mm deviennent 2,5 mm sur le papier). */
 export const MARGE_INTERIEURE_MM = 2;
+
+/**
+ * Largeur du papier de caisse, en millimètres. Le ticket prend toute la largeur du papier, mais jamais plus que cela : sur une grande feuille
+ * (une imprimante ordinaire, « Enregistrer en PDF »), il reste un ticket de 80 mm en haut à gauche au lieu de s'étaler sur toute la page.
+ */
+export const LARGEUR_PAPIER_MM = 80;

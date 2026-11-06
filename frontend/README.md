@@ -85,7 +85,7 @@ deux fois ; mesuré dans Edge : 2 pages avant, 1 après).
 Un ticket occupe **toute la largeur du papier de 80 mm** : marge de page à 0 (`@page`), ticket à `width: 100 %` (il suit le papier choisi dans l'imprimante et ne
 déborde jamais ; une largeur fixe en millimètres pourrait être rognée), marge intérieure de 2 mm (2,5 mm une fois agrandie). Les écritures sont agrandies de 25 %
 (`ECHELLE_TICKET`) par un `zoom` CSS sur le ticket, au papier et, pour le ticket de vente, à l'écran. Un pourcentage n'est pas multiplié par le zoom (mesuré dans
-Edge : 79,9 mm sur 80 mm) ; le zoom ne change donc pas la largeur, il fait seulement passer plus tôt à la ligne les désignations longues. Edge ignore `size: 80mm auto` :
+Edge : 79,9 mm sur 80 mm) ; le zoom ne change donc pas la largeur, il fait seulement passer plus tôt à la ligne les désignations longues. La largeur est plafonnée à 80 mm (`max-width: calc(80mm / échelle)`) : sur une feuille A4 (imprimante ordinaire, « Microsoft Print to PDF ») le ticket reste un ticket de 80 mm au lieu de s'étaler sur 210 mm (mesuré : 210 mm avant le plafond, 80 mm après). Edge ignore `size: 80mm auto` :
 c'est le papier choisi dans l'imprimante qui compte. Réglages dans `lib/ticket.ts` : `ECHELLE_TICKET` (taille des écritures) et `MARGE_INTERIEURE_MM` (à augmenter
 d'un millimètre à la fois si l'imprimante rogne les bords). Vérifié sur une page PDF de 80 mm sans marge (ticket de vente et reçu de règlement), pas sur la vraie imprimante.
 
