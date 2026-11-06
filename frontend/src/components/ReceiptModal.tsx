@@ -87,7 +87,7 @@ export default function ReceiptModal({ sale, onClose, duplicata = false }: Recei
   // Message de fin de ticket choisi par l'entreprise ; avant le chargement de ses informations, le message d'usage.
   const piedDePage = entreprise ? entreprise.piedDePage : "Merci de votre visite !";
   return (
-    <ZoneImpression cible="sales-receipt" largeurMm={72}>
+    <ZoneImpression cible="sales-receipt">
       <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl print:max-w-none print:rounded-none print:p-0 print:shadow-none">
         <div className="mb-5 flex items-center justify-between print:hidden">
           <div className="flex items-center gap-2 text-emerald-700">

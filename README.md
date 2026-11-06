@@ -140,7 +140,7 @@ Seuls ces quatre rôles existent. Les anciens rôles `VENDEUR` et `USER` sont fu
 - **Approvisionnements classés par période** : filtre « Période des bons » (toutes les dates, aujourd'hui, cette semaine du lundi au dimanche, ce mois, le mois
   dernier, dates précises avec « Du » et « Au », une borne pouvant manquer) sur la date du bon, et « Classer » du plus récent ou du plus ancien ; en bas : nombre de
   bons et total hors bons annulés. Côté écran seulement (la liste est chargée en entier, voir « listes non paginées ») ; logique dans `lib/periodes.ts`.
-- **Impression d'un ticket** (`ZoneImpression`, écritures 10 % plus grandes : `ECHELLE_TICKET`) : le ticket (reçu de vente, reçu de règlement) est rendu hors de l'application ; à
+- **Impression d'un ticket** (`ZoneImpression`, papier de 80 mm occupé en entier, écritures 25 % plus grandes : `ECHELLE_TICKET`, `lib/ticket.ts`) : le ticket (reçu de vente, reçu de règlement) est rendu hors de l'application ; à
   l'impression tout le reste de la page est retiré (`display: none`). L'ancien réglage (`visibility: hidden` + `position: fixed`)
   gardait la place de l'écran caché, fabriquait des pages en plus et répétait le ticket sur chacune : le reçu sortait deux fois.
 - **Réception payée en espèces de la caisse** (`POST /api/approvisionnements/{id}/validation`, corps facultatif

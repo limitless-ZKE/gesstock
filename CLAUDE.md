@@ -79,7 +79,9 @@ et image Docker. Les actions d'autres éditeurs que GitHub sont épinglées sur 
   valorisées à 0, corrigées au prix d'achat actuel et marquées « coût estimé » (V18, décision de l'utilisateur, novembre 2026).
   Bon d'approvisionnement imprimable en PDF (sans prix de revente). Ticket imprimé une seule fois : `ZoneImpression`, jamais
   `visibility: hidden` + `position: fixed` (le ticket se répète sur chaque page fabriquée par l'écran caché). Écritures des tickets
-  agrandies de 10 % à la demande des clients (novembre 2026) : une seule valeur, `ECHELLE_TICKET` dans `lib/ticket.ts`.
+  agrandies de 25 % (d'abord 10 %, puis plus à la demande des clients, novembre 2026) et ticket sur TOUTE la largeur du papier de 80 mm (`width: 100 %`,
+  marge de page 0, jamais une largeur fixe en mm qui pourrait déborder) : réglages `ECHELLE_TICKET` et `MARGE_INTERIEURE_MM` dans `lib/ticket.ts`. Jamais essayé
+  sur la vraie imprimante du client : si elle rogne les bords, augmenter la marge intérieure d'un millimètre à la fois.
 - Approvisionnements : classement des bons par période de date (aujourd'hui, semaine du lundi au dimanche, mois, mois dernier, dates précises) et par sens
   (plus récent ou plus ancien d'abord) ; date du BON, total de la période hors bons annulés.
 - Marge d'un article = prix de vente − coût, taux **sur le prix de vente** ; « Coût à vérifier » quand le coût est à 0 (jamais de faux 100 %).

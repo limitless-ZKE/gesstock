@@ -635,7 +635,7 @@ export default function ClientsDettesPage() {
       </form>
     </Modal>}
 
-    {receipt && <ZoneImpression cible="client-payment-receipt" largeurMm={80} className="z-[70]">
+    {receipt && <ZoneImpression cible="client-payment-receipt" agrandirALEcran={false} className="z-[70]">
       <section id="client-payment-receipt" className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl print:max-w-none print:rounded-none print:p-0 print:shadow-none">
         <div className="mb-5 flex items-center justify-between print:hidden"><div><h2 className="mt-1 text-lg font-bold text-slate-900">Reçu de règlement</h2></div><button onClick={() => setReceipt(null)} className="icon-button" aria-label="Fermer"><X size={16} /></button></div>
         <div className="border-y border-dashed border-slate-300 py-5 text-center"><EnTeteDocument variante="ticket" /><p className="mt-2 text-xs text-slate-500">REÇU DE VERSEMENT CLIENT</p><p className="mt-4 text-2xl font-extrabold text-slate-900">{currency.format(receipt.payment.montant)}</p></div>
