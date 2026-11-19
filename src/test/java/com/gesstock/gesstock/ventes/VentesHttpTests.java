@@ -65,6 +65,24 @@ class VentesHttpTests {
     }
 
     @Test
+    void unPrixNegocieSousLePrixDAchatRefuseLaValidationAvecUnCodeStable() throws Exception {
+        Article telephone = articleRepository.findByReferenceIgnoreCase("ELEC-001").orElseThrow();
+        mockMvc.perform(envoyer("/api/referentiels/sessions-caisse/ouverture", "{\"fondDeCaisse\":1000}"))
+            .andExpect(status().is2xxSuccessful());
+        // Le brouillon s'enregistre (le coût n'est connu qu'à la validation)...
+        String brouillon = mockMvc.perform(envoyer("/api/ventes", vente(telephone.getId(), "150000")))
+            .andExpect(status().isCreated())
+            .andReturn().getResponse().getContentAsString();
+        Number id = com.jayway.jsonpath.JsonPath.read(brouillon, "$.id");
+
+        // ... mais ne se valide pas : coût moyen de 189 000 au démarrage des données de démonstration.
+        mockMvc.perform(envoyer("/api/ventes/" + id + "/validation", ""))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("PRIX_SOUS_LE_COUT"))
+            .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("minimum 189000")));
+    }
+
+    @Test
     void historiqueSeFiltreParDateEtRefuseUneDateInvalide() throws Exception {
         mockMvc.perform(get("/api/ventes").param("date", "2000-01-01").with(user("caissier").roles("CAISSIER")))
             .andExpect(status().isOk())

@@ -21,23 +21,13 @@ import {
 import ChampClient from "../components/ChampClient";
 import QuantiteSaisie from "../components/QuantiteSaisie";
 import ReceiptModal, { type Sale } from "../components/ReceiptModal";
+import { usePanier, type Article, type CartLine } from "../panier/PanierContext";
 import { api } from "../services/api";
-import { apiErrorMessage as messageFor } from "../services/apiError";
+import { apiErrorMessage as messageFor, parseApiError } from "../services/apiError";
 import { money as currency, moneyPrecise as money2 } from "../lib/format";
 import { arrondirQuantite, formatQuantite } from "../lib/quantite";
 
 type Category = { id: number; nom: string };
-type Article = {
-  id: number;
-  reference: string;
-  designation: string;
-  prixVente: number;
-  quantiteStock: number;
-  seuilAlerteStock: number;
-  categorieId: number | null;
-  categorie: string | null;
-  uniteMesure: string | null;
-};
 type Client = { id: number; nom: string; telephone: string | null };
 type Promotion = {
   id: number;
@@ -67,10 +57,6 @@ type SaleResponse = Sale;
 type PaymentMode = "ESPECES" | "MOBILE_MONEY" | "CARTE" | "VIREMENT";
 /** Le crédit n'est pas un mode de règlement : la vente devient une dette du client, rien n'est encaissé. */
 type ChoixReglement = PaymentMode | "CREDIT";
-// prixNegocie : prix convenu avec le client par unité (texte saisi) ; vide = prix catalogue.
-// totalNegocie : prix convenu pour la LIGNE entière (remise sur le total de l'article) ; il remplace le prix unitaire et la
-// promotion. Les deux s'excluent : saisir l'un vide l'autre.
-type CartLine = { article: Article; quantite: number; promotionId: number | null; prixNegocie: string; totalNegocie: string };
 
 const round2 = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
 const round4 = (value: number) => Math.round((value + Number.EPSILON) * 10000) / 10000;
@@ -162,8 +148,8 @@ export default function CaissePage() {
   const [catalogError, setCatalogError] = useState("");
   const [search, setSearch] = useState("");
   const [categoryId, setCategoryId] = useState("all");
-  const [cart, setCart] = useState<CartLine[]>([]);
-  const [clientId, setClientId] = useState("");
+  // Le panier et le client choisi vivent au-dessus de l'écran (PanierProvider) : quitter la caisse ne les perd pas.
+  const { cart, setCart, clientId, setClientId, rapprocher } = usePanier();
   // Régime de TVA imposé par le serveur : la caisse l'affiche, elle ne le décide pas (0 % tant que la TVA n'est pas activée).
   const [fiscal, setFiscal] = useState({ tauxTva: 0, prixTtc: false });
   const [openingAmount, setOpeningAmount] = useState("");
@@ -176,6 +162,8 @@ export default function CaissePage() {
   // Lignes vendues sous le prix d'achat lors de la dernière vente : la vente est passée, le vendeur est prévenu.
   const [avertissements, setAvertissements] = useState<string[]>([]);
   const [pendingDraft, setPendingDraft] = useState<SaleResponse | null>(null);
+  // Contenu envoyé avec ce brouillon : le serveur le garde tel quel, un panier modifié depuis exige donc un nouveau brouillon.
+  const [draftSignature, setDraftSignature] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<SaleResponse | null>(null);
   const [notice, setNotice] = useState("");
   const [noticeIsError, setNoticeIsError] = useState(false);
@@ -225,7 +213,12 @@ export default function CaissePage() {
         ]);
       if (!active) return;
 
-      if (articleResult.status === "fulfilled") setArticles(articleResult.value.data);
+      let changementsDuPanier: string[] = [];
+      if (articleResult.status === "fulfilled") {
+        setArticles(articleResult.value.data);
+        // Un panier gardé depuis un passage précédent est corrigé d'après le stock et les prix du moment.
+        changementsDuPanier = rapprocher(articleResult.value.data);
+      }
       else setCatalogError(messageFor(articleResult.reason, "Impossible de charger le catalogue."));
       if (categoryResult.status === "fulfilled") setCategories(categoryResult.value.data);
       if (clientResult.status === "fulfilled") setClients(clientResult.value.data);
@@ -238,11 +231,15 @@ export default function CaissePage() {
         setNotice(messageFor(sessionResult.reason, "État de caisse indisponible."));
         setNoticeIsError(true);
       }
+      if (changementsDuPanier.length > 0) {
+        setNotice(`Panier mis à jour d'après le stock actuel : ${changementsDuPanier.join(" ")}`);
+        setNoticeIsError(true);
+      }
       setLoading(false);
     }
     void load();
     return () => { active = false; };
-  }, []);
+  }, [rapprocher]);
 
   function showNotice(message: string, isError = false) {
     setNotice(message);
@@ -389,17 +386,21 @@ export default function CaissePage() {
           };
         }),
       };
-      let draft = pendingDraft;
+      const signature = JSON.stringify(request);
+      let draft = pendingDraft !== null && draftSignature === signature ? pendingDraft : null;
+      draftAlreadyExists = draft !== null;
       if (!draft) {
         const { data } = await api.post<SaleResponse>("/ventes", request);
         draft = data;
         draftAlreadyExists = true;
         setPendingDraft(draft);
+        setDraftSignature(signature);
       }
       const { data: validated } = await api.post<SaleResponse>(`/ventes/${draft.id}/validation`);
       setReceipt(validated);
       setAvertissements(validated.avertissements ?? []);
       setPendingDraft(null);
+      setDraftSignature(null);
       setCart([]);
       setClientId("");
       setCheckoutOpen(false);
@@ -410,6 +411,15 @@ export default function CaissePage() {
       showNotice("Vente enregistrée et stock mis à jour.");
       void refreshSession().catch(() => setSession(null));
     } catch (error) {
+      if (parseApiError(error).code === "PRIX_SOUS_LE_COUT") {
+        // Le serveur refuse de valider tant que le prix négocié est sous le prix d'achat : on referme l'encaissement pour que le
+        // caissier relève le prix dans le panier ; l'ancien brouillon est abandonné, un nouveau sera créé avec le prix corrigé.
+        setPendingDraft(null);
+        setDraftSignature(null);
+        setCheckoutOpen(false);
+        showNotice(`${messageFor(error, "Un prix négocié est sous le prix d’achat.")} Le panier est conservé : corrigez le prix, puis encaissez à nouveau.`, true);
+        return;
+      }
       showNotice(
         draftAlreadyExists
           ? `Le brouillon reste enregistré. ${messageFor(error, "La validation a échoué.")} Corrigez le problème puis réessayez.`

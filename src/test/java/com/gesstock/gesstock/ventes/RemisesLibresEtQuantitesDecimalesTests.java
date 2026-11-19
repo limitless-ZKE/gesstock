@@ -1,8 +1,10 @@
 package com.gesstock.gesstock.ventes;
 
+import com.gesstock.gesstock.common.exception.PrixSousLeCoutException;
 import com.gesstock.gesstock.common.exception.RequeteInvalideException;
 import com.gesstock.gesstock.entities.Article;
 import com.gesstock.gesstock.entities.ModeReglement;
+import com.gesstock.gesstock.entities.StatutVente;
 import com.gesstock.gesstock.referentiels.dto.OuvertureSessionRequest;
 import com.gesstock.gesstock.referentiels.service.SessionCaisseService;
 import com.gesstock.gesstock.repositories.ArticleRepository;
@@ -25,8 +27,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Demande du client (novembre 2026) : le caissier fixe seul le prix négocié, quel que soit le taux, par unité ou pour la
- * ligne entière ; une vente sous le prix d'achat passe mais est signalée et notée au journal ; les quantités ont des
- * décimales. Données de démonstration : ELEC-001 à 245 000 (coût 189 000, stock 12), ALIM-001 riz à 1 300 (coût 900).
+ * ligne entière ; les quantités ont des décimales. Décision du propriétaire (novembre 2026) : un prix négocié sous le prix
+ * d'achat (coût moyen) empêche la validation de la vente. Données de démonstration : ELEC-001 à 245 000 (coût 189 000,
+ * stock 12), ALIM-001 riz à 1 300 (coût 900).
  */
 @SpringBootTest
 @Transactional
@@ -95,18 +98,73 @@ class RemisesLibresEtQuantitesDecimalesTests {
         assertThat(article("ALIM-001").getQuantiteStock()).isEqualByComparingTo(stockAvant.subtract(new BigDecimal("2.5")));
     }
 
-    @Test
-    void uneVenteSousLePrixDAchatPasseMaisEstSignaleeEtNoteeAuJournal() {
-        VenteResponse vente = vendre(new LigneDocumentRequest(article("ELEC-001").getId(), null, BigDecimal.ONE,
-            new BigDecimal("150000"), null));
+    private VenteResponse brouillon(LigneDocumentRequest... lignes) {
+        sessionService.ouvrir(new OuvertureSessionRequest(LocalDate.now(), new BigDecimal("1000")), "admin");
+        return ventesService.creerVenteDirecte(new VenteDirecteRequest(null, false, List.of(lignes),
+            BigDecimal.ZERO, ModeReglement.ESPECES, new BigDecimal("10000000")), CAISSIER);
+    }
 
-        assertThat(vente.montantTotal()).isEqualByComparingTo("150000");
-        assertThat(vente.avertissements()).singleElement().asString()
-            .contains("sous le prix d'achat").contains("ELEC-001").contains("189000");
-        assertThat(journalRepository.findAll())
-            .anySatisfy(entree -> {
-                assertThat(entree.getAction()).isEqualTo("VENTE_SOUS_COUT");
-                assertThat(entree.getDetails()).contains(vente.code()).contains("ELEC-001");
-            });
+    @Test
+    void unPrixNegocieSousLePrixDAchatEmpecheLaValidation() {
+        Article telephone = article("ELEC-001");
+        BigDecimal stockAvant = telephone.getQuantiteStock();
+        VenteResponse brouillon = brouillon(new LigneDocumentRequest(telephone.getId(), null, BigDecimal.ONE,
+            new BigDecimal("150000"), null));
+        long entreesDuJournalAvant = journalRepository.count();
+
+        assertThatThrownBy(() -> ventesService.validerVente(brouillon.id(), CAISSIER))
+            .isInstanceOf(PrixSousLeCoutException.class)
+            .hasMessageContaining("sous le prix d'achat").hasMessageContaining("ELEC-001")
+            .hasMessageContaining("150000").hasMessageContaining("minimum 189000");
+
+        assertThat(ventesService.obtenirVente(brouillon.id()).statut()).as("la vente reste un brouillon").isEqualTo(StatutVente.BROUILLON);
+        assertThat(article("ELEC-001").getQuantiteStock()).as("aucun article n'est sorti du stock").isEqualByComparingTo(stockAvant);
+        assertThat(journalRepository.count()).as("un refus ne laisse aucune trace au journal").isEqualTo(entreesDuJournalAvant);
+    }
+
+    @Test
+    void unPrixNegocieEgalAuPrixDAchatPasse() {
+        VenteResponse vente = vendre(new LigneDocumentRequest(article("ELEC-001").getId(), null, BigDecimal.ONE,
+            new BigDecimal("189000"), null));
+
+        assertThat(vente.statut()).isEqualTo(StatutVente.VALIDEE);
+        assertThat(vente.avertissements()).as("au coût exact : ni refus ni alerte").isEmpty();
+    }
+
+    @Test
+    void lePrixNegocieSurLeTotalDeLaLigneEstControleLuiAussi() {
+        // 3 téléphones coûtent 567 000 : 500 000 pour les trois est refusé, 567 000 passe
+        Article telephone = article("ELEC-001");
+        VenteResponse sousLeCout = brouillon(new LigneDocumentRequest(telephone.getId(), null, BigDecimal.valueOf(3),
+            null, null, new BigDecimal("500000")));
+        assertThatThrownBy(() -> ventesService.validerVente(sousLeCout.id(), CAISSIER))
+            .isInstanceOf(PrixSousLeCoutException.class).hasMessageContaining("minimum 567000");
+
+        VenteResponse auCout = ventesService.creerVenteDirecte(new VenteDirecteRequest(null, false,
+            List.of(new LigneDocumentRequest(telephone.getId(), null, BigDecimal.valueOf(3), null, null, new BigDecimal("567000"))),
+            BigDecimal.ZERO, ModeReglement.ESPECES, new BigDecimal("10000000")), CAISSIER);
+        assertThat(ventesService.validerVente(auCout.id(), CAISSIER).statut()).isEqualTo(StatutVente.VALIDEE);
+    }
+
+    @Test
+    void leRefusCiteTousLesArticlesFautifsEnUneFois() {
+        VenteResponse brouillon = brouillon(
+            new LigneDocumentRequest(article("ELEC-001").getId(), null, BigDecimal.ONE, new BigDecimal("150000"), null),
+            new LigneDocumentRequest(article("ALIM-001").getId(), null, BigDecimal.ONE, new BigDecimal("800"), null));
+
+        assertThatThrownBy(() -> ventesService.validerVente(brouillon.id(), CAISSIER))
+            .isInstanceOf(PrixSousLeCoutException.class)
+            .hasMessageContaining("ELEC-001").hasMessageContaining("ALIM-001");
+    }
+
+    @Test
+    void unArticleDontLeCoutEstEncoreAZeroNeBloqueJamais() {
+        Article riz = article("ALIM-001");
+        riz.setCmp(BigDecimal.ZERO);
+        articleRepository.saveAndFlush(riz);
+
+        VenteResponse vente = vendre(new LigneDocumentRequest(riz.getId(), null, BigDecimal.ONE, new BigDecimal("1"), null));
+
+        assertThat(vente.statut()).isEqualTo(StatutVente.VALIDEE);
     }
 }

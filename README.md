@@ -87,9 +87,14 @@ Seuls ces quatre rôles existent. Les anciens rôles `VENDEUR` et `USER` sont fu
 - **Remises** (décision du client, novembre 2026) : le vendeur fixe librement le prix négocié, quel que soit le taux et quel
   que soit son rôle ; aucun accord de responsable n'est demandé. Deux façons : un prix par unité (`prixUnitaire`, la promotion
   s'applique encore dessus) ou un prix pour la ligne entière (`montantNegocie`, facturé exactement, sans promotion). Aucun
-  des deux ne dépasse le prix catalogue. Une vente sous le prix d'achat (coût moyen au moment de la vente) passe : la réponse
-  de validation la signale (`avertissements`, affichés en orange à la caisse) et le journal des opérations la note
-  (« Vente sous le prix d'achat »). Le montant net de chaque ligne est calculé une fois et stocké (`montant_ligne`).
+  des deux ne dépasse le prix catalogue. **Un prix négocié sous le prix d'achat empêche la validation** (décision du
+  propriétaire, novembre 2026) : le prix d'achat est le coût moyen de l'article (× le facteur de l'unité) au moment de la
+  validation, car une entrée en stock peut le changer entre le brouillon et la validation. Le serveur répond `409`, cite
+  chaque article fautif avec son minimum, et ne touche ni à la vente (elle reste brouillon), ni au stock, ni au journal. Un
+  prix égal au coût passe ; un article dont le coût est encore à 0 ne bloque jamais. Une ligne au prix catalogue que seule une
+  promotion fait descendre sous le coût passe encore : la réponse de validation la signale (`avertissements`, en orange à la
+  caisse) et le journal des opérations la note (« Vente sous le prix d'achat »). La même règle s'applique à la conversion d'un
+  proforma en vente. Le montant net de chaque ligne est calculé une fois et stocké (`montant_ligne`).
 - **Quantités à virgule** : stock et quantités (vente, proforma, réception, retour, inventaire, ajustement) ont 3 décimales au
   plus (`DECIMAL(15,3)`) ; on les tape avec une virgule ou un point.
 - **Annulation d'une vente** (ADMIN et MANAGER seulement, `POST /api/ventes/{id}/annulation`) : à crédit, la dette est
@@ -140,6 +145,12 @@ Seuls ces quatre rôles existent. Les anciens rôles `VENDEUR` et `USER` sont fu
 - **Approvisionnements classés par période** : filtre « Période des bons » (toutes les dates, aujourd'hui, cette semaine du lundi au dimanche, ce mois, le mois
   dernier, dates précises avec « Du » et « Au », une borne pouvant manquer) sur la date du bon, et « Classer » du plus récent ou du plus ancien ; en bas : nombre de
   bons et total hors bons annulés. Côté écran seulement (la liste est chargée en entier, voir « listes non paginées ») ; logique dans `lib/periodes.ts`.
+- **Ticket de vente** (`ReceiptModal`, modèle : la facture papier de l'entreprise, novembre 2026) : en-tête de l'entreprise, « FACTURE N° »
+  suivi du code de la vente, date et heure (`AAAA-MM-JJ HH:mm:ss`, l'heure du serveur), client (« Client de passage » sans client), mode de
+  paiement et vendeur, puis un tableau N° / Produit / Qté / Prix / Montant à en-tête noir. Le tableau est au PRIX CATALOGUE : sa somme est
+  le « Total brut », la remise (négociée + promotions, en F et en %) s'en retranche, et le « TOTAL NET » est ce que le client paie. Une vente
+  à crédit finit par « Acompte payé » et « Reste à payer » (GesStock n'enregistre pas encore d'acompte à la vente : acompte = 0, reste = total) ;
+  une vente au comptant par le montant reçu et la monnaie rendue. Le message de fin vient des paramètres de l'entreprise.
 - **Impression d'un ticket** (`ZoneImpression`, papier de 80 mm occupé en entier, écritures 25 % plus grandes : `ECHELLE_TICKET`, `lib/ticket.ts`) : le ticket (reçu de vente, reçu de règlement) est rendu hors de l'application ; à
   l'impression tout le reste de la page est retiré (`display: none`). L'ancien réglage (`visibility: hidden` + `position: fixed`)
   gardait la place de l'écran caché, fabriquait des pages en plus et répétait le ticket sur chacune : le reçu sortait deux fois.

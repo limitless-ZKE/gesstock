@@ -62,8 +62,9 @@ et image Docker. Les actions d'autres éditeurs que GitHub sont épinglées sur 
 - 4 rôles : ADMIN, MANAGER, GESTIONNAIRE, CAISSIER. Annulation de vente : ADMIN/MANAGER seulement ; au comptant, le jour même.
 - Fuseau UTC+0 (Africa/Dakar). Aucune TVA pour l'instant (décidée par le serveur).
 - Remises LIBRES (décision du client, novembre 2026, remplace les plafonds par rôle) : le caissier fixe le prix négocié sans
-  responsable, quel que soit le taux, par unité ou sur le total de la ligne. Sous le prix d'achat : la vente passe, avec un
-  avertissement à la caisse et une ligne « Vente sous le prix d'achat » au journal des opérations.
+  responsable, quel que soit le taux, par unité ou sur le total de la ligne. Prix négocié sous le prix d'achat (coût moyen) :
+  la validation est REFUSÉE (409, décision du propriétaire, novembre 2026). Seule une promotion qui descend sous le coût
+  passe encore, avec un avertissement à la caisse et une ligne « Vente sous le prix d'achat » au journal des opérations.
 - Quantités à 3 décimales (stock, ventes, bons, retours, inventaires). Montant de chaque ligne de vente stocké (`montant_ligne`).
 - Approvisionnement : article cherché par son nom ; prix d'achat et de revente pré-remplis (derniers prix connus) ; le prix de
   revente devient le prix de vente à la RÉCEPTION ; un bon se corrige aussi après réception (stock, coût moyen, prix et dette

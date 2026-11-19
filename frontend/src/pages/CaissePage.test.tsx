@@ -1,8 +1,13 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter, Link, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { useAuth } from "../auth/AuthContext";
+import { PanierProvider } from "../panier/PanierContext";
 import { api } from "../services/api";
 import CaissePage from "./CaissePage";
+
+vi.mock("../auth/AuthContext", () => ({ useAuth: vi.fn() }));
 
 vi.mock("../services/api", () => ({ api: { get: vi.fn(), post: vi.fn() } }));
 vi.mock("../components/ReceiptModal", () => ({
@@ -29,6 +34,8 @@ const session = {
 };
 
 beforeEach(() => {
+  window.localStorage.clear();
+  vi.mocked(useAuth).mockReturnValue({ user: { username: "marie", roles: ["CAISSIER"] }, loading: false, login: vi.fn(), logout: vi.fn() });
   vi.mocked(api.get).mockReset();
   vi.mocked(api.post).mockReset();
   vi.mocked(api.get).mockImplementation(async (url: string) => {
@@ -55,9 +62,25 @@ async function choisirLeClient(utilisateur: ReturnType<typeof userEvent.setup>, 
 
 async function remplirLePanier() {
   const utilisateur = userEvent.setup();
-  render(<CaissePage />);
+  render(<PanierProvider><CaissePage /></PanierProvider>);
   await utilisateur.click(await screen.findByRole("button", { name: /Riz 25 kg/ }));
   return utilisateur;
+}
+
+/** La caisse et un autre écran, sous le même panier, comme dans l'application : on passe de l'un à l'autre par le menu. */
+function afficherAvecAutreEcran() {
+  return render(
+    <PanierProvider>
+      <MemoryRouter initialEntries={["/caisse"]}>
+        <Link to="/caisse">Aller à la caisse</Link>
+        <Link to="/clients">Aller aux clients</Link>
+        <Routes>
+          <Route path="/caisse" element={<CaissePage />} />
+          <Route path="/clients" element={<p>Écran des clients</p>} />
+        </Routes>
+      </MemoryRouter>
+    </PanierProvider>,
+  );
 }
 
 describe("vente à crédit à la caisse", () => {
@@ -239,21 +262,181 @@ describe("prix négocié librement par le caissier", () => {
     expect(api.post).not.toHaveBeenCalled();
   });
 
-  it("une vente sous le prix d'achat passe, et le caissier en est averti", async () => {
+  it("une vente que seule une promotion fait descendre sous le prix d'achat passe encore, et le caissier en est averti", async () => {
     vi.mocked(api.post).mockImplementation(async (url: string) => {
       if (url === "/ventes") return { data: { id: 77, code: "VTE-77", statut: "BROUILLON" } };
       if (url === "/ventes/77/validation") {
         return { data: { id: 77, code: "VTE-77", statut: "VALIDEE",
-          avertissements: ["Vendu sous le prix d'achat — RIZ-25 « Riz 25 kg » : 1 vendu(s) 400, prix d'achat 900"] } };
+          avertissements: ["Vendu sous le prix d'achat — RIZ-25 « Riz 25 kg » : 1 vendu(s) 800, prix d'achat 900"] } };
       }
       throw new Error(`appel inattendu : ${url}`);
     });
     const utilisateur = await remplirLePanier();
-    await utilisateur.type(screen.getByLabelText("Prix négocié pour Riz 25 kg"), "400");
     await utilisateur.click(screen.getByRole("button", { name: /^Encaisser/ }));
     await utilisateur.click(screen.getByRole("button", { name: "Valider et encaisser" }));
 
     const avertissement = await screen.findByText("Vente enregistrée sous le prix d’achat");
-    expect(avertissement.closest("[role=alert]")).toHaveTextContent("RIZ-25 « Riz 25 kg » : 1 vendu(s) 400, prix d'achat 900");
+    expect(avertissement.closest("[role=alert]")).toHaveTextContent("RIZ-25 « Riz 25 kg » : 1 vendu(s) 800, prix d'achat 900");
+  });
+});
+
+describe("panier gardé quand on quitte la caisse", () => {
+  it("retrouve les articles, la quantité et le client en revenant sur la caisse", async () => {
+    const utilisateur = userEvent.setup();
+    afficherAvecAutreEcran();
+    await utilisateur.click(await screen.findByRole("button", { name: /Riz 25 kg/ }));
+    await utilisateur.click(screen.getByRole("button", { name: "Augmenter quantité" }));
+    await choisirLeClient(utilisateur, "fatou", /Fatou Ndiaye/);
+
+    await utilisateur.click(screen.getByRole("link", { name: "Aller aux clients" }));
+    expect(screen.getByText("Écran des clients")).toBeInTheDocument();
+    await utilisateur.click(screen.getByRole("link", { name: "Aller à la caisse" }));
+
+    expect(await screen.findByLabelText("Quantité de Riz 25 kg")).toHaveValue("2");
+    expect(screen.getByRole("combobox", { name: /Client/ })).toHaveValue("Fatou Ndiaye");
+    expect(screen.queryByText("Votre panier est vide")).not.toBeInTheDocument();
+  });
+
+  it("garde aussi le prix négocié saisi", async () => {
+    const utilisateur = userEvent.setup();
+    afficherAvecAutreEcran();
+    await utilisateur.click(await screen.findByRole("button", { name: /Riz 25 kg/ }));
+    await utilisateur.type(screen.getByLabelText("Prix négocié pour Riz 25 kg"), "900");
+
+    await utilisateur.click(screen.getByRole("link", { name: "Aller aux clients" }));
+    await utilisateur.click(screen.getByRole("link", { name: "Aller à la caisse" }));
+
+    expect(await screen.findByLabelText("Prix négocié pour Riz 25 kg")).toHaveValue(900);
+  });
+
+  it("revient vide une fois la vente encaissée : on ne revend pas deux fois le même panier", async () => {
+    const utilisateur = userEvent.setup();
+    afficherAvecAutreEcran();
+    await utilisateur.click(await screen.findByRole("button", { name: /Riz 25 kg/ }));
+    await utilisateur.click(screen.getByRole("button", { name: /^Encaisser/ }));
+    await utilisateur.click(await screen.findByRole("button", { name: "Valider et encaisser" }));
+    await screen.findByRole("dialog", { name: "Reçu" });
+
+    await utilisateur.click(screen.getByRole("button", { name: "Fermer le reçu" }));
+    await utilisateur.click(screen.getByRole("link", { name: "Aller aux clients" }));
+    await utilisateur.click(screen.getByRole("link", { name: "Aller à la caisse" }));
+
+    expect(await screen.findByText("Votre panier est vide")).toBeInTheDocument();
+  });
+
+  it("retire d'un panier gardé l'article tombé en rupture et prévient le caissier", async () => {
+    window.localStorage.setItem("gesstock:panier:marie", JSON.stringify({
+      enregistreLe: Date.now(),
+      clientId: "",
+      lignes: [{ article: riz, quantite: 2, promotionId: null, prixNegocie: "", totalNegocie: "" }],
+    }));
+    vi.mocked(api.get).mockImplementation(async (url: string) => {
+      if (url === "/articles") return { data: [{ ...riz, quantiteStock: 0 }] };
+      if (url === "/caisse/parametres") return { data: { tauxTva: 0, prixTtc: false } };
+      if (url === "/articles/categories" || url === "/promotions") return { data: [] };
+      if (url === "/clients") return { data: CLIENTS };
+      if (url === "/referentiels/sessions-caisse/ouverte") return { data: session };
+      throw new Error(`appel inattendu : ${url}`);
+    });
+
+    afficherAvecAutreEcran();
+
+    expect(await screen.findByText(/n’est plus disponible : retiré du panier/)).toBeInTheDocument();
+    expect(screen.getByText("Votre panier est vide")).toBeInTheDocument();
+  });
+});
+
+/** Erreur de l'API telle que la voit le front (axios) : statut, code stable et message du serveur. */
+const erreurApi = (status: number, code: string, detail: string) =>
+  Object.assign(new Error(detail), { isAxiosError: true, response: { status, data: { code, detail }, headers: {} } });
+
+describe("prix négocié sous le prix d'achat : le serveur refuse la validation", () => {
+  const REFUS = "Prix négocié sous le prix d'achat : la vente n'est pas validée. Relevez le prix négocié de RIZ-25 « Riz 25 kg » : 400 proposé pour 1, minimum 900";
+
+  /** Chaque encaissement crée un brouillon (77, 78…) ; la validation du 77 est refusée, celle du suivant passe. */
+  function serveurQuiRefuseLePremierBrouillon() {
+    let dernier = 76;
+    vi.mocked(api.post).mockImplementation(async (url: string) => {
+      if (url === "/ventes") { dernier += 1; return { data: { id: dernier, code: `VTE-${dernier}`, statut: "BROUILLON" } }; }
+      if (url === "/ventes/77/validation") throw erreurApi(409, "PRIX_SOUS_LE_COUT", REFUS);
+      if (url === "/ventes/78/validation") return { data: { id: 78, code: "VTE-78", statut: "VALIDEE" } };
+      throw new Error(`appel inattendu : ${url}`);
+    });
+  }
+  const brouillonsCrees = () => vi.mocked(api.post).mock.calls.filter(([url]) => url === "/ventes");
+
+  it("referme l'encaissement, garde le panier et dit quel article relever", async () => {
+    serveurQuiRefuseLePremierBrouillon();
+    const utilisateur = await remplirLePanier();
+    await utilisateur.type(screen.getByLabelText("Prix négocié pour Riz 25 kg"), "400");
+    await utilisateur.click(screen.getByRole("button", { name: /^Encaisser/ }));
+
+    await utilisateur.click(screen.getByRole("button", { name: "Valider et encaisser" }));
+
+    expect(await screen.findByText(/minimum 900/)).toHaveTextContent("Le panier est conservé");
+    expect(screen.queryByRole("button", { name: "Valider et encaisser" })).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Prix négocié pour Riz 25 kg")).toHaveValue(400);
+    expect(screen.queryByRole("dialog", { name: "Reçu" })).not.toBeInTheDocument();
+  });
+
+  it("après avoir relevé le prix, la vente repart sur un nouveau brouillon et se valide", async () => {
+    serveurQuiRefuseLePremierBrouillon();
+    const utilisateur = await remplirLePanier();
+    const prix = screen.getByLabelText("Prix négocié pour Riz 25 kg");
+    await utilisateur.type(prix, "400");
+    await utilisateur.click(screen.getByRole("button", { name: /^Encaisser/ }));
+    await utilisateur.click(screen.getByRole("button", { name: "Valider et encaisser" }));
+    await screen.findByText(/minimum 900/);
+
+    await utilisateur.clear(prix);
+    await utilisateur.type(prix, "900");
+    await utilisateur.click(screen.getByRole("button", { name: /^Encaisser/ }));
+    await utilisateur.click(screen.getByRole("button", { name: "Valider et encaisser" }));
+
+    expect(await screen.findByRole("dialog", { name: "Reçu" })).toHaveTextContent("VTE-78");
+    expect(brouillonsCrees()).toHaveLength(2);
+    expect(brouillonsCrees()[1][1]).toEqual(expect.objectContaining({ lignes: [expect.objectContaining({ prixUnitaire: 900 })] }));
+  });
+});
+
+describe("brouillon gardé après un échec de validation", () => {
+  function validationEnPanneUneFois() {
+    let dernier = 76;
+    vi.mocked(api.post).mockImplementation(async (url: string) => {
+      if (url === "/ventes") { dernier += 1; return { data: { id: dernier, code: `VTE-${dernier}`, statut: "BROUILLON" } }; }
+      if (url === "/ventes/77/validation") throw erreurApi(409, "CONFLIT", "Stock insuffisant pour l'article RIZ-25");
+      return { data: { id: dernier, code: `VTE-${dernier}`, statut: "VALIDEE" } };
+    });
+  }
+  const brouillonsCrees = () => vi.mocked(api.post).mock.calls.filter(([url]) => url === "/ventes");
+
+  it("est réutilisé tel quel quand rien n'a changé dans le panier", async () => {
+    validationEnPanneUneFois();
+    const utilisateur = await remplirLePanier();
+    await utilisateur.click(screen.getByRole("button", { name: /^Encaisser/ }));
+    await utilisateur.click(screen.getByRole("button", { name: "Valider et encaisser" }));
+    await screen.findByText(/Le brouillon reste enregistré/);
+
+    await utilisateur.click(screen.getByRole("button", { name: "Valider et encaisser" }));
+
+    expect(brouillonsCrees()).toHaveLength(1);
+    expect(api.post).toHaveBeenCalledWith("/ventes/77/validation");
+  });
+
+  it("est remplacé par un nouveau quand le panier a changé : le serveur garde les anciennes lignes du brouillon", async () => {
+    validationEnPanneUneFois();
+    const utilisateur = await remplirLePanier();
+    await utilisateur.click(screen.getByRole("button", { name: /^Encaisser/ }));
+    await utilisateur.click(screen.getByRole("button", { name: "Valider et encaisser" }));
+    await screen.findByText(/Le brouillon reste enregistré/);
+    await utilisateur.click(screen.getByRole("button", { name: "Annuler" }));
+
+    await utilisateur.click(screen.getByRole("button", { name: "Augmenter quantité" }));
+    await utilisateur.click(screen.getByRole("button", { name: /^Encaisser/ }));
+    await utilisateur.click(screen.getByRole("button", { name: "Valider et encaisser" }));
+
+    expect(await screen.findByRole("dialog", { name: "Reçu" })).toHaveTextContent("VTE-78");
+    expect(brouillonsCrees()).toHaveLength(2);
+    expect(brouillonsCrees()[1][1]).toEqual(expect.objectContaining({ lignes: [expect.objectContaining({ quantite: 2 })] }));
   });
 });

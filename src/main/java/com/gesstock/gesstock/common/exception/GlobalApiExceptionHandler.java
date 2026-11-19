@@ -43,6 +43,11 @@ public class GlobalApiExceptionHandler extends ResponseEntityExceptionHandler {
         return problem(HttpStatus.NOT_FOUND, exception.getMessage(), "RESSOURCE_INTROUVABLE");
     }
 
+    @ExceptionHandler(PrixSousLeCoutException.class)
+    public ProblemDetail traiterPrixSousLeCout(PrixSousLeCoutException exception) {
+        return problem(HttpStatus.CONFLICT, exception.getMessage(), "PRIX_SOUS_LE_COUT");
+    }
+
     @ExceptionHandler(ConflitRessourceException.class)
     public ProblemDetail traiterConflit(ConflitRessourceException exception) {
         return problem(HttpStatus.CONFLICT, exception.getMessage(), "CONFLIT");

@@ -3,11 +3,13 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useAuth } from "../auth/AuthContext";
 import { useEntreprise } from "../entreprise/EntrepriseContext";
+import { usePanier } from "../panier/PanierContext";
 import { api } from "../services/api";
 import AppLayout from "./AppLayout";
 
 vi.mock("../auth/AuthContext", () => ({ useAuth: vi.fn() }));
 vi.mock("../entreprise/EntrepriseContext", () => ({ useEntreprise: vi.fn() }));
+vi.mock("../panier/PanierContext", () => ({ usePanier: vi.fn() }));
 vi.mock("../services/api", () => ({ api: { get: vi.fn() } }));
 
 const TOUS_LES_LIENS = [
@@ -39,6 +41,7 @@ describe("menu de navigation selon les rôles", () => {
   beforeEach(() => {
     vi.mocked(api.get).mockResolvedValue({ data: { statut: "OUVERTE" } });
     vi.mocked(useEntreprise).mockReturnValue({ entreprise: null, rafraichir: vi.fn(), logoUrl: () => null });
+    vi.mocked(usePanier).mockReturnValue({ nombreArticles: 0 } as ReturnType<typeof usePanier>);
   });
 
   it("le caissier ne voit que la vente, les clients et la caisse", async () => {
@@ -107,5 +110,18 @@ describe("menu de navigation selon les rôles", () => {
     vi.mocked(api.get).mockRejectedValue({ response: { status: 500 } });
     afficher(["CAISSIER"]);
     expect(await screen.findByText("Caisse indisponible")).toBeInTheDocument();
+  });
+
+  it("rappelle dans le menu les articles en attente dans le panier de vente", async () => {
+    vi.mocked(usePanier).mockReturnValue({ nombreArticles: 3 } as ReturnType<typeof usePanier>);
+    afficher(["CAISSIER"]);
+    await screen.findByText("Caisse ouverte");
+    expect(screen.getByRole("link", { name: /Caisse & ventes/ })).toHaveTextContent("3");
+  });
+
+  it("n'affiche aucun compteur quand le panier est vide", async () => {
+    afficher(["CAISSIER"]);
+    await screen.findByText("Caisse ouverte");
+    expect(screen.getByRole("link", { name: "Caisse & ventes" })).toBeInTheDocument();
   });
 });

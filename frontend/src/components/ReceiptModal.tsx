@@ -1,6 +1,5 @@
 import { CheckCircle2, Printer, X } from "lucide-react";
 import { useEntreprise } from "../entreprise/EntrepriseContext";
-import { formatPercent, moneyPrecise as money } from "../lib/format";
 import { imprimer } from "../lib/impression";
 import { formatQuantite } from "../lib/quantite";
 import EnTeteDocument from "./EnTeteDocument";
@@ -49,26 +48,36 @@ const paymentLabels: Record<ReceiptPaymentMode, string> = {
   AUTRE: "Autre",
 };
 
-// Jusqu'à deux décimales : un prix négocié peut comporter des centimes.
+// Montants du ticket : « 13 500 F », comme sur les factures papier de l'entreprise (jusqu'à deux décimales pour un prix négocié).
+const nombre = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 });
+const francs = (value: number) => `${nombre.format(value)} F`;
 
-function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat("fr-FR", { dateStyle: "short", timeStyle: "short" }).format(new Date(value));
+/** 1 -> « 1,0 », 0.5 -> « 0,5 », 2.25 -> « 2,25 » : au moins une décimale dans la colonne des quantités. */
+const quantiteDuTicket = (value: number) => (Number.isInteger(value) ? value.toFixed(1).replace(".", ",") : formatQuantite(value));
+
+/** « 2026-11-17T14:50:13 » -> « 2026-11-17 14:50:13 » : l'heure du serveur telle quelle, sans conversion de fuseau. */
+function formatDateTicket(value: string) {
+  const lue = /^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2})(?::(\d{2}))?/.exec(value);
+  return lue ? `${lue[1]} ${lue[2]}:${lue[3] ?? "00"}` : value;
 }
 
-/** Arrondi à deux décimales, pour éviter les écarts de virgule flottante dans les remises affichées. */
+/** Arrondi à deux décimales, pour éviter les écarts de virgule flottante dans les montants affichés. */
 const round2 = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
 
-/** Remise négociée par unité (prix catalogue - prix appliqué), jamais négative. */
-export const remiseNegocieeUnitaire = (line: ReceiptLine) =>
-  round2(Math.max(0, (line.prixCatalogue ?? line.prixUnitaire) - line.prixUnitaire));
-
-/** Totaux des remises d'une vente : négociée avec le client, et issue des promotions. */
-export function remisesDeLaVente(sale: Sale) {
-  // remise négociée = total au prix catalogue − promotions − montant facturé : couvre aussi un prix fixé pour la ligne entière
-  const negociee = round2(sale.lignes.reduce((total, line) => total + Math.max(0,
-    (line.prixCatalogue ?? line.prixUnitaire) * line.quantite - (line.remiseUnitaire ?? 0) * line.quantite - line.montantLigne), 0));
-  const promotions = round2(sale.lignes.reduce((total, line) => total + (line.remiseUnitaire ?? 0) * line.quantite, 0));
-  return { negociee, promotions, total: round2(negociee + promotions) };
+/**
+ * Lignes et totaux du ticket. Le tableau est au prix catalogue (prix avant remise) : sa somme est le « Total brut », la remise
+ * (négociée avec le client + promotions) s'en retranche, et ce qui reste est le « TOTAL NET » à payer. Tout s'additionne donc à
+ * la main, quelle que soit la façon dont les remises ont été accordées.
+ */
+export function totauxDuTicket(sale: Sale) {
+  const lignes = sale.lignes.map((line) => {
+    const prix = line.prixCatalogue ?? line.prixUnitaire;
+    return { ...line, prix, montant: round2(prix * line.quantite) };
+  });
+  const brut = round2(lignes.reduce((total, line) => total + line.montant, 0));
+  const remise = round2(Math.max(0, brut - sale.montantTotal));
+  const pourcentage = brut > 0 ? round2((remise / brut) * 100) : 0;
+  return { lignes, brut, remise, pourcentage };
 }
 
 type ReceiptModalProps = {
@@ -80,9 +89,11 @@ type ReceiptModalProps = {
 
 export default function ReceiptModal({ sale, onClose, duplicata = false }: ReceiptModalProps) {
   const received = sale.montantRecu ?? sale.montantTotal;
-  const paymentLabel = sale.modeReglement ? paymentLabels[sale.modeReglement] : "Paiement";
-  const remises = remisesDeLaVente(sale);
+  const libellePaiement = sale.aCredit ? "Crédit" : sale.modeReglement ? paymentLabels[sale.modeReglement] : "Comptant";
+  const { lignes, brut, remise, pourcentage } = totauxDuTicket(sale);
   const annulee = sale.statut === "ANNULEE";
+  // Une vente à crédit n'a pas d'acompte tant que la caisse n'en enregistre pas : le reste à payer est alors le total.
+  const acompte = sale.aCredit ? Math.min(sale.montantRecu ?? 0, sale.montantTotal) : 0;
   const { entreprise } = useEntreprise();
   // Message de fin de ticket choisi par l'entreprise ; avant le chargement de ses informations, le message d'usage.
   const piedDePage = entreprise ? entreprise.piedDePage : "Merci de votre visite !";
@@ -99,60 +110,58 @@ export default function ReceiptModal({ sale, onClose, duplicata = false }: Recei
         <div id="sales-receipt" className="receipt-content mx-auto max-w-xs font-mono text-[11px] text-slate-800">
           <div className="text-center">
             <EnTeteDocument variante="ticket" />
-            <p className="mt-2 text-[9px] uppercase tracking-[0.2em]">Ticket de vente</p>
             {duplicata && <p className="mt-2 border border-slate-800 py-1 text-xs font-extrabold tracking-[0.3em]">DUPLICATA</p>}
             {annulee && <p className="mt-2 border border-rose-600 py-1 text-xs font-extrabold tracking-[0.2em] text-rose-700">VENTE ANNULÉE</p>}
-            <p className="mt-3 border-y border-dashed border-slate-300 py-2">{sale.code}</p>
-            <p className="mt-1">{formatDateTime(sale.dateVente)}</p>
-            {sale.vendeur && <p className="mt-1">Caissier : {sale.vendeur}</p>}
           </div>
-          <div className="my-4 border-t border-dashed border-slate-300" />
-          <div className="space-y-3">
-            {sale.lignes.map((line, index) => {
-              const negociee = remiseNegocieeUnitaire(line);
-              const catalogue = line.prixCatalogue ?? line.prixUnitaire;
-              return (
-                <div key={`${line.articleId}-${index}`}>
-                  <div className="flex justify-between gap-3">
-                    <span className="min-w-0">{line.designation}</span>
-                    <span className="shrink-0">{money.format(line.montantLigne)}</span>
-                  </div>
-                  <p className="text-[9px] text-slate-500">
-                    {formatQuantite(line.quantite)} × {money.format(line.prixUnitaire)}
-                  </p>
-                  {negociee > 0 && (
-                    <p className="text-[9px] text-slate-500">
-                      Prix catalogue {money.format(catalogue)} · remise négociée −{money.format(negociee)}/u
-                      {" "}(−{formatPercent(round2(negociee / catalogue * 100))} %)
-                    </p>
-                  )}
-                  {(line.remiseUnitaire ?? 0) > 0 && (
-                    <p className="text-[9px] text-slate-500">Promotion −{money.format(line.remiseUnitaire ?? 0)}/u</p>
-                  )}
-                </div>
-              );
-            })}
+          <div className="mt-3 space-y-0.5 border-y border-dashed border-slate-400 py-2">
+            <p className="text-center text-xs font-extrabold">FACTURE N° {sale.code}</p>
+            <p>Date : {formatDateTicket(sale.dateVente)}</p>
+            <p>Client : {sale.client ?? "Client de passage"}</p>
+            <p>Paiement : {libellePaiement}{sale.vendeur ? ` - Vendeur : ${sale.vendeur}` : ""}</p>
           </div>
-          <div className="my-4 border-t border-dashed border-slate-300" />
-          <div className="space-y-1.5">
-            {remises.negociee > 0 && <ReceiptRow label="Remise négociée" value={`−${money.format(remises.negociee)}`} />}
-            {remises.promotions > 0 && <ReceiptRow label="Remise promotions" value={`−${money.format(remises.promotions)}`} />}
-            {remises.total > 0 && <ReceiptRow label="Total des remises" value={`−${money.format(remises.total)}`} />}
-            {sale.tauxTva > 0 && <ReceiptRow label="Sous-total HT" value={money.format(sale.montantHT)} />}
-            {sale.tauxTva > 0 && <ReceiptRow label={`TVA (${sale.tauxTva}%)`} value={money.format(sale.montantTva)} />}
-            <ReceiptRow label={sale.tauxTva > 0 ? "TOTAL TTC" : "TOTAL"} value={money.format(sale.montantTotal)} strong />
+          <table className="mt-3 w-full border-collapse text-[10px] leading-tight">
+            <thead>
+              {/* Fond noir imprimé tel quel : sans « exact », le navigateur retire les fonds à l'impression. */}
+              <tr className="bg-black text-white [-webkit-print-color-adjust:exact] [print-color-adjust:exact]">
+                <th className="px-1 py-1 text-left font-bold">N°</th>
+                <th className="px-1 py-1 text-left font-bold">Produit</th>
+                <th className="px-1 py-1 text-right font-bold">Qté</th>
+                <th className="px-1 py-1 text-right font-bold">Prix</th>
+                <th className="px-1 py-1 text-right font-bold">Montant</th>
+              </tr>
+            </thead>
+            <tbody>
+              {lignes.map((line, index) => (
+                <tr key={`${line.articleId}-${index}`} className="border-b border-slate-400 align-top">
+                  <td className="px-1 py-1">{index + 1}</td>
+                  <td className="px-1 py-1 break-words">{line.designation}</td>
+                  <td className="px-1 py-1 text-right whitespace-nowrap">{quantiteDuTicket(line.quantite)}</td>
+                  <td className="px-1 py-1 text-right whitespace-nowrap">{francs(line.prix)}</td>
+                  <td className="px-1 py-1 text-right font-bold whitespace-nowrap">{francs(line.montant)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div className="mt-3 space-y-1">
+            <ReceiptRow label="Total brut" value={francs(brut)} />
+            <ReceiptRow label={`Remise (${pourcentage.toFixed(1).replace(".", ",")} %)`} value={`−${francs(remise)}`} />
+            <ReceiptRow label="TOTAL NET" value={francs(sale.montantTotal)} strong />
+            {sale.tauxTva > 0 && <ReceiptRow label="dont HT" value={francs(sale.montantHT)} />}
+            {sale.tauxTva > 0 && <ReceiptRow label={`dont TVA (${sale.tauxTva} %)`} value={francs(sale.montantTva)} />}
             {sale.aCredit ? (
-              <ReceiptRow label="Vente à crédit" value="à régler" />
+              <>
+                <ReceiptRow label="Acompte payé" value={francs(acompte)} />
+                <ReceiptRow label="Reste à payer" value={francs(Math.max(0, sale.montantTotal - acompte))} bold />
+              </>
             ) : (
               <>
-                <ReceiptRow label={paymentLabel} value={money.format(received)} />
+                <ReceiptRow label={`Reçu (${libellePaiement})`} value={francs(received)} />
                 {sale.modeReglement === "ESPECES" && (
-                  <ReceiptRow label="Monnaie rendue" value={money.format(Math.max(0, received - sale.montantTotal))} />
+                  <ReceiptRow label="Monnaie rendue" value={francs(Math.max(0, received - sale.montantTotal))} />
                 )}
               </>
             )}
           </div>
-          {sale.client && <p className="mt-4">Client : {sale.client}</p>}
           {piedDePage && <p className="mt-5 text-center text-[9px] text-slate-500">{piedDePage}</p>}
         </div>
         <div className="mt-6 flex gap-3 print:hidden">
@@ -166,11 +175,12 @@ export default function ReceiptModal({ sale, onClose, duplicata = false }: Recei
   );
 }
 
-function ReceiptRow({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
+function ReceiptRow({ label, value, strong = false, bold = false }: { label: string; value: string; strong?: boolean; bold?: boolean }) {
+  const style = strong ? "border-y-2 border-black py-1 text-xs font-extrabold" : bold ? "font-extrabold" : "";
   return (
-    <div className={`flex justify-between gap-3 ${strong ? "border-t border-slate-300 pt-2 text-sm font-extrabold" : ""}`}>
+    <div className={`flex justify-between gap-3 ${style}`}>
       <span>{label}</span>
-      <span>{value}</span>
+      <span className="whitespace-nowrap">{value}</span>
     </div>
   );
 }

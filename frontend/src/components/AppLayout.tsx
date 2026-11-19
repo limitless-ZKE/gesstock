@@ -24,6 +24,8 @@ import {
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { useEntreprise } from "../entreprise/EntrepriseContext";
+import { usePanier } from "../panier/PanierContext";
+import { formatQuantite } from "../lib/quantite";
 import { api } from "../services/api";
 import Marque from "./Marque";
 
@@ -73,6 +75,7 @@ interface CashSession {
 
 export default function AppLayout() {
   const { user, logout } = useAuth();
+  const { nombreArticles } = usePanier();
   const { entreprise, logoUrl } = useEntreprise();
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
@@ -187,7 +190,7 @@ export default function AppLayout() {
                       title={collapsed ? label : undefined}
                       onClick={() => setMobileOpen(false)}
                       className={({ isActive }) =>
-                        `flex h-9 items-center gap-3 rounded-lg border-l-[3px] px-2.5 text-sm transition-colors ${
+                        `relative flex h-9 items-center gap-3 rounded-lg border-l-[3px] px-2.5 text-sm transition-colors ${
                           isActive
                             ? "border-emerald-600 bg-emerald-50 font-semibold text-emerald-800"
                             : "border-transparent font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900"
@@ -196,6 +199,15 @@ export default function AppLayout() {
                     >
                       <Icon size={18} strokeWidth={1.9} className="shrink-0" />
                       {!collapsed && <span className="truncate">{label}</span>}
+                      {/* Une vente commencée reste dans le panier quand on change d'écran : le compteur le rappelle. */}
+                      {to === "/caisse" && nombreArticles > 0 && (
+                        <span
+                          title="Articles en attente dans le panier de vente"
+                          className={`grid h-5 min-w-5 place-items-center rounded-full bg-emerald-600 px-1.5 text-xs font-bold text-white ${collapsed ? "absolute -right-0.5 -top-0.5" : "ml-auto"}`}
+                        >
+                          {formatQuantite(nombreArticles)}
+                        </span>
+                      )}
                     </NavLink>
                   ))}
                 </div>

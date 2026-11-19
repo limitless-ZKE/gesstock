@@ -4,6 +4,7 @@ import com.gesstock.gesstock.entities.*;
 import com.gesstock.gesstock.repositories.*;
 import com.gesstock.gesstock.ventes.dto.*;
 import com.gesstock.gesstock.common.exception.ConflitRessourceException;
+import com.gesstock.gesstock.common.exception.PrixSousLeCoutException;
 import com.gesstock.gesstock.common.exception.RequeteInvalideException;
 import com.gesstock.gesstock.common.exception.RessourceIntrouvableException;
 import com.gesstock.gesstock.stock.CoutMoyenPondere;
@@ -207,7 +208,8 @@ public class GestionVentesService {
         vente.setClient(request.clientId() == null ? null : trouverClient(request.clientId()));
         vente.setLignesVente(new ArrayList<>());
         // Le vendeur fixe librement le prix négocié, quel que soit le taux de remise (décision du client, novembre 2026) :
-        // aucun accord n'est demandé. Une vente sous le prix d'achat est signalée à la validation, sans être bloquée.
+        // aucun accord n'est demandé. En revanche la VALIDATION refuse un prix négocié sous le prix d'achat : le coût moyen
+        // n'est connu qu'à ce moment-là (une entrée en stock peut le changer entre le brouillon et la validation).
         for (LigneDocumentRequest requestLigne : request.lignes()) {
             vente.getLignesVente().add(creerLigneVente(vente, requestLigne));
         }
@@ -220,7 +222,10 @@ public class GestionVentesService {
         return VentesMapper.toResponse(saved);
     }
 
-    /** Valide la vente ; la réponse signale les lignes vendues sous le prix d'achat (la vente passe quand même). */
+    /**
+     * Valide la vente. Refusée (409, rien n'est modifié) si un prix négocié place une ligne sous le prix d'achat ; la réponse
+     * signale encore les lignes vendues sous le prix d'achat sans négociation (promotion), qui, elles, passent.
+     */
     public VenteResponse validerVente(Long id, String username) {
         Vente vente = venteRepository.findByIdForUpdate(id)
             .orElseThrow(() -> new RessourceIntrouvableException("Vente introuvable: " + id));
@@ -459,8 +464,10 @@ public class GestionVentesService {
     }
 
     /**
-     * Sort les articles du stock et valide la vente. Renvoie les avertissements « vendu sous le prix d'achat » : la vente
-     * passe quand même (décision du client), mais elle est notée au journal des opérations pour que le responsable la voie.
+     * Sort les articles du stock et valide la vente. Un prix négocié sous le prix d'achat la fait refuser (voir
+     * {@link #refuserPrixNegociesSousLeCout}). Renvoie les avertissements « vendu sous le prix d'achat » des lignes non
+     * négociées (une promotion qui descend sous le coût) : elles passent, mais sont notées au journal des opérations pour que
+     * le responsable les voie.
      */
     private List<String> validerEtDecrementerStock(Vente vente, String username) {
         LocalDate aujourdHui = LocalDate.now();
@@ -492,6 +499,9 @@ public class GestionVentesService {
             }
             articles.put(articleId, article);
         });
+
+        // Avant de toucher à la vente ou au stock : un refus ne laisse aucune trace.
+        refuserPrixNegociesSousLeCout(vente, articles);
 
         vente.setSessionCaisse(session);
         vente.setVendeur(vendeur);
@@ -532,6 +542,39 @@ public class GestionVentesService {
                 "Vente " + vente.getCode() + " sous le prix d'achat : " + String.join(" ; ", sousLeCout), username);
         }
         return sousLeCout.stream().map(detail -> "Vendu sous le prix d'achat — " + detail).toList();
+    }
+
+    /**
+     * Décision du propriétaire (novembre 2026) : une vente ne se valide pas si un prix négocié, par unité ou pour la ligne
+     * entière, la place sous son prix d'achat. Le prix d'achat est le coût moyen de l'article (le même que celui de la marge et
+     * de l'alerte après coup), multiplié par le facteur de l'unité vendue, au moment de la validation. Un prix égal au coût
+     * passe ; un article au coût encore à 0 ne bloque jamais. Une ligne au prix catalogue, même réduite par une promotion,
+     * n'est pas concernée. Tous les articles fautifs sont cités d'un coup pour que le vendeur corrige en une seule fois.
+     */
+    private void refuserPrixNegociesSousLeCout(Vente vente, Map<Long, Article> articles) {
+        List<String> refus = new ArrayList<>();
+        for (LigneVente ligne : vente.getLignesVente()) {
+            if (!estPrixNegocie(ligne)) {
+                continue;
+            }
+            Article article = articles.get(ligne.getArticle().getId());
+            BigDecimal coutUnitaire = article.getCmp().multiply(facteurDe(ligne)).setScale(4, RoundingMode.HALF_UP);
+            BigDecimal coutLigne = Quantites.montant(coutUnitaire, ligne.getQuantite());
+            if (ligne.getMontantLigne().compareTo(coutLigne) < 0) {
+                refus.add(article.getReference() + " « " + article.getDesignation() + " » : " + montantLisible(ligne.getMontantLigne())
+                    + " proposé pour " + Quantites.texte(ligne.getQuantite()) + ", minimum " + montantLisible(coutLigne));
+            }
+        }
+        if (!refus.isEmpty()) {
+            throw new PrixSousLeCoutException("Prix négocié sous le prix d'achat : la vente n'est pas validée. "
+                + "Relevez le prix négocié de " + String.join(" ; ", refus));
+        }
+    }
+
+    /** Une ligne est négociée quand son prix unitaire est inférieur au prix catalogue relevé à la création de la ligne. */
+    private static boolean estPrixNegocie(LigneVente ligne) {
+        return ligne.getPrixCatalogue() != null && ligne.getPrixUnitaire() != null
+            && ligne.getPrixUnitaire().compareTo(ligne.getPrixCatalogue()) < 0;
     }
 
     /** 150000.0000 -> « 150000 », 1234.5000 -> « 1234,5 » : un montant lisible dans un message au vendeur. */
