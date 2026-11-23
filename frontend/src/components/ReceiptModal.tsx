@@ -1,4 +1,4 @@
-import { CheckCircle2, Printer, X } from "lucide-react";
+﻿import { CheckCircle2, Printer, X } from "lucide-react";
 import { useEntreprise } from "../entreprise/EntrepriseContext";
 import { imprimer } from "../lib/impression";
 import { formatQuantite } from "../lib/quantite";
@@ -72,7 +72,11 @@ const round2 = (value: number) => Math.round((value + Number.EPSILON) * 100) / 1
 export function totauxDuTicket(sale: Sale) {
   const lignes = sale.lignes.map((line) => {
     const prix = line.prixCatalogue ?? line.prixUnitaire;
-    return { ...line, prix, montant: round2(prix * line.quantite) };
+    const montant = round2(prix * line.quantite);
+    const remisePromo = line.remiseUnitaire != null && line.remiseUnitaire > 0 ? round2(line.remiseUnitaire * line.quantite) : 0;
+    const remiseEcart = round2(Math.max(0, montant - line.montantLigne));
+    const remiseLigne = round2(Math.min(montant, Math.max(remiseEcart, remisePromo)));
+    return { ...line, prix, montant, remiseLigne };
   });
   const brut = round2(lignes.reduce((total, line) => total + line.montant, 0));
   const remise = round2(Math.max(0, brut - sale.montantTotal));
@@ -99,7 +103,7 @@ export default function ReceiptModal({ sale, onClose, duplicata = false }: Recei
   const piedDePage = entreprise ? entreprise.piedDePage : "Merci de votre visite !";
   return (
     <ZoneImpression cible="sales-receipt">
-      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl print:max-w-none print:rounded-none print:p-0 print:shadow-none">
+      <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl print:max-w-none print:rounded-none print:p-0 print:shadow-none">
         <div className="mb-5 flex items-center justify-between print:hidden">
           <div className="flex items-center gap-2 text-emerald-700">
             <CheckCircle2 size={20} />
@@ -107,7 +111,7 @@ export default function ReceiptModal({ sale, onClose, duplicata = false }: Recei
           </div>
           <button onClick={onClose} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100" aria-label="Fermer"><X size={18} /></button>
         </div>
-        <div id="sales-receipt" className="receipt-content mx-auto max-w-xs font-mono text-[11px] text-slate-800">
+        <div id="sales-receipt" className="receipt-content mx-auto max-w-sm font-mono text-[11px] text-slate-800">
           <div className="text-center">
             <EnTeteDocument variante="ticket" />
             {duplicata && <p className="mt-2 border border-slate-800 py-1 text-xs font-extrabold tracking-[0.3em]">DUPLICATA</p>}
@@ -119,25 +123,27 @@ export default function ReceiptModal({ sale, onClose, duplicata = false }: Recei
             <p>Client : {sale.client ?? "Client de passage"}</p>
             <p>Paiement : {libellePaiement}{sale.vendeur ? ` - Vendeur : ${sale.vendeur}` : ""}</p>
           </div>
-          <table className="mt-3 w-full border-collapse text-[10px] leading-tight">
+          <table className="mt-3 w-full border-collapse border border-slate-800 text-[9.5px] leading-tight">
             <thead>
               {/* Fond noir imprimé tel quel : sans « exact », le navigateur retire les fonds à l'impression. */}
               <tr className="bg-black text-white [-webkit-print-color-adjust:exact] [print-color-adjust:exact]">
-                <th className="px-1 py-1 text-left font-bold">N°</th>
-                <th className="px-1 py-1 text-left font-bold">Produit</th>
-                <th className="px-1 py-1 text-right font-bold">Qté</th>
-                <th className="px-1 py-1 text-right font-bold">Prix</th>
-                <th className="px-1 py-1 text-right font-bold">Montant</th>
+                <th className="border border-slate-800 px-1 py-1 text-left font-bold">N°</th>
+                <th className="border border-slate-800 px-1 py-1 text-left font-bold">Produit</th>
+                <th className="border border-slate-800 px-1 py-1 text-right font-bold">Qté</th>
+                <th className="border border-slate-800 px-1 py-1 text-right font-bold">Prix</th>
+                <th className="border border-slate-800 px-1 py-1 text-right font-bold">Remise</th>
+                <th className="border border-slate-800 px-1 py-1 text-right font-bold">Montant</th>
               </tr>
             </thead>
             <tbody>
               {lignes.map((line, index) => (
-                <tr key={`${line.articleId}-${index}`} className="border-b border-slate-400 align-top">
-                  <td className="px-1 py-1">{index + 1}</td>
-                  <td className="px-1 py-1 break-words">{line.designation}</td>
-                  <td className="px-1 py-1 text-right whitespace-nowrap">{quantiteDuTicket(line.quantite)}</td>
-                  <td className="px-1 py-1 text-right whitespace-nowrap">{francs(line.prix)}</td>
-                  <td className="px-1 py-1 text-right font-bold whitespace-nowrap">{francs(line.montant)}</td>
+                <tr key={`${line.articleId}-${index}`} className="border border-slate-800 align-top">
+                  <td className="border border-slate-800 px-1 py-1">{index + 1}</td>
+                  <td className="border border-slate-800 px-1 py-1 break-words">{line.designation}</td>
+                  <td className="border border-slate-800 px-1 py-1 text-right whitespace-nowrap">{quantiteDuTicket(line.quantite)}</td>
+                  <td className="border border-slate-800 px-1 py-1 text-right whitespace-nowrap">{francs(line.prix)}</td>
+                  <td className="border border-slate-800 px-1 py-1 text-right whitespace-nowrap">{francs(line.remiseLigne)}</td>
+                  <td className="border border-slate-800 px-1 py-1 text-right font-bold whitespace-nowrap">{francs(line.montant)}</td>
                 </tr>
               ))}
             </tbody>

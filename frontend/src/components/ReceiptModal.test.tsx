@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+﻿import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useEntreprise, type Entreprise } from "../entreprise/EntrepriseContext";
@@ -13,15 +13,46 @@ vi.mock("../entreprise/EntrepriseContext", async (importOriginal) => ({
 }));
 
 const ENTREPRISE: Entreprise = {
-  nom: "Baobab SARL", adresse: "12 rue du Marché, Dakar", telephone: "+221 33 800 00 00", email: null,
-  identifiantLegal: "RCCM SN-DKR-2020-B-1234", siteWeb: null, piedDePage: "À bientôt chez Baobab !", logoSurTickets: true,
-  logo: { empreinte: "empreinte-1", largeur: 600, hauteur: 200 }, misAJourLe: "2026-10-08T10:00:00", misAJourPar: "admin",
+  nom: "Baobab SARL",
+  adresse: "12 rue du Marché, Dakar",
+  telephone: "+221 33 800 00 00",
+  email: null,
+  identifiantLegal: "RCCM SN-DKR-2020-B-1234",
+  siteWeb: null,
+  piedDePage: "À bientôt chez Baobab !",
+  logoSurTickets: true,
+  logo: { empreinte: "empreinte-1", largeur: 600, hauteur: 200 },
+  misAJourLe: "2026-10-08T10:00:00",
+  misAJourPar: "admin",
 };
 
 const VENTE: Sale = {
-  id: 1, code: "VTE-0001", dateVente: "2026-10-08T10:30:00", statut: "VALIDEE", client: null, vendeur: "caissier", aCredit: false,
-  montantTotal: 2000, montantHT: 2000, montantTva: 0, tauxTva: 0, modeReglement: "ESPECES", montantRecu: 2000,
-  lignes: [{ articleId: 1, reference: "ALIM-001", designation: "Riz local", quantite: 2, prixUnitaire: 1000, montantLigne: 2000, promotionId: null, remiseUnitaire: null, prixCatalogue: 1000 }],
+  id: 1,
+  code: "VTE-0001",
+  dateVente: "2026-10-08T10:30:00",
+  statut: "VALIDEE",
+  client: null,
+  vendeur: "caissier",
+  aCredit: false,
+  montantTotal: 2000,
+  montantHT: 2000,
+  montantTva: 0,
+  tauxTva: 0,
+  modeReglement: "ESPECES",
+  montantRecu: 2000,
+  lignes: [
+    {
+      articleId: 1,
+      reference: "ALIM-001",
+      designation: "Riz local",
+      quantite: 2,
+      prixUnitaire: 1000,
+      montantLigne: 2000,
+      promotionId: null,
+      remiseUnitaire: null,
+      prixCatalogue: 1000,
+    },
+  ],
 };
 
 function afficher(entreprise: Entreprise | null, vente: Sale = VENTE, duplicata = false) {
@@ -29,19 +60,50 @@ function afficher(entreprise: Entreprise | null, vente: Sale = VENTE, duplicata 
   render(<ReceiptModal sale={vente} onClose={vi.fn()} duplicata={duplicata} />);
 }
 
-const ligne = (articleId: number, designation: string, quantite: number, prixCatalogue: number, montantLigne: number, remiseUnitaire: number | null = null) => ({
-  articleId, reference: `REF-${articleId}`, designation, quantite, prixUnitaire: prixCatalogue, montantLigne, promotionId: null, remiseUnitaire, prixCatalogue,
+const ligne = (
+  articleId: number,
+  designation: string,
+  quantite: number,
+  prixCatalogue: number,
+  montantLigne: number,
+  remiseUnitaire: number | null = null,
+) => ({
+  articleId,
+  reference: `REF-${articleId}`,
+  designation,
+  quantite,
+  prixUnitaire: prixCatalogue,
+  montantLigne,
+  promotionId: null,
+  remiseUnitaire,
+  prixCatalogue,
 });
 
 /** La vente de la facture papier de référence : 11 lignes, 106 800 F, aucune remise. */
 const FACTURE_BERU: Sale = {
-  ...VENTE, id: 333, code: "333", dateVente: "2026-11-17T14:50:13", client: "ALEX", vendeur: "Admin", aCredit: true, modeReglement: null, montantRecu: null,
-  montantTotal: 106800, montantHT: 106800,
+  ...VENTE,
+  id: 333,
+  code: "333",
+  dateVente: "2026-11-17T14:50:13",
+  client: "ALEX",
+  vendeur: "Admin",
+  aCredit: true,
+  modeReglement: null,
+  montantRecu: null,
+  montantTotal: 106800,
+  montantHT: 106800,
   lignes: [
-    ligne(1, "Sangria Forte", 1, 13500, 13500), ligne(2, "3X PM", 1, 9000, 9000), ligne(3, "Malta", 2, 7800, 15600),
-    ligne(4, "Cocktail", 2, 7800, 15600), ligne(5, "Desperado", 1, 13000, 13000), ligne(6, "Becker's", 1, 10000, 10000),
-    ligne(7, "Alomo", 2, 1900, 3800), ligne(8, "Sun Set Max GM", 0.5, 12000, 6000), ligne(9, "Voltic 1,5l", 1, 3400, 3400),
-    ligne(10, "Vitale 1,5l", 1, 3400, 3400), ligne(11, "Vody", 1, 13500, 13500),
+    ligne(1, "Sangria Forte", 1, 13500, 13500),
+    ligne(2, "3X PM", 1, 9000, 9000),
+    ligne(3, "Malta", 2, 7800, 15600),
+    ligne(4, "Cocktail", 2, 7800, 15600),
+    ligne(5, "Desperado", 1, 13000, 13000),
+    ligne(6, "Becker's", 1, 10000, 10000),
+    ligne(7, "Alomo", 2, 1900, 3800),
+    ligne(8, "Sun Set Max GM", 0.5, 12000, 6000),
+    ligne(9, "Voltic 1,5l", 1, 3400, 3400),
+    ligne(10, "Vitale 1,5l", 1, 3400, 3400),
+    ligne(11, "Vody", 1, 13500, 13500),
   ],
 };
 
@@ -71,7 +133,7 @@ describe("ticket de vente", () => {
     afficher(null);
     const ticket = document.getElementById("sales-receipt")!;
     expect(ticket).toHaveTextContent("Merci de votre visite !");
-    expect(ticket).toHaveTextContent("VTE-0001");   // le ticket reste imprimable, sans en-tête personnalisé
+    expect(ticket).toHaveTextContent("VTE-0001");
   });
 
   it("imprime le ticket après le chargement de son logo", async () => {
@@ -99,12 +161,26 @@ describe("mise en page du ticket : en-tête, tableau, totaux", () => {
     expect(document.getElementById("sales-receipt")).toHaveTextContent("Paiement : Espèces - Vendeur : caissier");
   });
 
-  it("présente les articles en tableau N° / Produit / Qté / Prix / Montant", () => {
+  it("présente les articles en tableau N° / Produit / Qté / Prix / Remise / Montant", () => {
     afficher(ENTREPRISE, FACTURE_BERU);
-    expect(screen.getAllByRole("columnheader").map((cellule) => cellule.textContent)).toEqual(["N°", "Produit", "Qté", "Prix", "Montant"]);
+    expect(screen.getAllByRole("columnheader").map((cellule) => cellule.textContent)).toEqual([
+      "N°",
+      "Produit",
+      "Qté",
+      "Prix",
+      "Remise",
+      "Montant",
+    ]);
     const lignes = screen.getAllByRole("row").slice(1);
     expect(lignes).toHaveLength(11);
-    expect(Array.from(lignes[2].querySelectorAll("td")).map((cellule) => cellule.textContent?.replace(/\s/g, " "))).toEqual(["3", "Malta", "2,0", "7 800 F", "15 600 F"]);
+    expect(Array.from(lignes[2].querySelectorAll("td")).map((cellule) => cellule.textContent?.replace(/\s/g, " "))).toEqual([
+      "3",
+      "Malta",
+      "2,0",
+      "7 800 F",
+      "0 F",
+      "15 600 F",
+    ]);
     expect(lignes[7]).toHaveTextContent("Sun Set Max GM");
     expect(lignes[7]).toHaveTextContent("0,5");
     expect(lignes[7]).toHaveTextContent("6 000 F");
@@ -121,11 +197,16 @@ describe("mise en page du ticket : en-tête, tableau, totaux", () => {
   });
 
   it("retranche la remise du total brut : le tableau est au prix catalogue", () => {
-    // 2 riz au catalogue à 1 000 vendus 800 pièce, plus 1 huile à 3 500 en promotion à 3 000
-    const vente: Sale = { ...VENTE, montantTotal: 4600, montantHT: 4600, montantRecu: 5000, lignes: [
-      { ...ligne(1, "Riz local", 2, 1000, 1600) },
-      { ...ligne(2, "Huile 5 l", 1, 3500, 3000, 500) },
-    ] };
+    const vente: Sale = {
+      ...VENTE,
+      montantTotal: 4600,
+      montantHT: 4600,
+      montantRecu: 5000,
+      lignes: [
+        { ...ligne(1, "Riz local", 2, 1000, 1600) },
+        { ...ligne(2, "Huile 5 l", 1, 3500, 3000, 500) },
+      ],
+    };
 
     expect(totauxDuTicket(vente)).toMatchObject({ brut: 5500, remise: 900, pourcentage: 16.36 });
     afficher(ENTREPRISE, vente);
