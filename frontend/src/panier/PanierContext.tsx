@@ -23,6 +23,8 @@ export type Article = {
   categorieId: number | null;
   categorie: string | null;
   uniteMesure: string | null;
+  /** Coût moyen (prix d'achat) fourni par le catalogue : sert à prévenir dès la saisie d'un prix négocié trop bas. Absent d'un panier gardé avant sa mise en phase avec le catalogue. */
+  coutMoyen?: number | null;
 };
 
 // prixNegocie : prix convenu avec le client par unité (texte saisi) ; vide = prix catalogue.

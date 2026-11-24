@@ -65,20 +65,19 @@ function formatDateTicket(value: string) {
 const round2 = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
 
 /**
- * Lignes et totaux du ticket. Le tableau est au prix catalogue (prix avant remise) : sa somme est le « Total brut », la remise
- * (négociée avec le client + promotions) s'en retranche, et ce qui reste est le « TOTAL NET » à payer. Tout s'additionne donc à
- * la main, quelle que soit la façon dont les remises ont été accordées.
+ * Lignes et totaux du ticket. Chaque ligne montre ce que le client paie vraiment : le « Prix » est le prix appliqué (le prix
+ * négocié, ou le prix après promotion ; pour un total négocié, ce total divisé par la quantité) et le « Montant » est le montant
+ * de la ligne, de sorte que Prix × Qté retombe sur le Montant. La somme des montants est donc le « TOTAL NET ». Le « Total
+ * brut » reste le total au prix catalogue (avant toute remise) : la différence est la ligne « Remise ».
  */
 export function totauxDuTicket(sale: Sale) {
-  const lignes = sale.lignes.map((line) => {
-    const prix = line.prixCatalogue ?? line.prixUnitaire;
-    const montant = round2(prix * line.quantite);
-    const remisePromo = line.remiseUnitaire != null && line.remiseUnitaire > 0 ? round2(line.remiseUnitaire * line.quantite) : 0;
-    const remiseEcart = round2(Math.max(0, montant - line.montantLigne));
-    const remiseLigne = round2(Math.min(montant, Math.max(remiseEcart, remisePromo)));
-    return { ...line, prix, montant, remiseLigne };
-  });
-  const brut = round2(lignes.reduce((total, line) => total + line.montant, 0));
+  const lignes = sale.lignes.map((line) => ({
+    ...line,
+    prix: line.quantite > 0 ? round2(line.montantLigne / line.quantite) : line.prixUnitaire,
+    montant: line.montantLigne,
+    montantCatalogue: round2((line.prixCatalogue ?? line.prixUnitaire) * line.quantite),
+  }));
+  const brut = round2(lignes.reduce((total, line) => total + line.montantCatalogue, 0));
   const remise = round2(Math.max(0, brut - sale.montantTotal));
   const pourcentage = brut > 0 ? round2((remise / brut) * 100) : 0;
   return { lignes, brut, remise, pourcentage };
@@ -131,7 +130,6 @@ export default function ReceiptModal({ sale, onClose, duplicata = false }: Recei
                 <th className="border border-slate-800 px-1 py-1 text-left font-bold">Produit</th>
                 <th className="border border-slate-800 px-1 py-1 text-right font-bold">Qté</th>
                 <th className="border border-slate-800 px-1 py-1 text-right font-bold">Prix</th>
-                <th className="border border-slate-800 px-1 py-1 text-right font-bold">Remise</th>
                 <th className="border border-slate-800 px-1 py-1 text-right font-bold">Montant</th>
               </tr>
             </thead>
@@ -142,7 +140,6 @@ export default function ReceiptModal({ sale, onClose, duplicata = false }: Recei
                   <td className="border border-slate-800 px-1 py-1 break-words">{line.designation}</td>
                   <td className="border border-slate-800 px-1 py-1 text-right whitespace-nowrap">{quantiteDuTicket(line.quantite)}</td>
                   <td className="border border-slate-800 px-1 py-1 text-right whitespace-nowrap">{francs(line.prix)}</td>
-                  <td className="border border-slate-800 px-1 py-1 text-right whitespace-nowrap">{francs(line.remiseLigne)}</td>
                   <td className="border border-slate-800 px-1 py-1 text-right font-bold whitespace-nowrap">{francs(line.montant)}</td>
                 </tr>
               ))}

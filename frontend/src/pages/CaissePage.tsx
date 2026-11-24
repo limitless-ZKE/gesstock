@@ -99,6 +99,31 @@ function negotiatedLineTotal(line: CartLine): number | null {
   return negotiatedTotalError(line) === null ? parseNegotiatedPrice(line.totalNegocie) : null;
 }
 
+/**
+ * Alerte « sous le prix d'achat » d'une ligne, ou null. Même règle que le serveur à la validation : une ligne négociée (prix ou
+ * total inférieur au catalogue) dont le montant final est inférieur au coût moyen × la quantité. Le prix égal au coût passe, une
+ * ligne au prix catalogue n'est jamais concernée (même réduite par une promotion), un coût inconnu ou nul ne bloque jamais. Le
+ * serveur reste juge : il refuse aussi si le coût a changé depuis le chargement du catalogue.
+ */
+function alerteSousLeCout(line: CartLine, promotions: Promotion[]): string | null {
+  const cout = line.article.coutMoyen ?? 0;
+  if (cout <= 0) return null;
+  const total = negotiatedLineTotal(line);
+  const prix = negotiatedPriceError(line) === null ? parseNegotiatedPrice(line.prixNegocie) : null;
+  const negocie = total !== null ? total < catalogueTotal(line) : prix !== null && prix < line.article.prixVente;
+  if (!negocie) return null;
+  const coutUnitaire = round4(cout);
+  const minimum = round4(coutUnitaire * line.quantite);
+  const montant = lineAmount(line, promotions);
+  if (montant >= minimum) return null;
+  if (total !== null) return `Total négocié sous le prix d'achat : minimum ${currency.format(minimum)}.`;
+  const taux = promotionOf(line, promotions)?.pourcentage ?? 0;
+  if (taux > 0) {
+    return `Avec la remise de ${taux} %, la ligne revient à ${currency.format(montant)}, sous le prix d'achat (minimum ${currency.format(minimum)}) : relevez le prix négocié.`;
+  }
+  return `Prix négocié sous le prix d'achat : minimum ${currency.format(coutUnitaire)} par unité.`;
+}
+
 function promotionOf(line: CartLine, promotions: Promotion[]) {
   return line.promotionId == null
     ? bestPromotion(line.article.id, promotions)
@@ -326,6 +351,14 @@ export default function CaissePage() {
     if (!session) {
       showNotice("Ouvrez une session de caisse avant d’encaisser une vente.", true);
       return;
+    }
+    // Un prix négocié sous le prix d'achat serait refusé par le serveur : on le dit avant d'ouvrir l'encaissement.
+    for (const line of cart) {
+      const alerte = alerteSousLeCout(line, promotions);
+      if (alerte) {
+        showNotice(`« ${line.article.designation} » : ${alerte} Corrigez le prix dans le panier avant d'encaisser.`, true);
+        return;
+      }
     }
     setPaymentMode("ESPECES");
     setAmountReceived(String(cartTotals.total));
@@ -587,6 +620,7 @@ export default function CaissePage() {
                 const negotiationError = negotiatedPriceError(line);
                 const totalError = negotiatedTotalError(line);
                 const lineTotal = negotiatedLineTotal(line);
+                const sousLeCout = negotiationError || totalError ? null : alerteSousLeCout(line, promotions);
                 const negotiatedDiscount = round2(line.article.prixVente - basePrice(line));
                 const amount = lineAmount(line, promotions);
                 const unitPrice = amount / line.quantite;
@@ -627,7 +661,8 @@ export default function CaissePage() {
                         onChange={(event) => setCart((current) => current.map((entry) => entry.article.id === line.article.id
                           ? { ...entry, prixNegocie: event.target.value, totalNegocie: "" }
                           : entry))}
-                        className={`input-field h-8 min-w-0 flex-1 text-right text-xs ${negotiationError ? "border-rose-300" : ""}`}
+                        aria-invalid={negotiationError || (sousLeCout && line.prixNegocie.trim() !== "") ? true : undefined}
+                        className={`input-field h-8 min-w-0 flex-1 text-right text-xs ${negotiationError || (sousLeCout && line.prixNegocie.trim() !== "") ? "border-rose-300" : ""}`}
                       />
                     </label>
                     <label className="mt-2 flex items-center gap-2 text-xs font-semibold text-slate-600">
@@ -643,11 +678,12 @@ export default function CaissePage() {
                         onChange={(event) => setCart((current) => current.map((entry) => entry.article.id === line.article.id
                           ? { ...entry, totalNegocie: event.target.value, prixNegocie: "" }
                           : entry))}
-                        className={`input-field h-8 min-w-0 flex-1 text-right text-xs ${totalError ? "border-rose-300" : ""}`}
+                        aria-invalid={totalError || (sousLeCout && line.totalNegocie.trim() !== "") ? true : undefined}
+                        className={`input-field h-8 min-w-0 flex-1 text-right text-xs ${totalError || (sousLeCout && line.totalNegocie.trim() !== "") ? "border-rose-300" : ""}`}
                       />
                     </label>
-                    {negotiationError || totalError
-                      ? <p role="alert" className="mt-1 text-xs font-semibold text-rose-600">{negotiationError ?? totalError}</p>
+                    {negotiationError || totalError || sousLeCout
+                      ? <p role="alert" className="mt-1 text-xs font-semibold text-rose-600">{negotiationError ?? totalError ?? sousLeCout}</p>
                       : lineTotal !== null && lineDiscount > 0 ? (
                         <p className="mt-1 text-xs font-semibold text-emerald-700">
                           Remise sur la ligne : −{money2.format(lineDiscount)}

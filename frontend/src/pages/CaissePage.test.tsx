@@ -440,3 +440,88 @@ describe("brouillon gardé après un échec de validation", () => {
     expect(brouillonsCrees()[1][1]).toEqual(expect.objectContaining({ lignes: [expect.objectContaining({ quantite: 2 })] }));
   });
 });
+
+describe("alerte dès la saisie d'un prix négocié sous le prix d'achat", () => {
+  /** Le catalogue de la caisse, avec le coût moyen que l'API lui envoie déjà pour chaque article. */
+  function catalogueAvecCout(coutMoyen: number | null) {
+    vi.mocked(api.get).mockImplementation(async (url: string) => {
+      if (url === "/caisse/parametres") return { data: { tauxTva: 0, prixTtc: false } };
+      if (url === "/articles") return { data: [{ ...riz, coutMoyen }] };
+      if (url === "/articles/categories" || url === "/promotions") return { data: [] };
+      if (url === "/clients") return { data: CLIENTS };
+      if (url === "/referentiels/sessions-caisse/ouverte") return { data: session };
+      throw new Error(`appel inattendu : ${url}`);
+    });
+  }
+
+  it("prévient pendant la frappe et donne le minimum par unité", async () => {
+    catalogueAvecCout(700);
+    const utilisateur = await remplirLePanier();
+    const prix = screen.getByLabelText("Prix négocié pour Riz 25 kg");
+
+    await utilisateur.type(prix, "600");
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/Prix négocié sous le prix d.achat : minimum 700.* par unité/);
+    expect(prix).toBeInvalid();
+  });
+
+  it("laisse passer un prix égal au coût, et signale le centime en dessous", async () => {
+    catalogueAvecCout(700);
+    const utilisateur = await remplirLePanier();
+    const prix = screen.getByLabelText("Prix négocié pour Riz 25 kg");
+
+    await utilisateur.type(prix, "699.99");
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+
+    await utilisateur.clear(prix);
+    await utilisateur.type(prix, "700");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(prix).toBeValid();
+  });
+
+  it("contrôle aussi le total négocié de la ligne, au coût de toutes les unités", async () => {
+    catalogueAvecCout(700);
+    const utilisateur = await remplirLePanier();
+    await utilisateur.click(screen.getByRole("button", { name: "Augmenter quantité" })); // 2 sacs : coût 1 400
+    const total = screen.getByLabelText("Total négocié pour Riz 25 kg");
+
+    await utilisateur.type(total, "1300");
+    expect(await screen.findByRole("alert")).toHaveTextContent(/Total négocié sous le prix d.achat : minimum 1 400/);
+
+    await utilisateur.clear(total);
+    await utilisateur.type(total, "1400");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("n'alerte pas quand le coût est inconnu ou nul, ni quand le prix reste celui du catalogue", async () => {
+    catalogueAvecCout(null);
+    const utilisateur = await remplirLePanier();
+    await utilisateur.type(screen.getByLabelText("Prix négocié pour Riz 25 kg"), "1");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("n'alerte jamais une ligne au prix catalogue, même si le catalogue est sous le coût", async () => {
+    catalogueAvecCout(1500);
+    const utilisateur = await remplirLePanier();
+    await utilisateur.type(screen.getByLabelText("Prix négocié pour Riz 25 kg"), "1000");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("refuse d'ouvrir l'encaissement tant que la ligne est sous le prix d'achat, sans rien envoyer au serveur", async () => {
+    catalogueAvecCout(700);
+    const utilisateur = await remplirLePanier();
+    const prix = screen.getByLabelText("Prix négocié pour Riz 25 kg");
+    await utilisateur.type(prix, "600");
+
+    await utilisateur.click(screen.getByRole("button", { name: /^Encaisser/ }));
+
+    expect(await screen.findByText(/Corrigez le prix dans le panier avant d.encaisser/)).toHaveTextContent("Riz 25 kg");
+    expect(screen.queryByRole("button", { name: "Valider et encaisser" })).not.toBeInTheDocument();
+    expect(api.post).not.toHaveBeenCalled();
+
+    await utilisateur.clear(prix);
+    await utilisateur.type(prix, "700");
+    await utilisateur.click(screen.getByRole("button", { name: /^Encaisser/ }));
+    expect(await screen.findByRole("button", { name: "Valider et encaisser" })).toBeInTheDocument();
+  });
+});
